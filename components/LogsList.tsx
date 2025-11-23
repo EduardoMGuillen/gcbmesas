@@ -24,6 +24,10 @@ const actionLabels: Record<LogAction, string> = {
   LOGOUT: 'Cierre de Sesión',
 }
 
+function getActionLabel(action: string): string {
+  return actionLabels[action as LogAction] || action
+}
+
 export function LogsList({ initialLogs }: LogsListProps) {
   const [logs] = useState(initialLogs)
   const [filter, setFilter] = useState({
@@ -39,7 +43,7 @@ export function LogsList({ initialLogs }: LogsListProps) {
     const headers = ['Fecha', 'Acción', 'Usuario', 'Mesa', 'Detalles']
     const rows = filteredLogs.map((log) => [
       formatDate(log.createdAt),
-      actionLabels[log.action] || log.action,
+      getActionLabel(log.action),
       log.user?.username || 'N/A',
       log.table?.name || 'N/A',
       JSON.stringify(log.details || {}),
@@ -133,7 +137,7 @@ export function LogsList({ initialLogs }: LogsListProps) {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary-500/20 text-primary-400">
-                        {actionLabels[log.action] || log.action}
+                        {getActionLabel(log.action)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
