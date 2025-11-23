@@ -30,8 +30,10 @@ export default function ScanPage() {
   const handleQRScan = () => {
     // This would integrate with a QR scanner library
     // For now, we'll use manual input
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    if (typeof window !== 'undefined' && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
       // QR scanner implementation would go here
+      alert('Funcionalidad de escaneo QR se implementará con una librería como html5-qrcode')
+    } else {
       alert('Funcionalidad de escaneo QR se implementará con una librería como html5-qrcode')
     }
   }
