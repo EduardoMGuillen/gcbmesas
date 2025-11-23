@@ -1,0 +1,350 @@
+'use client'
+
+import { useState } from 'react'
+import {
+  createProduct,
+  updateProduct,
+  deactivateProduct,
+} from '@/lib/actions'
+import { formatCurrency } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
+
+interface ProductsListProps {
+  initialProducts: any[]
+}
+
+export function ProductsList({ initialProducts }: ProductsListProps) {
+  const [products, setProducts] = useState(initialProducts)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [formData, setFormData] = useState({
+    name: '',
+    price: '',
+    category: '',
+  })
+  const router = useRouter()
+
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      const price = parseFloat(formData.price)
+      if (isNaN(price) || price <= 0) {
+        setError('El precio debe ser mayor a 0')
+        setLoading(false)
+        return
+      }
+
+      const newProduct = await createProduct({
+        name: formData.name,
+        price,
+        category: formData.category || undefined,
+      })
+      setProducts([...products, newProduct])
+      setShowCreateModal(false)
+      setFormData({ name: '', price: '', category: '' })
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || 'Error al crear producto')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      const updateData: any = {}
+      if (formData.name) updateData.name = formData.name
+      if (formData.price) {
+        const price = parseFloat(formData.price)
+        if (isNaN(price) || price <= 0) {
+          setError('El precio debe ser mayor a 0')
+          setLoading(false)
+          return
+        }
+        updateData.price = price
+      }
+      if (formData.category !== undefined) updateData.category = formData.category
+
+      const updatedProduct = await updateProduct(editingProduct.id, updateData)
+      setProducts(
+        products.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
+      )
+      setEditingProduct(null)
+      setFormData({ name: '', price: '', category: '' })
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || 'Error al actualizar producto')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeactivate = async (productId: string) => {
+    if (!confirm('¿Estás seguro de desactivar este producto?')) {
+      return
+    }
+
+    try {
+      await deactivateProduct(productId)
+      setProducts(
+        products.map((p) =>
+          p.id === productId ? { ...p, isActive: false } : p
+        )
+      )
+      router.refresh()
+    } catch (err: any) {
+      alert(err.message || 'Error al desactivar producto')
+    }
+  }
+
+  const openEditModal = (product: any) => {
+    setEditingProduct(product)
+    setFormData({
+      name: product.name,
+      price: product.price.toString(),
+      category: product.category || '',
+    })
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-white mb-2">Inventario</h1>
+          <p className="text-dark-400">
+            Gestiona los productos del menú
+          </p>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+        >
+          Crear Producto
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-6 bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {products.map((product) => (
+          <div
+            key={product.id}
+            className={`bg-dark-100 border rounded-xl p-6 ${
+              product.isActive
+                ? 'border-dark-200'
+                : 'border-red-500/50 opacity-60'
+            }`}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-semibold text-white mb-1">
+                  {product.name}
+                </h3>
+                {product.category && (
+                  <p className="text-sm text-dark-400">
+                    {product.category}
+                  </p>
+                )}
+              </div>
+              <div
+                className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                  product.isActive
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-red-500/20 text-red-400'
+                }`}
+              >
+                {product.isActive ? 'Activo' : 'Inactivo'}
+              </div>
+            </div>
+
+            <p className="text-2xl font-bold text-primary-400 mb-4">
+              {formatCurrency(product.price)}
+            </p>
+
+            <div className="flex space-x-2">
+              <button
+                onClick={() => openEditModal(product)}
+                className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+              >
+                Editar
+              </button>
+              {product.isActive && (
+                <button
+                  onClick={() => handleDeactivate(product.id)}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                >
+                  Desactivar
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-dark-100 border border-dark-200 rounded-xl p-6 max-w-md w-full">
+            <h2 className="text-2xl font-semibold text-white mb-4">
+              Crear Producto
+            </h2>
+            <form onSubmit={handleCreateProduct} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Nombre
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  required
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Precio
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.price}
+                  onChange={(e) =>
+                    setFormData({ ...formData, price: e.target.value })
+                  }
+                  required
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Categoría (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Bebidas, Comida, etc."
+                />
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false)
+                    setError('')
+                    setFormData({ name: '', price: '', category: '' })
+                  }}
+                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Creando...' : 'Crear'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-dark-100 border border-dark-200 rounded-xl p-6 max-w-md w-full">
+            <h2 className="text-2xl font-semibold text-white mb-4">
+              Editar Producto
+            </h2>
+            <form onSubmit={handleUpdateProduct} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Nombre
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  required
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Precio
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.price}
+                  onChange={(e) =>
+                    setFormData({ ...formData, price: e.target.value })
+                  }
+                  required
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Categoría
+                </label>
+                <input
+                  type="text"
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingProduct(null)
+                    setError('')
+                    setFormData({ name: '', price: '', category: '' })
+                  }}
+                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+

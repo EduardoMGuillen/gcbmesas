@@ -1,0 +1,133 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MESERO
+  CAJERO
+}
+
+enum AccountStatus {
+  OPEN
+  CLOSED
+}
+
+enum LogAction {
+  ACCOUNT_OPENED
+  ACCOUNT_CLOSED
+  ORDER_CREATED
+  ORDER_CANCELLED
+  PRODUCT_ADDED
+  PRODUCT_UPDATED
+  PRODUCT_DEACTIVATED
+  TABLE_CREATED
+  TABLE_UPDATED
+  USER_CREATED
+  USER_UPDATED
+  LOGIN
+  LOGOUT
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  role      UserRole @default(MESERO)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+  logs   Log[]
+
+  @@map("users")
+}
+
+model Table {
+  id        String   @id @default(cuid())
+  name      String
+  zone      String?
+  qrUrl     String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts Account[]
+  logs     Log[]
+
+  @@map("tables")
+}
+
+model Account {
+  id             String        @id @default(cuid())
+  tableId        String
+  initialBalance  Decimal       @db.Decimal(10, 2)
+  currentBalance Decimal       @db.Decimal(10, 2)
+  status         AccountStatus @default(OPEN)
+  createdAt      DateTime      @default(now())
+  closedAt       DateTime?
+
+  table  Table   @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("accounts")
+}
+
+model Product {
+  id        String   @id @default(cuid())
+  name      String
+  price     Decimal  @db.Decimal(10, 2)
+  category  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  @@map("products")
+}
+
+model Order {
+  id        String   @id @default(cuid())
+  accountId String
+  productId String
+  userId    String
+  price     Decimal  @db.Decimal(10, 2)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([accountId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model Log {
+  id        String    @id @default(cuid())
+  userId    String?
+  tableId   String?
+  action    LogAction
+  details   Json?
+  createdAt DateTime  @default(now())
+
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  table Table? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([tableId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("logs")
+}
+
