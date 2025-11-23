@@ -24,16 +24,29 @@ export default function LoginPage() {
       })
 
       if (result?.error) {
-        setError('Usuario o contraseña incorrectos')
+        // Mostrar mensaje más específico
+        if (result.error === 'CredentialsSignin') {
+          setError('Usuario o contraseña incorrectos. Verifica tus credenciales.')
+        } else if (result.error.includes('database') || result.error.includes('connection')) {
+          setError('Error de conexión a la base de datos. Verifica la configuración.')
+        } else {
+          setError(`Error: ${result.error}. Revisa los logs del servidor.`)
+        }
         setLoading(false)
         return
       }
 
-      // Redirect based on role
-      router.push('/')
-      router.refresh()
-    } catch (err) {
-      setError('Error al iniciar sesión')
+      if (result?.ok) {
+        // Redirect based on role
+        router.push('/')
+        router.refresh()
+      } else {
+        setError('Error desconocido al iniciar sesión')
+        setLoading(false)
+      }
+    } catch (err: any) {
+      console.error('Login error:', err)
+      setError(err?.message || 'Error al iniciar sesión. Revisa la consola para más detalles.')
       setLoading(false)
     }
   }
