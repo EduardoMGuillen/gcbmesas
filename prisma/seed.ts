@@ -88,8 +88,14 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error(e)
-    process.exit(1)
+    // En producción, no fallar el build si el seed ya se ejecutó
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('⚠️ Seed warning (no crítico):', e.message)
+      // No hacer exit(1) para no romper el build
+    } else {
+      console.error(e)
+      process.exit(1)
+    }
   })
   .finally(async () => {
     await prisma.$disconnect()
