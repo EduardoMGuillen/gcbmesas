@@ -5,3 +5,6 @@ const handler = NextAuth(authOptions)
 
 export { handler as GET, handler as POST }
 
+// Add error handling
+export const runtime = 'nodejs'
+

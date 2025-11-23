@@ -3,6 +3,11 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 
+// Validate NEXTAUTH_SECRET
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error('NEXTAUTH_SECRET is not set in environment variables')
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -14,7 +19,16 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         try {
           if (!credentials?.username || !credentials?.password) {
+            console.error('Auth: Missing credentials')
             return null
+          }
+
+          // Test database connection
+          try {
+            await prisma.$connect()
+          } catch (dbError) {
+            console.error('Auth: Database connection error:', dbError)
+            throw new Error('Database connection failed')
           }
 
           const user = await prisma.user.findUnique({
@@ -22,6 +36,7 @@ export const authOptions: NextAuthOptions = {
           })
 
           if (!user) {
+            console.error(`Auth: User not found: ${credentials.username}`)
             return null
           }
 
@@ -31,6 +46,7 @@ export const authOptions: NextAuthOptions = {
           )
 
           if (!isPasswordValid) {
+            console.error(`Auth: Invalid password for user: ${credentials.username}`)
             return null
           }
 
@@ -44,16 +60,23 @@ export const authOptions: NextAuthOptions = {
               },
             })
           } catch (logError) {
-            console.error('Failed to log login:', logError)
+            console.error('Auth: Failed to log login:', logError)
+            // Don't fail authentication if logging fails
           }
+
+          console.log(`Auth: Successful login for user: ${user.username}`)
 
           return {
             id: user.id,
             username: user.username,
             role: user.role,
           }
-        } catch (error) {
-          console.error('Auth error:', error)
+        } catch (error: any) {
+          console.error('Auth: Error in authorize:', error)
+          // Re-throw database errors so NextAuth can handle them properly
+          if (error.message?.includes('Database')) {
+            throw error
+          }
           return null
         }
       },
@@ -77,10 +100,13 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/login',
+    error: '/login/error', // Custom error page
   },
   session: {
     strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === 'development',
 }
 
