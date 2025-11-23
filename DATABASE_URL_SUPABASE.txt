@@ -1,0 +1,19 @@
+# DATABASE_URL para Supabase
+
+## Tu información:
+- Project URL: https://bixevluattcjedpvkruu.supabase.co
+- Project Ref: bixevluattcjedpvkruu
+
+## Formato de DATABASE_URL:
+postgresql://postgres:[TU_CONTRASEÑA]@db.bixevluattcjedpvkruu.supabase.co:5432/postgres?schema=public
+
+## Pasos:
+1. Ve a Supabase Dashboard → Settings → Database
+2. Busca "Database password" (la que configuraste al crear el proyecto)
+3. Si no la recuerdas, puedes resetearla
+4. Reemplaza [TU_CONTRASEÑA] en la URL de arriba
+5. Copia la URL completa y pégala en Vercel como DATABASE_URL
+
+## Ejemplo (con contraseña "mipassword123"):
+postgresql://postgres:mipassword123@db.bixevluattcjedpvkruu.supabase.co:5432/postgres?schema=public
+
