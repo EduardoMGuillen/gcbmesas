@@ -8,26 +8,32 @@ export default async function Home() {
   try {
     const session = await getServerSession(authOptions)
 
-    console.log('Home page - Session check:', {
-      hasSession: !!session,
-      userId: session?.user?.id,
-      username: session?.user?.username,
-      role: session?.user?.role,
-    })
-
     if (!session) {
-      console.log('No session found, redirecting to login')
       redirect('/login')
+      return
     }
 
+    // Validate session has required fields
+    if (!session.user || !session.user.role) {
+      console.error('Invalid session data:', session)
+      redirect('/login')
+      return
+    }
+
+    // Redirect based on role
     if (session.user.role === 'ADMIN') {
-      console.log('Admin user, redirecting to /admin')
       redirect('/admin')
+      return
     }
 
-    console.log('Mesero user, redirecting to /mesero')
-    redirect('/mesero')
-  } catch (error) {
+    if (session.user.role === 'MESERO') {
+      redirect('/mesero')
+      return
+    }
+
+    // Unknown role, redirect to login
+    redirect('/login')
+  } catch (error: any) {
     console.error('Error in home page:', error)
     // Redirect to login on error
     redirect('/login')

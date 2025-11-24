@@ -10,9 +10,22 @@ export default async function AdminDashboard() {
 
   if (!session || session.user.role !== 'ADMIN') {
     redirect('/login')
+    return
   }
 
-  const stats = await getDashboardStats()
+  let stats
+  try {
+    stats = await getDashboardStats()
+  } catch (error: any) {
+    console.error('Error fetching dashboard stats:', error)
+    // Return default stats on error
+    stats = {
+      totalConsumedToday: 0,
+      openAccounts: 0,
+      activeWaiters: 0,
+      topProducts: [],
+    }
+  }
 
   return (
     <div className="min-h-screen">
