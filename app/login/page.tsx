@@ -37,10 +37,14 @@ export default function LoginPage() {
       }
 
       if (result?.ok) {
-        // Redirect based on role
-        router.push('/')
-        router.refresh()
+        // Login successful
+        console.log('Login successful, redirecting...')
+        // Wait a bit for session to be established
+        await new Promise((resolve) => setTimeout(resolve, 200))
+        // Use window.location for more reliable redirect
+        window.location.href = '/'
       } else {
+        console.error('Login failed:', result)
         setError('Error desconocido al iniciar sesión')
         setLoading(false)
       }
