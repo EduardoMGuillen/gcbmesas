@@ -1,40 +1,34 @@
-import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import AuthCallbackClient from './AuthCallbackClient'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 export default async function AuthCallbackPage() {
+  // Try to get session on server first
+  let initialSession = null
+  let redirectUrl = null
+  
   try {
     // Wait a bit for the session cookie to be set (especially important for mobile)
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    await new Promise((resolve) => setTimeout(resolve, 800))
     
-    const session = await getServerSession(authOptions)
+    initialSession = await getServerSession(authOptions)
     
-    console.log('Auth callback - Session check:', {
-      hasSession: !!session,
-      role: session?.user?.role,
-    })
-
-    if (!session || !session.user || !session.user.role) {
-      console.log('Auth callback - No session, redirecting to login')
-      redirect('/login')
-      return
+    if (initialSession?.user?.role) {
+      redirectUrl = initialSession.user.role === 'ADMIN' 
+        ? '/admin' 
+        : initialSession.user.role === 'MESERO' 
+        ? '/mesero' 
+        : '/'
     }
-
-    // Determine redirect URL based on role
-    const redirectUrl = session.user.role === 'ADMIN' 
-      ? '/admin' 
-      : session.user.role === 'MESERO' 
-      ? '/mesero' 
-      : '/'
-    
-    console.log('Auth callback - Session verified, redirecting to:', redirectUrl)
-    redirect(redirectUrl)
-  } catch (error: any) {
-    console.error('Auth callback error:', error)
-    redirect('/login')
+  } catch (error) {
+    console.error('Auth callback server error:', error)
   }
+
+  // Render the loading UI and let the client component handle the redirect
+  // This works better on mobile because it gives time for cookies to be set
+  return <AuthCallbackClient initialRedirectUrl={redirectUrl} />
 }
 
