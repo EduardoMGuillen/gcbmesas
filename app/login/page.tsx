@@ -41,21 +41,71 @@ export default function LoginPage() {
       }
 
       if (result?.ok) {
-        console.log('Login successful, redirecting...')
+        console.log('Login successful, verifying session and redirecting...')
         
-        // For iOS/Safari compatibility: use a simpler redirect approach
-        // Wait a bit for cookie to be set, then redirect
-        await new Promise((resolve) => setTimeout(resolve, 300))
+        // Wait for cookie to be set (longer wait for iOS/Safari)
+        await new Promise((resolve) => setTimeout(resolve, 1000))
         
-        // Use window.location.replace for better iOS compatibility
-        // This avoids history issues and works better on mobile browsers
+        // Multiple redirect strategies for maximum compatibility
+        let redirectSuccess = false
+        
+        // Strategy 1: Try server-side redirect endpoint
         try {
-          // Try to get role from the result if available, otherwise redirect to home
-          // The server-side page.tsx will handle role-based redirection
-          window.location.replace('/')
+          const redirectResponse = await fetch('/api/auth-redirect', {
+            method: 'GET',
+            credentials: 'include',
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          })
+          
+          if (redirectResponse.ok) {
+            const redirectData = await redirectResponse.json()
+            if (redirectData.redirectUrl) {
+              console.log('Server redirect URL:', redirectData.redirectUrl)
+              window.location.href = redirectData.redirectUrl
+              redirectSuccess = true
+            }
+          }
         } catch (redirectError) {
-          console.error('Redirect error:', redirectError)
-          // Fallback: use href instead of replace
+          console.warn('Server redirect failed, trying alternative:', redirectError)
+        }
+        
+        // Strategy 2: Verify session and redirect client-side
+        if (!redirectSuccess) {
+          try {
+            const sessionResponse = await fetch('/api/debug-session', {
+              method: 'GET',
+              credentials: 'include',
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache',
+              },
+            })
+            
+            const sessionData = await sessionResponse.json()
+            console.log('Session check result:', sessionData)
+            
+            if (sessionData.hasSession && sessionData.session?.user?.role) {
+              const role = sessionData.session.user.role
+              console.log('Session verified, redirecting to:', role === 'ADMIN' ? '/admin' : '/mesero')
+              
+              // Redirect based on role
+              const redirectUrl = role === 'ADMIN' ? '/admin' : role === 'MESERO' ? '/mesero' : '/'
+              
+              // Force a full page reload for iOS/Safari compatibility
+              window.location.href = redirectUrl
+              redirectSuccess = true
+            }
+          } catch (sessionError) {
+            console.warn('Session check failed:', sessionError)
+          }
+        }
+        
+        // Strategy 3: Fallback - redirect to home and let server handle it
+        if (!redirectSuccess) {
+          console.log('Using fallback redirect to home...')
           window.location.href = '/'
         }
       } else {
