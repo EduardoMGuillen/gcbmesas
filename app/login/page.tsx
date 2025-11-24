@@ -17,15 +17,19 @@ export default function LoginPage() {
     try {
       console.log('Attempting login for user:', username)
       
+      // For mobile compatibility, use redirect: true and let NextAuth handle it
+      // But we'll use a custom callback page that works better on mobile
       const result = await signIn('credentials', {
         username,
         password,
-        redirect: false,
-        callbackUrl: '/',
+        redirect: true,
+        callbackUrl: '/auth-callback',
       })
 
+      // If we get here, redirect was successful (NextAuth handled it)
+      // This code should not execute, but keep it as fallback
       console.log('Login result:', result)
-
+      
       if (result?.error) {
         console.error('Login error:', result.error)
         // Mostrar mensaje más específico
@@ -38,80 +42,6 @@ export default function LoginPage() {
         }
         setLoading(false)
         return
-      }
-
-      if (result?.ok) {
-        console.log('Login successful, verifying session and redirecting...')
-        
-        // Wait for cookie to be set (longer wait for iOS/Safari)
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        
-        // Multiple redirect strategies for maximum compatibility
-        let redirectSuccess = false
-        
-        // Strategy 1: Try server-side redirect endpoint
-        try {
-          const redirectResponse = await fetch('/api/auth-redirect', {
-            method: 'GET',
-            credentials: 'include',
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache',
-            },
-          })
-          
-          if (redirectResponse.ok) {
-            const redirectData = await redirectResponse.json()
-            if (redirectData.redirectUrl) {
-              console.log('Server redirect URL:', redirectData.redirectUrl)
-              window.location.href = redirectData.redirectUrl
-              redirectSuccess = true
-            }
-          }
-        } catch (redirectError) {
-          console.warn('Server redirect failed, trying alternative:', redirectError)
-        }
-        
-        // Strategy 2: Verify session and redirect client-side
-        if (!redirectSuccess) {
-          try {
-            const sessionResponse = await fetch('/api/debug-session', {
-              method: 'GET',
-              credentials: 'include',
-              cache: 'no-store',
-              headers: {
-                'Cache-Control': 'no-cache',
-              },
-            })
-            
-            const sessionData = await sessionResponse.json()
-            console.log('Session check result:', sessionData)
-            
-            if (sessionData.hasSession && sessionData.session?.user?.role) {
-              const role = sessionData.session.user.role
-              console.log('Session verified, redirecting to:', role === 'ADMIN' ? '/admin' : '/mesero')
-              
-              // Redirect based on role
-              const redirectUrl = role === 'ADMIN' ? '/admin' : role === 'MESERO' ? '/mesero' : '/'
-              
-              // Force a full page reload for iOS/Safari compatibility
-              window.location.href = redirectUrl
-              redirectSuccess = true
-            }
-          } catch (sessionError) {
-            console.warn('Session check failed:', sessionError)
-          }
-        }
-        
-        // Strategy 3: Fallback - redirect to home and let server handle it
-        if (!redirectSuccess) {
-          console.log('Using fallback redirect to home...')
-          window.location.href = '/'
-        }
-      } else {
-        console.error('Login failed - unexpected result:', result)
-        setError('Error desconocido al iniciar sesión. Por favor, intenta nuevamente.')
-        setLoading(false)
       }
     } catch (err: any) {
       console.error('Login error:', err)

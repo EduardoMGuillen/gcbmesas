@@ -34,8 +34,8 @@ export default withAuth(
   {
     callbacks: {
       authorized: ({ token, req }) => {
-        // For login page, always allow (don't check token)
-        if (req.nextUrl.pathname === '/login') {
+        // For login and auth-callback pages, always allow (don't check token)
+        if (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/auth-callback') {
           return true
         }
         // For protected routes, require token
@@ -47,5 +47,6 @@ export default withAuth(
 
 export const config = {
   matcher: ['/admin/:path*', '/mesero/:path*', '/mesa/:path*'],
+  // Don't match auth-callback to allow it to work
 }
 
