@@ -9,29 +9,45 @@ interface AuthCallbackClientProps {
 export default function AuthCallbackClient({ initialRedirectUrl }: AuthCallbackClientProps) {
   const [status, setStatus] = useState<'checking' | 'redirecting' | 'error'>('checking')
   const [attempts, setAttempts] = useState(0)
-  const maxAttempts = 10
+  const maxAttempts = 8 // Reduced from 10, faster failure
 
   useEffect(() => {
     // If we already have a redirect URL from server, use it immediately
     if (initialRedirectUrl) {
-      console.log('Auth callback - Using server redirect URL:', initialRedirectUrl)
+      console.log('[AuthCallback Client] Using server redirect URL:', initialRedirectUrl)
       setStatus('redirecting')
       setTimeout(() => {
-        window.location.href = initialRedirectUrl
-      }, 300)
+        window.location.replace(initialRedirectUrl)
+      }, 200)
       return
     }
 
-    // Otherwise, poll the server for session
+    // Check session cookie first
+    const checkCookie = (): boolean => {
+      if (typeof document === 'undefined') return false
+      const cookies = document.cookie.split(';')
+      return cookies.some(cookie => 
+        cookie.trim().startsWith('next-auth.session-token=')
+      )
+    }
+
+    // Poll the server for session
     const checkSession = async () => {
       if (attempts >= maxAttempts) {
-        console.error('Auth callback - Max attempts reached, redirecting to login')
+        console.error('[AuthCallback Client] Max attempts reached, redirecting to login')
         setStatus('error')
         setTimeout(() => {
-          window.location.href = '/login'
-        }, 2000)
+          window.location.replace('/login')
+        }, 1500)
         return
       }
+
+      const attemptNum = attempts + 1
+      console.log(`[AuthCallback Client] Checking session (attempt ${attemptNum}/${maxAttempts})...`)
+
+      // Check cookie first
+      const hasCookie = checkCookie()
+      console.log(`[AuthCallback Client] Cookie check: ${hasCookie ? 'found' : 'missing'}`)
 
       try {
         const response = await fetch('/api/auth-redirect', {
@@ -45,38 +61,45 @@ export default function AuthCallbackClient({ initialRedirectUrl }: AuthCallbackC
 
         if (response.ok) {
           const data = await response.json()
+          console.log('[AuthCallback Client] Server response:', {
+            hasSession: data.hasSession,
+            redirectUrl: data.redirectUrl,
+            role: data.role,
+          })
           
           if (data.hasSession && data.redirectUrl) {
-            console.log('Auth callback - Session found, redirecting to:', data.redirectUrl)
+            console.log('[AuthCallback Client] Session found, redirecting to:', data.redirectUrl)
             setStatus('redirecting')
             setTimeout(() => {
-              window.location.href = data.redirectUrl
-            }, 300)
+              window.location.replace(data.redirectUrl)
+            }, 200)
             return
           }
+        } else {
+          console.warn(`[AuthCallback Client] Server responded with status: ${response.status}`)
         }
 
         // Session not ready yet, try again
         setAttempts(prev => prev + 1)
-        setTimeout(checkSession, 500)
+        setTimeout(checkSession, 600) // Slightly longer delay
       } catch (error) {
-        console.error('Auth callback - Error checking session:', error)
+        console.error('[AuthCallback Client] Error checking session:', error)
         setAttempts(prev => prev + 1)
-        if (attempts < maxAttempts - 1) {
-          setTimeout(checkSession, 500)
+        if (attemptNum < maxAttempts) {
+          setTimeout(checkSession, 600)
         } else {
           setStatus('error')
           setTimeout(() => {
-            window.location.href = '/login'
-          }, 2000)
+            window.location.replace('/login')
+          }, 1500)
         }
       }
     }
 
-    // Start checking after a short delay to allow cookies to be set
+    // Start checking after a short delay
     const timeout = setTimeout(() => {
       checkSession()
-    }, 1000)
+    }, 500)
 
     return () => clearTimeout(timeout)
   }, [initialRedirectUrl, attempts, maxAttempts])

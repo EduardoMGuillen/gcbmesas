@@ -5,11 +5,13 @@ import { authOptions } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    console.log('[DebugSession API] Checking session...')
+    
     const session = await getServerSession(authOptions)
     
-    return NextResponse.json({
+    const result = {
       hasSession: !!session,
       session: session ? {
         user: {
@@ -19,7 +21,15 @@ export async function GET() {
         },
       } : null,
       timestamp: new Date().toISOString(),
-    }, {
+    }
+    
+    console.log('[DebugSession API] Result:', {
+      hasSession: result.hasSession,
+      role: result.session?.user?.role,
+      username: result.session?.user?.username,
+    })
+    
+    return NextResponse.json(result, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
         'Pragma': 'no-cache',
@@ -27,10 +37,16 @@ export async function GET() {
       },
     })
   } catch (error: any) {
+    console.error('[DebugSession API] Error:', error)
     return NextResponse.json({
       error: error.message,
       hasSession: false,
-    }, { status: 500 })
+    }, { 
+      status: 500,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    })
   }
 }
 

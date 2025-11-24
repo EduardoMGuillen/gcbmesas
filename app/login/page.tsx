@@ -14,12 +14,27 @@ export default function LoginPage() {
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href)
       if (url.searchParams.get('callbackUrl')) {
-        // Remove callbackUrl from URL to prevent redirect loops
+        console.log('[Login] Cleaning up callbackUrl from URL')
         url.searchParams.delete('callbackUrl')
         window.history.replaceState({}, '', url.pathname)
       }
     }
   }, [])
+
+  // Helper function to check if session cookie exists
+  const checkSessionCookie = (): boolean => {
+    if (typeof document === 'undefined') return false
+    
+    // Check for NextAuth session cookie
+    const cookies = document.cookie.split(';')
+    const sessionCookie = cookies.find(cookie => 
+      cookie.trim().startsWith('next-auth.session-token=')
+    )
+    
+    const hasCookie = !!sessionCookie
+    console.log('[Login] Session cookie check:', { hasCookie, cookie: sessionCookie ? 'exists' : 'missing' })
+    return hasCookie
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,20 +42,20 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      console.log('Attempting login for user:', username)
+      console.log('[Login] Attempting login for user:', username)
       
-      // Use NextAuth signIn but with better error handling
+      // Use redirect: false to handle redirect manually
       const result = await signIn('credentials', {
         username,
         password,
         redirect: false,
       })
       
-      console.log('Login result:', result)
+      console.log('[Login] SignIn result:', { ok: result?.ok, error: result?.error })
 
       // Check for errors first
       if (result?.error) {
-        console.error('Login error:', result.error)
+        console.error('[Login] Login error:', result.error)
         setLoading(false)
         if (result.error === 'CredentialsSignin') {
           setError('Usuario o contraseña incorrectos. Verifica tus credenciales.')
@@ -54,24 +69,75 @@ export default function LoginPage() {
 
       // Check if login was successful
       if (result?.ok) {
-        console.log('Login successful, establishing session...')
+        console.log('[Login] Login successful, verifying session cookie...')
         
-        // For mobile: use a more reliable approach
-        // Wait for cookie and then do a full page reload to the callback
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        // Verify cookie was set with retries (important for mobile)
+        let cookieVerified = false
+        const maxRetries = 5
+        const retryDelay = 400 // 400ms between retries
         
-        // Always redirect to callback page which will handle session verification
-        // This is more reliable on mobile
-        window.location.replace('/auth-callback')
-        return
+        for (let i = 0; i < maxRetries; i++) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelay))
+          
+          if (checkSessionCookie()) {
+            cookieVerified = true
+            console.log(`[Login] Cookie verified on attempt ${i + 1}`)
+            break
+          }
+          
+          console.log(`[Login] Cookie check attempt ${i + 1}/${maxRetries} - not found yet`)
+        }
+
+        if (!cookieVerified) {
+          console.warn('[Login] Cookie not found after retries, but proceeding anyway')
+          // Still proceed - the callback page will handle it
+        }
+
+        // Verify session with server before redirecting
+        try {
+          console.log('[Login] Verifying session with server...')
+          const sessionResponse = await fetch('/api/debug-session', {
+            method: 'GET',
+            credentials: 'include',
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          })
+          
+          const sessionData = await sessionResponse.json()
+          console.log('[Login] Session verification result:', {
+            hasSession: sessionData.hasSession,
+            role: sessionData.session?.user?.role,
+          })
+          
+          if (sessionData.hasSession && sessionData.session?.user?.role) {
+            const role = sessionData.session.user.role
+            const redirectUrl = role === 'ADMIN' ? '/admin' : role === 'MESERO' ? '/mesero' : '/'
+            console.log('[Login] Session verified, redirecting to:', redirectUrl)
+            
+            // Use replace for mobile compatibility
+            window.location.replace(redirectUrl)
+            return
+          } else {
+            console.log('[Login] Session not ready, redirecting to callback for retry')
+            window.location.replace('/auth-callback')
+            return
+          }
+        } catch (sessionError) {
+          console.error('[Login] Session verification error:', sessionError)
+          // Fallback: redirect to callback
+          window.location.replace('/auth-callback')
+          return
+        }
       }
 
       // Unexpected result
-      console.error('Unexpected login result:', result)
+      console.error('[Login] Unexpected login result:', result)
       setError('Error desconocido. Por favor, intenta nuevamente.')
       setLoading(false)
     } catch (err: any) {
-      console.error('Login error:', err)
+      console.error('[Login] Login exception:', err)
       setError(err?.message || 'Error al iniciar sesión.')
       setLoading(false)
     }
