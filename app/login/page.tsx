@@ -41,38 +41,21 @@ export default function LoginPage() {
       }
 
       if (result?.ok) {
-        console.log('Login successful, verifying session...')
+        console.log('Login successful, redirecting...')
         
-        // Wait for session cookie to be set
-        await new Promise((resolve) => setTimeout(resolve, 500))
+        // For iOS/Safari compatibility: use a simpler redirect approach
+        // Wait a bit for cookie to be set, then redirect
+        await new Promise((resolve) => setTimeout(resolve, 300))
         
-        // Verify session before redirecting
+        // Use window.location.replace for better iOS compatibility
+        // This avoids history issues and works better on mobile browsers
         try {
-          const sessionCheck = await fetch('/api/debug-session', {
-            cache: 'no-store',
-          })
-          const sessionData = await sessionCheck.json()
-          console.log('Session verification:', sessionData)
-          
-          if (sessionData.hasSession && sessionData.session?.user) {
-            const userRole = sessionData.session.user.role
-            console.log('Session verified, redirecting to:', userRole === 'ADMIN' ? '/admin' : '/mesero')
-            
-            // Redirect directly based on role
-            if (userRole === 'ADMIN') {
-              window.location.href = '/admin'
-            } else if (userRole === 'MESERO') {
-              window.location.href = '/mesero'
-            } else {
-              window.location.href = '/'
-            }
-          } else {
-            console.warn('Session not available yet, redirecting to home...')
-            window.location.href = '/'
-          }
-        } catch (checkError) {
-          console.warn('Session check failed, redirecting anyway:', checkError)
-          // Fallback: redirect to home
+          // Try to get role from the result if available, otherwise redirect to home
+          // The server-side page.tsx will handle role-based redirection
+          window.location.replace('/')
+        } catch (redirectError) {
+          console.error('Redirect error:', redirectError)
+          // Fallback: use href instead of replace
           window.location.href = '/'
         }
       } else {

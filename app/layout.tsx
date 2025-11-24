@@ -8,6 +8,19 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'TableControl - Gestión de Mesas',
   description: 'Sistema de gestión de cuentas de consumo para discotecas',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+  },
+}
+
+// Viewport metadata for iOS/Safari compatibility
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
