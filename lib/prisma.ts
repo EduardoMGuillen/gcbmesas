@@ -13,13 +13,6 @@ export const prisma =
         url: process.env.DATABASE_URL,
       },
     },
-    // Deshabilitar prepared statements para evitar conflictos con Session Pooler
-    // Esto es necesario cuando se usa Session Pooler en lugar de Transaction Pooler
-    __internal: {
-      engine: {
-        connectTimeout: 10000,
-      },
-    },
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
