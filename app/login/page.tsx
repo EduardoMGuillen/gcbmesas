@@ -25,18 +25,12 @@ export default function LoginPage() {
         callbackUrl: '/auth-callback',
       })
       
-      if (result?.ok) {
-        // Redirect to callback page which will handle session verification
-        window.location.href = '/auth-callback'
-        return
-      }
-
-      // If we get here, redirect was successful (NextAuth handled it)
-      // This code should not execute, but keep it as fallback
       console.log('Login result:', result)
-      
+
+      // Check for errors first
       if (result?.error) {
         console.error('Login error:', result.error)
+        setLoading(false)
         // Mostrar mensaje más específico
         if (result.error === 'CredentialsSignin') {
           setError('Usuario o contraseña incorrectos. Verifica tus credenciales.')
@@ -45,9 +39,50 @@ export default function LoginPage() {
         } else {
           setError(`Error: ${result.error}. Revisa los logs del servidor.`)
         }
-        setLoading(false)
         return
       }
+
+      // Check if login was successful
+      if (result?.ok) {
+        console.log('Login successful, waiting for session cookie...')
+        // Wait a bit for the session cookie to be set (especially important for mobile)
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        
+        // Verify session before redirecting
+        try {
+          const sessionCheck = await fetch('/api/debug-session', {
+            method: 'GET',
+            credentials: 'include',
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          })
+          
+          const sessionData = await sessionCheck.json()
+          console.log('Session check result:', sessionData)
+          
+          if (sessionData.hasSession && sessionData.session?.user?.role) {
+            console.log('Session verified, redirecting to callback...')
+            // Redirect to callback page which will handle final redirect
+            window.location.href = '/auth-callback'
+          } else {
+            console.warn('Session not available yet, redirecting anyway...')
+            // Redirect anyway - the callback page will handle retries
+            window.location.href = '/auth-callback'
+          }
+        } catch (sessionError) {
+          console.warn('Session check failed, redirecting anyway:', sessionError)
+          // Redirect anyway - the callback page will handle retries
+          window.location.href = '/auth-callback'
+        }
+        return
+      }
+
+      // If we get here, something unexpected happened
+      console.error('Unexpected login result:', result)
+      setError('Error desconocido al iniciar sesión. Por favor, intenta nuevamente.')
+      setLoading(false)
     } catch (err: any) {
       console.error('Login error:', err)
       setError(err?.message || 'Error al iniciar sesión. Revisa la consola para más detalles.')
