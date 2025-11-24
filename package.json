@@ -12,7 +12,9 @@
     "db:studio": "prisma studio",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+    "db:seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",
+    "db:fix-password": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/fix-admin-password.ts",
+    "db:verify-password": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/verify-admin-password.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",

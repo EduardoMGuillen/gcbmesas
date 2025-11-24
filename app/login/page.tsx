@@ -23,6 +23,8 @@ export default function LoginPage() {
         redirect: false,
       })
 
+      console.log('Login result:', result)
+
       if (result?.error) {
         // Mostrar mensaje más específico
         if (result.error === 'CredentialsSignin') {
@@ -37,15 +39,15 @@ export default function LoginPage() {
       }
 
       if (result?.ok) {
-        // Login successful
+        // Login successful - force full page reload to ensure session is available
         console.log('Login successful, redirecting...')
-        // Wait a bit for session to be established
-        await new Promise((resolve) => setTimeout(resolve, 200))
-        // Use window.location for more reliable redirect
+        
+        // Use window.location.href for a complete page reload
+        // This ensures the session cookie is properly set and available server-side
         window.location.href = '/'
       } else {
-        console.error('Login failed:', result)
-        setError('Error desconocido al iniciar sesión')
+        console.error('Login failed - unexpected result:', result)
+        setError('Error desconocido al iniciar sesión. Por favor, intenta nuevamente.')
         setLoading(false)
       }
     } catch (err: any) {
