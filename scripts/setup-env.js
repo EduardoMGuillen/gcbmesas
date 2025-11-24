@@ -24,21 +24,44 @@ if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('?schema=publ
   console.log('✅ Added ?schema=public to DATABASE_URL')
 }
 
-// Validar que esté usando Session Pooler (puerto 6543) para Vercel
+// Validar y corregir automáticamente el puerto para Session Pooler
 if (process.env.DATABASE_URL && process.env.VERCEL) {
-  const dbUrl = process.env.DATABASE_URL
-  // Verificar si está usando puerto 5432 (directo) en lugar de 6543 (pooler)
-  if (dbUrl.includes(':5432/')) {
-    console.error('❌ ERROR: DATABASE_URL está usando puerto 5432 (conexión directa)')
-    console.error('   Vercel requiere Session Pooler (puerto 6543)')
+  let dbUrl = process.env.DATABASE_URL
+  let wasFixed = false
+  
+  // Si está usando pooler pero con puerto 5432, corregir a 6543
+  if (dbUrl.includes('pooler.supabase.com') || dbUrl.includes('pooler.supabase.co')) {
+    if (dbUrl.includes(':5432/')) {
+      console.warn('⚠️ ADVERTENCIA: Detectado puerto 5432 con pooler.supabase.com')
+      console.warn('   Corrigiendo automáticamente a puerto 6543 (Session Pooler)')
+      dbUrl = dbUrl.replace(':5432/', ':6543/')
+      process.env.DATABASE_URL = dbUrl
+      wasFixed = true
+    }
+  }
+  
+  // Si está usando conexión directa (db.xxxxx.supabase.co:5432), mostrar error
+  if (dbUrl.includes('db.') && dbUrl.includes('.supabase.co:5432')) {
+    console.error('❌ ERROR: DATABASE_URL está usando conexión directa (puerto 5432)')
+    console.error('   Vercel NO puede usar conexión directa - requiere Session Pooler')
     console.error('   Por favor, actualiza DATABASE_URL o POSTGRES_PRISMA_URL en Vercel')
     console.error('   Formato correcto: postgresql://...@pooler.supabase.com:6543/...')
+    console.error('')
+    console.error('   Pasos:')
+    console.error('   1. Ve a Supabase Dashboard → Settings → Database')
+    console.error('   2. Selecciona "Connection Pooling" → "Session mode"')
+    console.error('   3. Copia la Connection String (con puerto 6543)')
+    console.error('   4. Actualiza en Vercel → Settings → Environment Variables')
     process.exit(1)
   }
-  // Verificar que esté usando pooler.supabase.com
+  
+  // Verificar que esté usando pooler después de la corrección
   if (!dbUrl.includes('pooler.supabase.com') && !dbUrl.includes('pooler.supabase.co')) {
     console.warn('⚠️ ADVERTENCIA: DATABASE_URL no parece usar Session Pooler')
     console.warn('   Para Vercel, se recomienda usar: ...@pooler.supabase.com:6543/...')
+    console.warn('   La conexión puede fallar. Por favor, actualiza la URL en Vercel.')
+  } else if (wasFixed) {
+    console.log('✅ URL corregida automáticamente a puerto 6543')
   }
 }
 
