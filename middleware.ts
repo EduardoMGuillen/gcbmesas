@@ -6,21 +6,41 @@ export default withAuth(
     const token = req.nextauth.token
     const path = req.nextUrl.pathname
 
-    // Admin routes
-    if (path.startsWith('/admin') && token?.role !== 'ADMIN') {
-      return NextResponse.redirect(new URL('/mesero', req.url))
+    // Admin routes - only allow ADMIN role
+    if (path.startsWith('/admin')) {
+      if (!token || token.role !== 'ADMIN') {
+        // If no token or wrong role, redirect to login
+        return NextResponse.redirect(new URL('/login', req.url))
+      }
     }
 
-    // Mesero routes
-    if (path.startsWith('/mesero') && !['MESERO', 'ADMIN'].includes(token?.role as string)) {
-      return NextResponse.redirect(new URL('/login', req.url))
+    // Mesero routes - allow MESERO and ADMIN roles
+    if (path.startsWith('/mesero')) {
+      if (!token || !['MESERO', 'ADMIN'].includes(token.role as string)) {
+        // If no token or wrong role, redirect to login
+        return NextResponse.redirect(new URL('/login', req.url))
+      }
+    }
+
+    // Mesa routes - allow any authenticated user
+    if (path.startsWith('/mesa')) {
+      if (!token) {
+        return NextResponse.redirect(new URL('/login', req.url))
+      }
     }
 
     return NextResponse.next()
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token, req }) => {
+        // For login page, always allow (don't check token)
+        if (req.nextUrl.pathname === '/login') {
+          return true
+        }
+        // For protected routes, require token
+        return !!token
+      },
     },
   }
 )

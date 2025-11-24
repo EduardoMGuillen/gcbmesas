@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { signIn, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
@@ -11,16 +11,38 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const { data: session, status } = useSession()
+  const redirectingRef = useRef(false)
 
-  // Redirect if already logged in
+  // Redirect if already logged in (only once)
   useEffect(() => {
-    if (status === 'authenticated' && session) {
+    // Only redirect if we have a confirmed authenticated status
+    if (status === 'authenticated' && session?.user && !redirectingRef.current) {
+      redirectingRef.current = true
       console.log('Already authenticated, redirecting...', session.user)
-      if (session.user.role === 'ADMIN') {
-        window.location.replace('/admin')
-      } else {
-        window.location.replace('/mesero')
-      }
+      
+      // Use a longer delay to ensure session is fully established
+      const timer = setTimeout(() => {
+        try {
+          if (session.user.role === 'ADMIN') {
+            window.location.href = '/admin'
+          } else if (session.user.role === 'MESERO') {
+            window.location.href = '/mesero'
+          } else {
+            // Unknown role, redirect to home
+            window.location.href = '/'
+          }
+        } catch (err) {
+          console.error('Redirect error:', err)
+          redirectingRef.current = false
+        }
+      }, 200)
+      
+      return () => clearTimeout(timer)
+    }
+    
+    // Reset redirect flag if status changes to unauthenticated
+    if (status === 'unauthenticated') {
+      redirectingRef.current = false
     }
   }, [status, session])
 
@@ -58,8 +80,15 @@ export default function LoginPage() {
       if (result?.ok) {
         console.log('Login successful, waiting for session cookie...')
         
+        // Prevent multiple redirects
+        if (redirectingRef.current) {
+          console.log('Already redirecting, skipping...')
+          return
+        }
+        redirectingRef.current = true
+        
         // Wait for session to be established
-        await new Promise((resolve) => setTimeout(resolve, 300))
+        await new Promise((resolve) => setTimeout(resolve, 500))
         
         // Try to verify session and get user role before redirecting
         try {
@@ -72,22 +101,21 @@ export default function LoginPage() {
             console.log('Session confirmed, redirecting based on role:', userRole)
             
             // Redirect directly to the appropriate panel based on role
+            // Use href instead of replace to avoid potential issues
             if (userRole === 'ADMIN') {
-              window.location.replace('/admin')
+              window.location.href = '/admin'
             } else {
-              window.location.replace('/mesero')
+              window.location.href = '/mesero'
             }
           } else {
-            console.warn('Session not yet available, waiting longer...')
-            await new Promise((resolve) => setTimeout(resolve, 500))
+            console.warn('Session not yet available, redirecting to home...')
             // Fallback: redirect to home page which will handle the redirect
-            window.location.replace('/')
+            window.location.href = '/'
           }
         } catch (checkError) {
           console.warn('Session check failed, redirecting to home:', checkError)
           // Fallback: redirect to home page which will handle the redirect
-          await new Promise((resolve) => setTimeout(resolve, 500))
-          window.location.replace('/')
+          window.location.href = '/'
         }
       } else {
         console.error('Login failed - unexpected result:', result)
@@ -99,6 +127,17 @@ export default function LoginPage() {
       setError(err?.message || 'Error al iniciar sesión. Revisa la consola para más detalles.')
       setLoading(false)
     }
+  }
+
+  // Show loading if checking session or redirecting
+  if (status === 'loading' || (status === 'authenticated' && redirectingRef.current)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="text-white text-lg">Cargando...</div>
+        </div>
+      </div>
+    )
   }
 
   return (
