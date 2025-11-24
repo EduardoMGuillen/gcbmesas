@@ -17,14 +17,19 @@ export default function LoginPage() {
     try {
       console.log('Attempting login for user:', username)
       
-      // For mobile compatibility, use redirect: true and let NextAuth handle it
-      // But we'll use a custom callback page that works better on mobile
+      // Use redirect: false to handle redirect manually for better mobile compatibility
       const result = await signIn('credentials', {
         username,
         password,
-        redirect: true,
+        redirect: false,
         callbackUrl: '/auth-callback',
       })
+      
+      if (result?.ok) {
+        // Redirect to callback page which will handle session verification
+        window.location.href = '/auth-callback'
+        return
+      }
 
       // If we get here, redirect was successful (NextAuth handled it)
       // This code should not execute, but keep it as fallback
