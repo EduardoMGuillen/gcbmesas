@@ -15,11 +15,11 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (status === 'authenticated' && session) {
-      console.log('Already authenticated, redirecting...')
+      console.log('Already authenticated, redirecting...', session.user)
       if (session.user.role === 'ADMIN') {
-        window.location.href = '/admin'
+        window.location.replace('/admin')
       } else {
-        window.location.href = '/mesero'
+        window.location.replace('/mesero')
       }
     }
   }, [status, session])
@@ -61,24 +61,31 @@ export default function LoginPage() {
         // Wait for session to be established
         await new Promise((resolve) => setTimeout(resolve, 300))
         
-        // Try to verify session before redirecting
+        // Try to verify session and get user role before redirecting
         try {
           const sessionCheck = await fetch('/api/debug-session')
           const sessionData = await sessionCheck.json()
           console.log('Session check result:', sessionData)
           
-          if (sessionData.hasSession) {
-            console.log('Session confirmed, redirecting...')
-            // Use replace to avoid adding to history
-            window.location.replace('/')
+          if (sessionData.hasSession && sessionData.session?.user) {
+            const userRole = sessionData.session.user.role
+            console.log('Session confirmed, redirecting based on role:', userRole)
+            
+            // Redirect directly to the appropriate panel based on role
+            if (userRole === 'ADMIN') {
+              window.location.replace('/admin')
+            } else {
+              window.location.replace('/mesero')
+            }
           } else {
             console.warn('Session not yet available, waiting longer...')
             await new Promise((resolve) => setTimeout(resolve, 500))
+            // Fallback: redirect to home page which will handle the redirect
             window.location.replace('/')
           }
         } catch (checkError) {
-          console.warn('Session check failed, redirecting anyway:', checkError)
-          // Fallback: redirect anyway after a delay
+          console.warn('Session check failed, redirecting to home:', checkError)
+          // Fallback: redirect to home page which will handle the redirect
           await new Promise((resolve) => setTimeout(resolve, 500))
           window.location.replace('/')
         }
