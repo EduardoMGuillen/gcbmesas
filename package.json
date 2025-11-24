@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && npm run db:setup && next build",
+    "build": "node scripts/setup-env.js && prisma generate && npm run db:setup && next build",
     "db:setup": "npx prisma db push --accept-data-loss || true && npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts || echo 'Seed skipped'",
     "start": "next start",
     "lint": "next lint",
