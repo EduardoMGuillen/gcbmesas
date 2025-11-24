@@ -86,6 +86,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, trigger }) {
       // Initial sign in
       if (user) {
+        console.log('JWT callback - User signed in:', { id: user.id, username: user.username, role: user.role })
         token.id = user.id
         token.role = user.role
         token.username = user.username
@@ -109,6 +110,11 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string
         session.user.role = token.role as string
         session.user.username = (token.username as string) || ''
+        console.log('Session callback - Session created:', {
+          userId: session.user.id,
+          username: session.user.username,
+          role: session.user.role,
+        })
       }
       return session
     },
