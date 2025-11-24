@@ -41,14 +41,40 @@ export default function LoginPage() {
       }
 
       if (result?.ok) {
-        console.log('Login successful, redirecting...')
+        console.log('Login successful, verifying session...')
         
-        // Simple redirect - let the server handle routing based on session
-        // Wait a moment for the session cookie to be set
-        await new Promise((resolve) => setTimeout(resolve, 300))
+        // Wait for session cookie to be set
+        await new Promise((resolve) => setTimeout(resolve, 500))
         
-        // Redirect to home page which will handle the routing based on role
-        window.location.href = '/'
+        // Verify session before redirecting
+        try {
+          const sessionCheck = await fetch('/api/debug-session', {
+            cache: 'no-store',
+          })
+          const sessionData = await sessionCheck.json()
+          console.log('Session verification:', sessionData)
+          
+          if (sessionData.hasSession && sessionData.session?.user) {
+            const userRole = sessionData.session.user.role
+            console.log('Session verified, redirecting to:', userRole === 'ADMIN' ? '/admin' : '/mesero')
+            
+            // Redirect directly based on role
+            if (userRole === 'ADMIN') {
+              window.location.href = '/admin'
+            } else if (userRole === 'MESERO') {
+              window.location.href = '/mesero'
+            } else {
+              window.location.href = '/'
+            }
+          } else {
+            console.warn('Session not available yet, redirecting to home...')
+            window.location.href = '/'
+          }
+        } catch (checkError) {
+          console.warn('Session check failed, redirecting anyway:', checkError)
+          // Fallback: redirect to home
+          window.location.href = '/'
+        }
       } else {
         console.error('Login failed - unexpected result:', result)
         setError('Error desconocido al iniciar sesión. Por favor, intenta nuevamente.')
