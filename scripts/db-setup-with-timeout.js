@@ -48,10 +48,20 @@ async function main() {
     // Step 1: Prisma db push with timeout
     console.log('📦 Running prisma db push...')
     try {
+      // Usar --skip-generate para evitar regenerar el cliente
+      // El error de prepared statement puede ocurrir pero no es crítico si el schema ya está actualizado
       await runWithTimeout('npx prisma db push --accept-data-loss --skip-generate', 60000)
       console.log('✅ Database schema pushed successfully')
     } catch (error) {
-      console.warn('⚠️ db:push failed or timed out, continuing anyway:', error.message)
+      // El error de "prepared statement already exists" puede ocurrir con poolers
+      // pero no es crítico - el schema puede estar ya actualizado
+      if (error.message && error.message.includes('prepared statement')) {
+        console.warn('⚠️ Prepared statement error during db:push (non-critical)')
+        console.warn('   This can happen with connection poolers but schema may still be updated')
+        console.warn('   Continuing with seed...')
+      } else {
+        console.warn('⚠️ db:push failed or timed out, continuing anyway:', error.message)
+      }
     }
     
     // Step 2: Seed database

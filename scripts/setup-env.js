@@ -36,10 +36,16 @@ if (process.env.DATABASE_URL) {
     params.push('pool_timeout=10')
   }
   
-  // Para Transaction Pooler, NO necesitamos pgbouncer=true ni statement_cache_size=0
-  // Transaction Pooler ya maneja esto correctamente
-  // Solo agregar pgbouncer=true si se detecta Session Pooler (aunque no debería ser necesario)
-  // Pero mejor no agregarlo para Transaction Pooler ya que puede causar problemas
+  // Agregar parámetros para evitar problemas con prepared statements
+  // Incluso con Transaction Pooler, Prisma db push puede tener problemas
+  // Estos parámetros ayudan a evitar el error "prepared statement already exists"
+  if (!dbUrl.includes('pgbouncer=true')) {
+    params.push('pgbouncer=true')
+  }
+  // Deshabilitar prepared statements para evitar conflictos
+  if (!dbUrl.includes('prepared_statement_cache_size=0')) {
+    params.push('prepared_statement_cache_size=0')
+  }
   
   if (params.length > 0) {
     const separator = dbUrl.includes('?') ? '&' : '?'
