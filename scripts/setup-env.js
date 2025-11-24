@@ -27,7 +27,7 @@ if (process.env.DATABASE_URL) {
     dbUrl = `${dbUrl}${separator}schema=public`
   }
   
-  // Agregar parámetros de conexión para evitar timeouts y problemas con prepared statements
+  // Agregar parámetros de conexión para evitar timeouts
   const params = []
   if (!dbUrl.includes('connect_timeout')) {
     params.push('connect_timeout=10')
@@ -35,15 +35,11 @@ if (process.env.DATABASE_URL) {
   if (!dbUrl.includes('pool_timeout')) {
     params.push('pool_timeout=10')
   }
-  // Agregar parámetros para evitar problemas con prepared statements
-  // Estos parámetros son necesarios cuando se usa Session Pooler con Prisma
-  if (!dbUrl.includes('pgbouncer=true')) {
-    params.push('pgbouncer=true')
-  }
-  // Agregar parámetro para deshabilitar prepared statements (necesario con Session Pooler)
-  if (!dbUrl.includes('statement_cache_size=0')) {
-    params.push('statement_cache_size=0')
-  }
+  
+  // Para Transaction Pooler, NO necesitamos pgbouncer=true ni statement_cache_size=0
+  // Transaction Pooler ya maneja esto correctamente
+  // Solo agregar pgbouncer=true si se detecta Session Pooler (aunque no debería ser necesario)
+  // Pero mejor no agregarlo para Transaction Pooler ya que puede causar problemas
   
   if (params.length > 0) {
     const separator = dbUrl.includes('?') ? '&' : '?'
