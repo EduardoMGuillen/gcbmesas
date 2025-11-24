@@ -1,0 +1,18 @@
+# Tu DATABASE_URL
+
+## URL Original:
+postgresql://postgres:Guillen01..@db.bixevluattcjedpvkruu.supabase.co:5432/postgres?schema=public
+
+## Nota sobre los puntos:
+Los puntos (.) generalmente NO necesitan codificación en URLs de PostgreSQL, pero si hay problemas, puedes probar codificarlos como %2E
+
+## URL con puntos codificados (si es necesario):
+postgresql://postgres:Guillen01%2E%2E@db.bixevluattcjedpvkruu.supabase.co:5432/postgres?schema=public
+
+## Pasos:
+1. Copia la URL original de arriba
+2. Ve a Vercel → Settings → Environment Variables
+3. Edita o crea DATABASE_URL
+4. Pega la URL
+5. Guarda y redeploy
+
