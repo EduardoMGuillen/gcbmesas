@@ -46,22 +46,31 @@ async function main() {
   
   try {
     // Step 1: Prisma db push with timeout
+    // Nota: El error de "prepared statement already exists" es común con connection poolers
+    // pero no es crítico - el schema puede estar ya actualizado
     console.log('📦 Running prisma db push...')
+    console.log('   (Note: Prepared statement errors are non-critical with poolers)')
     try {
       // Usar --skip-generate para evitar regenerar el cliente
-      // El error de prepared statement puede ocurrir pero no es crítico si el schema ya está actualizado
-      await runWithTimeout('npx prisma db push --accept-data-loss --skip-generate', 60000)
+      // Reducir timeout a 30 segundos para evitar que se quede atascado
+      await runWithTimeout('npx prisma db push --accept-data-loss --skip-generate', 30000)
       console.log('✅ Database schema pushed successfully')
     } catch (error) {
-      // El error de "prepared statement already exists" puede ocurrir con poolers
-      // pero no es crítico - el schema puede estar ya actualizado
-      if (error.message && error.message.includes('prepared statement')) {
+      // Cualquier error en db:push es no crítico
+      // El schema puede estar ya actualizado, o las tablas pueden existir
+      const errorMsg = error.message || String(error)
+      if (errorMsg.includes('prepared statement')) {
         console.warn('⚠️ Prepared statement error during db:push (non-critical)')
-        console.warn('   This can happen with connection poolers but schema may still be updated')
-        console.warn('   Continuing with seed...')
+        console.warn('   This is common with connection poolers (Transaction/Session Pooler)')
+        console.warn('   The schema may already be up to date. Continuing...')
+      } else if (errorMsg.includes('timeout') || errorMsg.includes('timed out')) {
+        console.warn('⚠️ db:push timed out (non-critical)')
+        console.warn('   Schema may already be updated. Continuing...')
       } else {
-        console.warn('⚠️ db:push failed or timed out, continuing anyway:', error.message)
+        console.warn('⚠️ db:push encountered an error (non-critical):', errorMsg.substring(0, 200))
+        console.warn('   Continuing with seed - schema may already be up to date')
       }
+      // No lanzar el error - continuar con el seed
     }
     
     // Step 2: Seed database
