@@ -2,22 +2,24 @@
 
 import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
-import { useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const searchParams = useSearchParams()
 
   // Clean up callbackUrl from URL to avoid redirect loops
   useEffect(() => {
-    if (typeof window !== 'undefined' && searchParams.get('callbackUrl')) {
-      const newUrl = window.location.pathname
-      window.history.replaceState({}, '', newUrl)
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      if (url.searchParams.get('callbackUrl')) {
+        // Remove callbackUrl from URL to prevent redirect loops
+        url.searchParams.delete('callbackUrl')
+        window.history.replaceState({}, '', url.pathname)
+      }
     }
-  }, [searchParams])
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,38 +56,13 @@ export default function LoginPage() {
       if (result?.ok) {
         console.log('Login successful, establishing session...')
         
-        // Wait for cookie to be set - longer wait for mobile
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+        // For mobile: use a more reliable approach
+        // Wait for cookie and then do a full page reload to the callback
+        await new Promise((resolve) => setTimeout(resolve, 2000))
         
-        // Now use NextAuth to establish session properly
-        // Then redirect based on role
-        try {
-          // Get session to determine redirect
-          const sessionResponse = await fetch('/api/debug-session', {
-            credentials: 'include',
-            cache: 'no-store',
-          })
-          
-          const sessionData = await sessionResponse.json()
-          console.log('Session data:', sessionData)
-          
-          if (sessionData.hasSession && sessionData.session?.user?.role) {
-            const role = sessionData.session.user.role
-            const redirectUrl = role === 'ADMIN' ? '/admin' : role === 'MESERO' ? '/mesero' : '/'
-            console.log('Redirecting to:', redirectUrl)
-            
-            // Use full page reload for mobile compatibility
-            window.location.href = redirectUrl
-          } else {
-            // Fallback: redirect to callback page
-            console.log('Session not ready, redirecting to callback...')
-            window.location.href = '/auth-callback'
-          }
-        } catch (err) {
-          console.error('Session check error:', err)
-          // Fallback: redirect to callback
-          window.location.href = '/auth-callback'
-        }
+        // Always redirect to callback page which will handle session verification
+        // This is more reliable on mobile
+        window.location.replace('/auth-callback')
         return
       }
 
