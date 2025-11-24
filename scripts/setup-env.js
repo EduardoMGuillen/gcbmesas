@@ -17,11 +17,24 @@ if (process.env.POSTGRES_PRISMA_URL) {
   console.warn('⚠️ No database URL found. Please configure POSTGRES_PRISMA_URL, POSTGRES_URL, or DATABASE_URL')
 }
 
-// Verificar que tenga ?schema=public
-if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('?schema=public')) {
-  const separator = process.env.DATABASE_URL.includes('?') ? '&' : '?'
-  process.env.DATABASE_URL = `${process.env.DATABASE_URL}${separator}schema=public`
-  console.log('✅ Added ?schema=public to DATABASE_URL')
+// Verificar que tenga ?schema=public y agregar parámetros de conexión
+if (process.env.DATABASE_URL) {
+  let dbUrl = process.env.DATABASE_URL
+  
+  // Agregar schema=public si no está
+  if (!dbUrl.includes('schema=public')) {
+    const separator = dbUrl.includes('?') ? '&' : '?'
+    dbUrl = `${dbUrl}${separator}schema=public`
+  }
+  
+  // Agregar parámetros de conexión para evitar timeouts
+  if (!dbUrl.includes('connect_timeout')) {
+    const separator = dbUrl.includes('?') ? '&' : '?'
+    dbUrl = `${dbUrl}${separator}connect_timeout=10&pool_timeout=10`
+  }
+  
+  process.env.DATABASE_URL = dbUrl
+  console.log('✅ DATABASE_URL configured with schema and connection parameters')
 }
 
 // Función para corregir el puerto en URLs de Supabase
