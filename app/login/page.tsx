@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { signIn } from 'next-auth/react'
+import { useState, useEffect } from 'react'
+import { signIn, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -10,6 +10,19 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { data: session, status } = useSession()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (status === 'authenticated' && session) {
+      console.log('Already authenticated, redirecting...')
+      if (session.user.role === 'ADMIN') {
+        window.location.href = '/admin'
+      } else {
+        window.location.href = '/mesero'
+      }
+    }
+  }, [status, session])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -17,15 +30,19 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      console.log('Attempting login for user:', username)
+      
       const result = await signIn('credentials', {
         username,
         password,
         redirect: false,
+        callbackUrl: '/',
       })
 
       console.log('Login result:', result)
 
       if (result?.error) {
+        console.error('Login error:', result.error)
         // Mostrar mensaje más específico
         if (result.error === 'CredentialsSignin') {
           setError('Usuario o contraseña incorrectos. Verifica tus credenciales.')
@@ -39,12 +56,32 @@ export default function LoginPage() {
       }
 
       if (result?.ok) {
-        // Login successful - force full page reload to ensure session is available
-        console.log('Login successful, redirecting...')
+        console.log('Login successful, waiting for session cookie...')
         
-        // Use window.location.href for a complete page reload
-        // This ensures the session cookie is properly set and available server-side
-        window.location.href = '/'
+        // Wait for session to be established
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        
+        // Try to verify session before redirecting
+        try {
+          const sessionCheck = await fetch('/api/debug-session')
+          const sessionData = await sessionCheck.json()
+          console.log('Session check result:', sessionData)
+          
+          if (sessionData.hasSession) {
+            console.log('Session confirmed, redirecting...')
+            // Use replace to avoid adding to history
+            window.location.replace('/')
+          } else {
+            console.warn('Session not yet available, waiting longer...')
+            await new Promise((resolve) => setTimeout(resolve, 500))
+            window.location.replace('/')
+          }
+        } catch (checkError) {
+          console.warn('Session check failed, redirecting anyway:', checkError)
+          // Fallback: redirect anyway after a delay
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          window.location.replace('/')
+        }
       } else {
         console.error('Login failed - unexpected result:', result)
         setError('Error desconocido al iniciar sesión. Por favor, intenta nuevamente.')
