@@ -31,10 +31,13 @@ Connection string:
 [Dropdown: Session mode ▼]
 ```
 
-### Paso 4: Seleccionar Session Mode
+### Paso 4: Seleccionar Connection Pooling Mode
 
-1. **IMPORTANTE:** Asegúrate de que el dropdown diga **"Session mode"** (no "Direct connection")
-2. Si dice "Direct connection", cámbialo a **"Session mode"**
+1. **IMPORTANTE:** Asegúrate de que el dropdown diga:
+   - **"Session mode"** (recomendado para Prisma/Next.js)
+   - O **"Transaction mode"** (también funciona)
+2. **NO uses "Direct connection"** - ese usa puerto 5432 y no funciona en Vercel
+3. Ambos (Session y Transaction) usan puerto **6543** y funcionan con Vercel
 
 ### Paso 5: Copiar la Connection String
 
