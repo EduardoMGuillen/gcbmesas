@@ -1,0 +1,22 @@
+# URL Final Correcta para Vercel
+
+## ✅ URL de Session Pooler (IPv4 compatible):
+postgresql://postgres.bixevluattcjedpvkruu:Guillen01..@aws-0-us-east-1.pooler.supabase.com:6543/postgres?schema=public
+
+## 📋 Pasos Finales:
+
+1. Ve a Vercel → Settings → Environment Variables
+2. Edita `POSTGRES_PRISMA_URL`
+3. Pega la URL de arriba
+4. Marca la casilla **Production**
+5. Guarda
+6. **Redeploy**
+
+## ✅ Después del Redeploy:
+
+- Las tablas se crearán automáticamente
+- El usuario admin se creará automáticamente
+- Podrás iniciar sesión con:
+  - Usuario: `admin`
+  - Contraseña: `admin123`
+
