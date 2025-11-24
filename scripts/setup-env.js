@@ -27,10 +27,22 @@ if (process.env.DATABASE_URL) {
     dbUrl = `${dbUrl}${separator}schema=public`
   }
   
-  // Agregar parámetros de conexión para evitar timeouts
+  // Agregar parámetros de conexión para evitar timeouts y problemas con prepared statements
+  const params = []
   if (!dbUrl.includes('connect_timeout')) {
+    params.push('connect_timeout=10')
+  }
+  if (!dbUrl.includes('pool_timeout')) {
+    params.push('pool_timeout=10')
+  }
+  // Agregar parámetro para evitar problemas con prepared statements en Session Pooler
+  if (!dbUrl.includes('pgbouncer=true') && !dbUrl.includes('?pgbouncer=true') && !dbUrl.includes('&pgbouncer=true')) {
+    params.push('pgbouncer=true')
+  }
+  
+  if (params.length > 0) {
     const separator = dbUrl.includes('?') ? '&' : '?'
-    dbUrl = `${dbUrl}${separator}connect_timeout=10&pool_timeout=10`
+    dbUrl = `${dbUrl}${separator}${params.join('&')}`
   }
   
   process.env.DATABASE_URL = dbUrl
