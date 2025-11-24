@@ -29,10 +29,20 @@ function fixSupabasePort(url) {
   if (!url) return url
   
   // Si está usando pooler pero con puerto 5432, corregir a 6543
+  // Esto puede pasar si Supabase muestra la URL incorrecta o si se copió mal
   if ((url.includes('pooler.supabase.com') || url.includes('pooler.supabase.co')) && url.includes(':5432')) {
-    console.warn('⚠️ Detectado puerto 5432 con pooler.supabase.com - corrigiendo a 6543')
+    console.warn('⚠️ Detectado puerto 5432 con pooler.supabase.com')
+    console.warn('   El Session Pooler SIEMPRE usa puerto 6543, no 5432')
+    console.warn('   Corrigiendo automáticamente a puerto 6543')
     // Reemplazar :5432/ o :5432? o :5432 al final
     url = url.replace(/:5432(\/|\?|$)/g, ':6543$1')
+    return url
+  }
+  
+  // Si tiene pooler pero no especifica puerto, agregar 6543
+  if ((url.includes('pooler.supabase.com') || url.includes('pooler.supabase.co')) && !url.match(/:\d{4}/)) {
+    console.warn('⚠️ URL de pooler sin puerto especificado - agregando puerto 6543')
+    url = url.replace(/@([^:]+)(\/|\?|$)/, '@$1:6543$2')
     return url
   }
   
