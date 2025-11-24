@@ -88,8 +88,14 @@ async function main() {
 
 main()
   .catch((e) => {
-    // En producción, no fallar el build si el seed ya se ejecutó
-    if (process.env.NODE_ENV === 'production') {
+    // El error de "prepared statement already exists" es común con Session Pooler
+    // pero no es crítico - el seed puede completarse a pesar del error
+    if (e.message && e.message.includes('prepared statement')) {
+      console.warn('⚠️ Prepared statement error (common with Session Pooler)')
+      console.warn('   This is non-critical. Consider switching to Transaction Pooler.')
+      console.warn('   See: CAMBIAR_A_TRANSACTION_POOLER.md for instructions')
+      // No hacer exit(1) para no romper el build
+    } else if (process.env.NODE_ENV === 'production') {
       console.warn('⚠️ Seed warning (no crítico):', e.message)
       // No hacer exit(1) para no romper el build
     } else {
