@@ -27,7 +27,7 @@ if (process.env.DATABASE_URL) {
     dbUrl = `${dbUrl}${separator}schema=public`
   }
   
-  // Agregar parámetros de conexión para evitar timeouts
+  // Agregar parámetros de conexión para evitar timeouts y problemas con prepared statements
   const params = []
   if (!dbUrl.includes('connect_timeout')) {
     params.push('connect_timeout=10')
@@ -36,15 +36,19 @@ if (process.env.DATABASE_URL) {
     params.push('pool_timeout=10')
   }
   
-  // Agregar parámetros para evitar problemas con prepared statements
-  // Incluso con Transaction Pooler, Prisma db push puede tener problemas
-  // Estos parámetros ayudan a evitar el error "prepared statement already exists"
+  // CRÍTICO: Agregar parámetros para deshabilitar prepared statements
+  // Esto es necesario incluso con Transaction Pooler cuando se usa Prisma
+  // Prisma intenta usar prepared statements que causan conflictos con poolers
   if (!dbUrl.includes('pgbouncer=true')) {
     params.push('pgbouncer=true')
   }
-  // Deshabilitar prepared statements para evitar conflictos
+  // Deshabilitar completamente el caché de prepared statements
   if (!dbUrl.includes('prepared_statement_cache_size=0')) {
     params.push('prepared_statement_cache_size=0')
+  }
+  // Forzar que no se usen prepared statements
+  if (!dbUrl.includes('statement_cache_size=0')) {
+    params.push('statement_cache_size=0')
   }
   
   if (params.length > 0) {
