@@ -1,0 +1,26 @@
+# DATABASE_URL con Nueva Contraseña
+
+## Nueva Contraseña: casablanca2025astro
+
+## URL Session Pooler (Para Vercel - IPv4 compatible):
+postgresql://postgres.bixevluattcjedpvkruu:casablanca2025astro@aws-0-us-east-1.pooler.supabase.com:6543/postgres?schema=public
+
+## URL Alternativa (Usuario simple - si la anterior no funciona):
+postgresql://postgres:casablanca2025astro@aws-0-us-east-1.pooler.supabase.com:6543/postgres?schema=public
+
+## 🔧 Configurar en Vercel:
+
+1. Ve a Vercel → Settings → Environment Variables
+2. Edita POSTGRES_PRISMA_URL
+3. Pega la primera URL (con postgres.bixevluattcjedpvkruu)
+4. Si no funciona, prueba la segunda (con postgres simple)
+5. Marca Production
+6. Guarda
+7. Redeploy
+
+## ✅ Después del Redeploy:
+
+- Las tablas se crearán automáticamente
+- El usuario admin se creará automáticamente
+- Podrás iniciar sesión con admin/admin123
+

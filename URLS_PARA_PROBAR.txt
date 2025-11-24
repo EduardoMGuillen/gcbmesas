@@ -1,0 +1,27 @@
+# URLs para Probar - Session Pooler
+
+## Opción 1: Usuario con Project Ref (Probablemente Correcta)
+postgresql://postgres.bixevluattcjedpvkruu:Guillen01..@aws-0-us-east-1.pooler.supabase.com:6543/postgres?schema=public
+
+## Opción 2: Usuario Simple (Si la anterior no funciona)
+postgresql://postgres:Guillen01..@aws-0-us-east-1.pooler.supabase.com:6543/postgres?schema=public
+
+## Opción 3: Obtener la URL Exacta de Supabase
+
+1. Ve a Supabase Dashboard
+2. Settings → Database → Connection Pooling
+3. Selecciona "Session mode"
+4. Copia la URL EXACTA que muestra
+5. Reemplaza [YOUR-PASSWORD] con Guillen01..
+6. Agrega ?schema=public al final
+7. Úsala tal cual (no modifiques el formato del usuario)
+
+## 🔧 Configurar en Vercel
+
+1. Ve a Vercel → Settings → Environment Variables
+2. Edita POSTGRES_PRISMA_URL
+3. Prueba primero la Opción 1
+4. Si no funciona, prueba la Opción 2
+5. O mejor: usa la URL exacta de Supabase (Opción 3)
+6. Guarda y Redeploy
+
