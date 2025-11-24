@@ -14,24 +14,24 @@ export default async function MeseroPage() {
   return (
     <div className="min-h-screen">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
             Panel de Mesero
           </h1>
-          <p className="text-dark-400">
+          <p className="text-sm sm:text-base text-dark-400">
             Gestiona pedidos y cuentas de las mesas
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <Link
             href="/mesero/scan"
-            className="bg-dark-100 border border-dark-200 rounded-xl p-6 hover:border-primary-500 transition-all hover:shadow-lg group"
+            className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 hover:border-primary-500 active:border-primary-500 transition-all hover:shadow-lg group touch-manipulation"
           >
-            <div className="flex items-center justify-center w-16 h-16 bg-primary-600/20 rounded-lg mb-4 group-hover:bg-primary-600/30 transition-colors">
+            <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-primary-600/20 rounded-lg mb-3 sm:mb-4 group-hover:bg-primary-600/30 transition-colors">
               <svg
-                className="w-8 h-8 text-primary-400"
+                className="w-6 h-6 sm:w-8 sm:h-8 text-primary-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -44,10 +44,10 @@ export default async function MeseroPage() {
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-white mb-2">
+            <h2 className="text-lg sm:text-xl font-semibold text-white mb-1 sm:mb-2">
               Escanear QR
             </h2>
-            <p className="text-dark-400 text-sm">
+            <p className="text-xs sm:text-sm text-dark-400">
               Escanea el código QR de una mesa para ver su estado y agregar
               pedidos
             </p>
@@ -55,11 +55,11 @@ export default async function MeseroPage() {
 
           <Link
             href="/mesero/pedidos"
-            className="bg-dark-100 border border-dark-200 rounded-xl p-6 hover:border-primary-500 transition-all hover:shadow-lg group"
+            className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 hover:border-primary-500 active:border-primary-500 transition-all hover:shadow-lg group touch-manipulation"
           >
-            <div className="flex items-center justify-center w-16 h-16 bg-primary-600/20 rounded-lg mb-4 group-hover:bg-primary-600/30 transition-colors">
+            <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-primary-600/20 rounded-lg mb-3 sm:mb-4 group-hover:bg-primary-600/30 transition-colors">
               <svg
-                className="w-8 h-8 text-primary-400"
+                className="w-6 h-6 sm:w-8 sm:h-8 text-primary-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -72,10 +72,10 @@ export default async function MeseroPage() {
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-white mb-2">
+            <h2 className="text-lg sm:text-xl font-semibold text-white mb-1 sm:mb-2">
               Agregar Pedido
             </h2>
-            <p className="text-dark-400 text-sm">
+            <p className="text-xs sm:text-sm text-dark-400">
               Agrega productos a una cuenta manualmente
             </p>
           </Link>
@@ -83,11 +83,11 @@ export default async function MeseroPage() {
           {session.user.role === 'ADMIN' && (
             <Link
               href="/admin"
-              className="bg-dark-100 border border-dark-200 rounded-xl p-6 hover:border-primary-500 transition-all hover:shadow-lg group"
+              className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 hover:border-primary-500 active:border-primary-500 transition-all hover:shadow-lg group touch-manipulation"
             >
-              <div className="flex items-center justify-center w-16 h-16 bg-primary-600/20 rounded-lg mb-4 group-hover:bg-primary-600/30 transition-colors">
+              <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-primary-600/20 rounded-lg mb-3 sm:mb-4 group-hover:bg-primary-600/30 transition-colors">
                 <svg
-                  className="w-8 h-8 text-primary-400"
+                  className="w-6 h-6 sm:w-8 sm:h-8 text-primary-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -106,10 +106,10 @@ export default async function MeseroPage() {
                   />
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold text-white mb-2">
+              <h2 className="text-lg sm:text-xl font-semibold text-white mb-1 sm:mb-2">
                 Panel Admin
               </h2>
-              <p className="text-dark-400 text-sm">
+              <p className="text-xs sm:text-sm text-dark-400">
                 Accede al panel de administración
               </p>
             </Link>
