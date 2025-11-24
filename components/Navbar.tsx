@@ -18,7 +18,7 @@ export function Navbar() {
         <div className="flex justify-between h-16">
           <div className="flex items-center space-x-8">
             <Link href="/" className="text-xl font-bold text-white">
-              TableControl
+              La Gran Casa Blanca
             </Link>
             {session?.user.role === 'ADMIN' && (
               <div className="flex space-x-4">
