@@ -35,9 +35,14 @@ if (process.env.DATABASE_URL) {
   if (!dbUrl.includes('pool_timeout')) {
     params.push('pool_timeout=10')
   }
-  // Agregar parámetro para evitar problemas con prepared statements en Session Pooler
-  if (!dbUrl.includes('pgbouncer=true') && !dbUrl.includes('?pgbouncer=true') && !dbUrl.includes('&pgbouncer=true')) {
+  // Agregar parámetros para evitar problemas con prepared statements
+  // Estos parámetros son necesarios cuando se usa Session Pooler con Prisma
+  if (!dbUrl.includes('pgbouncer=true')) {
     params.push('pgbouncer=true')
+  }
+  // Agregar parámetro para deshabilitar prepared statements (necesario con Session Pooler)
+  if (!dbUrl.includes('statement_cache_size=0')) {
+    params.push('statement_cache_size=0')
   }
   
   if (params.length > 0) {
