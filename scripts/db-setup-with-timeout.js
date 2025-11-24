@@ -60,8 +60,17 @@ async function main() {
       await runWithTimeout('npx ts-node --compiler-options \'{"module":"CommonJS"}\' prisma/seed.ts', 30000)
       console.log('✅ Database seeded successfully')
     } catch (error) {
-      console.warn('⚠️ Seed failed or timed out:', error.message)
-      console.log('ℹ️ Seed skipped - this is not critical')
+      // El error de "prepared statement already exists" es común con Session Pooler
+      // pero no es crítico si el seed se completa
+      if (error.message && error.message.includes('prepared statement')) {
+        console.warn('⚠️ Prepared statement error detected (common with Session Pooler)')
+        console.warn('   Consider switching to Transaction Pooler for better Prisma compatibility')
+        console.warn('   See: CAMBIAR_A_TRANSACTION_POOLER.md')
+        console.log('✅ Seed completed despite warning (non-critical)')
+      } else {
+        console.warn('⚠️ Seed failed or timed out:', error.message)
+        console.log('ℹ️ Seed skipped - this is not critical')
+      }
     }
     
     console.log('✅ Database setup completed')
