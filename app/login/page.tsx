@@ -13,8 +13,7 @@ export default function LoginPage() {
 
   // Clean up callbackUrl from URL to avoid redirect loops
   useEffect(() => {
-    if (searchParams.get('callbackUrl')) {
-      // Remove callbackUrl from URL to prevent redirect loops
+    if (typeof window !== 'undefined' && searchParams.get('callbackUrl')) {
       const newUrl = window.location.pathname
       window.history.replaceState({}, '', newUrl)
     }
@@ -28,12 +27,11 @@ export default function LoginPage() {
     try {
       console.log('Attempting login for user:', username)
       
-      // Use redirect: false to handle redirect manually for better mobile compatibility
+      // Use NextAuth signIn but with better error handling
       const result = await signIn('credentials', {
         username,
         password,
         redirect: false,
-        callbackUrl: '/auth-callback',
       })
       
       console.log('Login result:', result)
@@ -42,75 +40,76 @@ export default function LoginPage() {
       if (result?.error) {
         console.error('Login error:', result.error)
         setLoading(false)
-        // Mostrar mensaje más específico
         if (result.error === 'CredentialsSignin') {
           setError('Usuario o contraseña incorrectos. Verifica tus credenciales.')
         } else if (result.error.includes('database') || result.error.includes('connection')) {
           setError('Error de conexión a la base de datos. Verifica la configuración.')
         } else {
-          setError(`Error: ${result.error}. Revisa los logs del servidor.`)
+          setError(`Error: ${result.error}`)
         }
         return
       }
 
       // Check if login was successful
       if (result?.ok) {
-        console.log('Login successful, waiting for session cookie...')
-        // Wait a bit for the session cookie to be set (especially important for mobile)
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        console.log('Login successful, establishing session...')
         
-        // Verify session before redirecting
+        // Wait for cookie to be set - longer wait for mobile
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+        
+        // Now use NextAuth to establish session properly
+        // Then redirect based on role
         try {
-          const sessionCheck = await fetch('/api/debug-session', {
-            method: 'GET',
+          // Get session to determine redirect
+          const sessionResponse = await fetch('/api/debug-session', {
             credentials: 'include',
             cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache',
-            },
           })
           
-          const sessionData = await sessionCheck.json()
-          console.log('Session check result:', sessionData)
+          const sessionData = await sessionResponse.json()
+          console.log('Session data:', sessionData)
           
           if (sessionData.hasSession && sessionData.session?.user?.role) {
-            console.log('Session verified, redirecting to callback...')
-            // Redirect to callback page which will handle final redirect
-            window.location.href = '/auth-callback'
+            const role = sessionData.session.user.role
+            const redirectUrl = role === 'ADMIN' ? '/admin' : role === 'MESERO' ? '/mesero' : '/'
+            console.log('Redirecting to:', redirectUrl)
+            
+            // Use full page reload for mobile compatibility
+            window.location.href = redirectUrl
           } else {
-            console.warn('Session not available yet, redirecting anyway...')
-            // Redirect anyway - the callback page will handle retries
+            // Fallback: redirect to callback page
+            console.log('Session not ready, redirecting to callback...')
             window.location.href = '/auth-callback'
           }
-        } catch (sessionError) {
-          console.warn('Session check failed, redirecting anyway:', sessionError)
-          // Redirect anyway - the callback page will handle retries
+        } catch (err) {
+          console.error('Session check error:', err)
+          // Fallback: redirect to callback
           window.location.href = '/auth-callback'
         }
         return
       }
 
-      // If we get here, something unexpected happened
+      // Unexpected result
       console.error('Unexpected login result:', result)
-      setError('Error desconocido al iniciar sesión. Por favor, intenta nuevamente.')
+      setError('Error desconocido. Por favor, intenta nuevamente.')
       setLoading(false)
     } catch (err: any) {
       console.error('Login error:', err)
-      setError(err?.message || 'Error al iniciar sesión. Revisa la consola para más detalles.')
+      setError(err?.message || 'Error al iniciar sesión.')
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-dark-50">
       <div className="w-full max-w-md">
-        <div className="bg-dark-100 rounded-2xl shadow-2xl p-8 border border-dark-200">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">TableControl</h1>
-            <p className="text-dark-400">Sistema de Gestión de Mesas</p>
+        <div className="bg-dark-100 rounded-2xl shadow-2xl p-6 sm:p-8 border border-dark-200">
+          <div className="text-center mb-6 sm:mb-8">
+            <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">TableControl</h1>
+            <p className="text-sm sm:text-base text-dark-400">Sistema de Gestión de Mesas</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             <div>
               <label
                 htmlFor="username"
@@ -124,7 +123,8 @@ export default function LoginPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                autoComplete="username"
+                className="w-full px-4 py-3 text-base sm:text-lg bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="Ingresa tu usuario"
               />
             </div>
@@ -142,13 +142,14 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                autoComplete="current-password"
+                className="w-full px-4 py-3 text-base sm:text-lg bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="Ingresa tu contraseña"
               />
             </div>
 
             {error && (
-              <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm sm:text-base">
                 {error}
               </div>
             )}
@@ -156,9 +157,17 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold py-3 sm:py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-lg touch-manipulation"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+              {loading ? (
+                <span className="flex items-center justify-center">
+                  <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></span>
+                  Iniciando sesión...
+                </span>
+              ) : (
+                'Iniciar Sesión'
+              )}
             </button>
           </form>
         </div>
