@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { createTable, updateTable, deleteTable } from '@/lib/actions'
 import { generateQRCode } from '@/lib/utils'
-import { formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
 interface TablesListProps {
@@ -87,7 +86,10 @@ export function TablesList({ initialTables }: TablesListProps) {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Mesas</h1>
-          <p className="text-dark-100">Gestiona las mesas del establecimiento</p>
+          <p className="text-dark-100">
+            Gestiona las mesas del establecimiento. Usa el código corto para
+            ingreso manual si no puedes escanear el QR.
+          </p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -111,9 +113,14 @@ export function TablesList({ initialTables }: TablesListProps) {
           >
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h3 className="text-xl font-semibold text-white mb-1">
-                  {table.name}
-                </h3>
+                <div className="flex items-center space-x-2 mb-1">
+                  <h3 className="text-xl font-semibold text-white">
+                    {table.name}
+                  </h3>
+                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-dark-50 text-white border border-dark-200">
+                    {table.shortCode}
+                  </span>
+                </div>
                 {table.zone && (
                   <p className="text-sm text-dark-100">Zona: {table.zone}</p>
                 )}

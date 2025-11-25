@@ -5,11 +5,12 @@ import { Navbar } from '@/components/Navbar'
 import { useRouter } from 'next/navigation'
 
 export default function ScanPage() {
-  const [tableId, setTableId] = useState('')
+  const [manualCode, setManualCode] = useState('')
   const [error, setError] = useState('')
   const [isScanning, setIsScanning] = useState(false)
   const [scannerError, setScannerError] = useState('')
   const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown')
+  const [manualLoading, setManualLoading] = useState(false)
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const scannerRef = useRef<any>(null)
@@ -22,16 +23,37 @@ export default function ScanPage() {
     }
   }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    if (!tableId.trim()) {
-      setError('Por favor ingresa un ID de mesa')
+    if (!manualCode.trim()) {
+      setError('Por favor ingresa un ID o código corto de mesa')
       return
     }
 
-    router.push(`/mesa/${tableId.trim()}`)
+    setManualLoading(true)
+    try {
+      const response = await fetch('/api/table-lookup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: manualCode.trim() }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'No encontramos una mesa con ese código.')
+      }
+
+      const data = await response.json()
+      router.push(`/mesa/${data.id}`)
+    } catch (err: any) {
+      setError(err.message || 'No encontramos una mesa con ese código.')
+    } finally {
+      setManualLoading(false)
+    }
   }
 
   const parseTableId = (scannedText: string) => {
@@ -150,21 +172,21 @@ export default function ScanPage() {
         </div>
 
         <div className="bg-dark-100 border border-dark-200 rounded-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleManualSubmit} className="space-y-6">
             <div>
               <label
-                htmlFor="tableId"
+                htmlFor="manualCode"
                 className="block text-sm font-medium text-dark-300 mb-2"
               >
-                ID de Mesa
+                ID o Código de Mesa
               </label>
               <input
                 ref={inputRef}
-                id="tableId"
+                id="manualCode"
                 type="text"
-                value={tableId}
-                onChange={(e) => setTableId(e.target.value)}
-                placeholder="Ingresa o escanea el ID de la mesa"
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value)}
+                placeholder="Ej. M001 o copia/pega la URL"
                 className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-lg"
               />
             </div>
@@ -178,9 +200,10 @@ export default function ScanPage() {
             <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
               <button
                 type="submit"
-                className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+                disabled={manualLoading}
+                className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
               >
-                Acceder a Mesa
+                {manualLoading ? 'Buscando...' : 'Acceder a Mesa'}
               </button>
               <button
                 type="button"

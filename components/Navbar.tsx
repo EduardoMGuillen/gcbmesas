@@ -27,7 +27,16 @@ export function Navbar() {
     { href: '/mesero', label: 'Panel', match: pathname === '/mesero' },
   ]
 
-  const links = session?.user.role === 'ADMIN' ? adminLinks : meseroLinks
+  const cajeroLinks = [
+    { href: '/cajero', label: 'Cajero', match: pathname?.startsWith('/cajero') },
+  ]
+
+  const links =
+    session?.user.role === 'ADMIN'
+      ? adminLinks
+      : session?.user.role === 'CAJERO'
+      ? cajeroLinks
+      : meseroLinks
 
   return (
     <nav className="bg-dark-100 border-b border-dark-200 sticky top-0 z-50">
