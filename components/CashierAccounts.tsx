@@ -9,7 +9,7 @@ interface CashierAccountsProps {
     createdAt: string | Date
     orders: Array<{
       id: string
-      createdAt: string
+      createdAt: string | Date
       served: boolean
       quantity: number
       product: { name: string }
