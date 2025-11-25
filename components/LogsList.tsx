@@ -18,8 +18,10 @@ const actionLabels: Record<LogAction, string> = {
   PRODUCT_DEACTIVATED: 'Producto Desactivado',
   TABLE_CREATED: 'Mesa Creada',
   TABLE_UPDATED: 'Mesa Actualizada',
+  TABLE_DELETED: 'Mesa Eliminada',
   USER_CREATED: 'Usuario Creado',
   USER_UPDATED: 'Usuario Actualizado',
+  USER_DELETED: 'Usuario Eliminado',
   LOGIN: 'Inicio de Sesión',
   LOGOUT: 'Cierre de Sesión',
 }
