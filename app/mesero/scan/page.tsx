@@ -133,12 +133,12 @@ export default function ScanPage() {
           qrbox: window.innerWidth < 640 ? { width: 220, height: 220 } : { width: 300, height: 300 },
           aspectRatio: 1.0,
         },
-        (decodedText: string) => {
-          const parsedId = parseTableId(decodedText)
-          setTableId(parsedId)
-          stopScanner()
-          router.push(`/mesa/${parsedId}`)
-        },
+                (decodedText: string) => {
+                  const parsedId = parseTableId(decodedText)
+                  setManualCode(parsedId)
+                  stopScanner()
+                  router.push(`/mesa/${parsedId}`)
+                },
         (errorMessage: string) => {
           console.debug('[QR Scanner] Scanning', errorMessage)
         }
