@@ -59,7 +59,7 @@ model Table {
   name      String
   zone      String?
   qrUrl     String?  @unique
-  shortCode String   @unique
+  shortCode String   @unique @map("shortcode")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
