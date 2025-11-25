@@ -3,6 +3,8 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getDashboardStats } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
+import { CleanUrlParams } from '@/components/CleanUrlParams'
+import { Suspense } from 'react'
 import { formatCurrency } from '@/lib/utils'
 
 export default async function AdminDashboard() {
@@ -29,6 +31,9 @@ export default async function AdminDashboard() {
 
   return (
     <div className="min-h-screen">
+      <Suspense fallback={null}>
+        <CleanUrlParams />
+      </Suspense>
       <Navbar />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         <div className="mb-6 sm:mb-8">
