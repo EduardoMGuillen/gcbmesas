@@ -6,7 +6,7 @@ interface CashierAccountsProps {
     table: { name: string; shortCode: string; zone?: string | null }
     initialBalance: string | number | { toString(): string }
     currentBalance: string | number | { toString(): string }
-    createdAt: string
+    createdAt: string | Date
     orders: Array<{
       id: string
       createdAt: string
@@ -45,9 +45,9 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                 {account.table.zone && (
                   <p className="text-sm text-dark-100">Zona: {account.table.zone}</p>
                 )}
-                <p className="text-xs text-dark-300">
-                  Abierta {formatDate(account.createdAt)}
-                </p>
+          <p className="text-xs text-dark-300">
+            Abierta {formatDate(account.createdAt)}
+          </p>
               </div>
               <div className="grid grid-cols-3 gap-4 mt-4 sm:mt-0">
                 <div>
