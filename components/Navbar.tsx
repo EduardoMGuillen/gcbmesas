@@ -47,7 +47,7 @@ export function Navbar() {
                   className={`px-2 lg:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors touch-manipulation ${
                     link.match
                       ? 'bg-primary-600 text-white'
-                      : 'text-dark-300 hover:text-white hover:bg-dark-200'
+                      : 'text-dark-100 hover:text-white hover:bg-dark-200'
                   }`}
                 >
                   {link.label}
@@ -59,14 +59,14 @@ export function Navbar() {
           {/* User Info and Mobile Menu Button */}
           <div className="flex items-center space-x-2 sm:space-x-4">
             {/* User info - Hidden on small mobile */}
-            <span className="hidden sm:inline-block text-xs sm:text-sm text-dark-300 truncate max-w-[150px] lg:max-w-none">
+            <span className="hidden sm:inline-block text-xs sm:text-sm text-dark-100 truncate max-w-[150px] lg:max-w-none">
               {session?.user.name || session?.user.username} ({session?.user.role})
             </span>
             
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-dark-300 hover:text-white hover:bg-dark-200 rounded-md transition-colors touch-manipulation"
+              className="md:hidden p-2 text-dark-100 hover:text-white hover:bg-dark-200 rounded-md transition-colors touch-manipulation"
               aria-label="Toggle menu"
             >
               <svg
@@ -107,7 +107,7 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-dark-200 py-4 space-y-2">
             {/* User info in mobile menu */}
-            <div className="px-2 py-2 text-sm text-dark-300 border-b border-dark-200 mb-2">
+            <div className="px-2 py-2 text-sm text-dark-100 border-b border-dark-200 mb-2">
               <div className="font-medium text-white">{session?.user.name || session?.user.username}</div>
               <div className="text-xs">{session?.user.role}</div>
             </div>
@@ -121,7 +121,7 @@ export function Navbar() {
                 className={`block px-4 py-3 rounded-lg text-base font-medium transition-colors touch-manipulation ${
                   link.match
                     ? 'bg-primary-600 text-white'
-                    : 'text-dark-300 hover:text-white hover:bg-dark-200'
+                    : 'text-dark-100 hover:text-white hover:bg-dark-200'
                 }`}
               >
                 {link.label}

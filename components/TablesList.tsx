@@ -87,7 +87,7 @@ export function TablesList({ initialTables }: TablesListProps) {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Mesas</h1>
-          <p className="text-dark-400">Gestiona las mesas del establecimiento</p>
+          <p className="text-dark-100">Gestiona las mesas del establecimiento</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -115,7 +115,7 @@ export function TablesList({ initialTables }: TablesListProps) {
                   {table.name}
                 </h3>
                 {table.zone && (
-                  <p className="text-sm text-dark-400">Zona: {table.zone}</p>
+                  <p className="text-sm text-dark-100">Zona: {table.zone}</p>
                 )}
               </div>
               <button
@@ -136,13 +136,13 @@ export function TablesList({ initialTables }: TablesListProps) {
 
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-sm">
-                <span className="text-dark-400">Cuentas abiertas:</span>
+                <span className="text-dark-100">Cuentas abiertas:</span>
                 <span className="text-white font-semibold">
                   {table.accounts.length}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-dark-400">Total cuentas:</span>
+                <span className="text-dark-100">Total cuentas:</span>
                 <span className="text-white font-semibold">
                   {table._count.accounts}
                 </span>
@@ -240,7 +240,7 @@ export function TablesList({ initialTables }: TablesListProps) {
                 <img src={qrCode} alt="QR Code" className="w-64 h-64" />
               )}
             </div>
-            <p className="text-sm text-dark-400 mb-4 text-center">
+            <p className="text-sm text-dark-100 mb-4 text-center">
               {selectedTable.qrUrl}
             </p>
             <button
