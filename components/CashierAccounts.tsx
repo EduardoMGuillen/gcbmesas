@@ -22,7 +22,7 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
   if (!accounts.length) {
     return (
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
-        <p className="text-dark-100">No hay cuentas abiertas en este momento.</p>
+        <p className="text-white/80">No hay cuentas abiertas en este momento.</p>
       </div>
     )
   }
@@ -43,15 +43,15 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                   Mesa {account.table.shortCode} · {account.table.name}
                 </h3>
                 {account.table.zone && (
-                  <p className="text-sm text-dark-100">Zona: {account.table.zone}</p>
+                  <p className="text-sm text-white/80">Zona: {account.table.zone}</p>
                 )}
-          <p className="text-xs text-dark-300">
+          <p className="text-xs text-white/70">
             Abierta {formatDate(account.createdAt)}
           </p>
               </div>
               <div className="grid grid-cols-3 gap-4 mt-4 sm:mt-0">
                 <div>
-                  <p className="text-xs text-dark-300">Inicial</p>
+                  <p className="text-xs text-white/70">Inicial</p>
                   <p className="text-white font-semibold">
                     {formatCurrency(
                       typeof account.initialBalance === 'object'
@@ -61,13 +61,13 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-dark-300">Consumido</p>
+                  <p className="text-xs text-white/70">Consumido</p>
                   <p className="text-primary-400 font-semibold">
                     {formatCurrency(Number(totalConsumed))}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-dark-300">Disponible</p>
+                  <p className="text-xs text-white/70">Disponible</p>
                   <p
                     className={`font-semibold ${
                       Number(account.currentBalance) < 0
@@ -82,11 +82,11 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-dark-100 mb-2">
+              <h4 className="text-sm font-semibold text-white/80 mb-2">
                 Pedidos recientes
               </h4>
               {account.orders.length === 0 ? (
-                <p className="text-dark-300 text-sm">
+                <p className="text-white/70 text-sm">
                   Esta cuenta aún no tiene pedidos.
                 </p>
               ) : (
@@ -100,7 +100,7 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                         <p className="text-white text-sm">
                           {order.quantity} × {order.product.name}
                         </p>
-                        <p className="text-xs text-dark-300">
+                        <p className="text-xs text-white/70">
                           {formatDate(order.createdAt)} ·{' '}
                           {order.user?.name || order.user?.username || '—'}
                         </p>
