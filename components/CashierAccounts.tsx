@@ -63,11 +63,7 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                 <div>
                   <p className="text-xs text-dark-300">Consumido</p>
                   <p className="text-primary-400 font-semibold">
-                    {formatCurrency(
-                      typeof totalConsumed === 'object'
-                        ? totalConsumed.toString()
-                        : totalConsumed
-                    )}
+                    {formatCurrency(Number(totalConsumed))}
                   </p>
                 </div>
                 <div>
@@ -79,11 +75,7 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                         : 'text-green-400'
                     }`}
                   >
-                    {formatCurrency(
-                      typeof account.currentBalance === 'object'
-                        ? account.currentBalance.toString()
-                        : account.currentBalance
-                    )}
+                    {formatCurrency(Number(account.currentBalance))}
                   </p>
                 </div>
               </div>
