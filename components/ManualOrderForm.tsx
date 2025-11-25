@@ -13,7 +13,7 @@ interface ManualOrderFormProps {
 export function ManualOrderForm({ tables, products }: ManualOrderFormProps) {
   const [selectedTableId, setSelectedTableId] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
-  const [quantity, setQuantity] = useState(1)
+  const [quantityInput, setQuantityInput] = useState('1')
   const [initialBalance, setInitialBalance] = useState('')
   const [showCreateAccount, setShowCreateAccount] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -73,15 +73,22 @@ export function ManualOrderForm({ tables, products }: ManualOrderFormProps) {
         return
       }
 
+      const quantityNumber = parseInt(quantityInput, 10)
+      if (!quantityNumber || quantityNumber < 1) {
+        setError('La cantidad debe ser un número mayor o igual a 1')
+        setLoading(false)
+        return
+      }
+
       await createOrder({
         accountId: account.id,
         productId: selectedProductId,
-        quantity: quantity,
+        quantity: quantityNumber,
       })
 
       setSuccess('Pedido agregado exitosamente')
       setSelectedProductId('')
-      setQuantity(1)
+      setQuantityInput('1')
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Error al agregar pedido')
@@ -228,11 +235,19 @@ export function ManualOrderForm({ tables, products }: ManualOrderFormProps) {
                 </label>
                 <input
                   type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) =>
-                    setQuantity(parseInt(e.target.value) || 1)
-                  }
+                  inputMode="numeric"
+                  value={quantityInput}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (/^\d*$/.test(value)) {
+                      setQuantityInput(value)
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!quantityInput || quantityInput === '0') {
+                      setQuantityInput('1')
+                    }
+                  }}
                   required
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -246,7 +261,8 @@ export function ManualOrderForm({ tables, products }: ManualOrderFormProps) {
                       Number(
                         products.find((p) => p.id === selectedProductId)?.price ||
                           0
-                      ) * quantity
+                      ) *
+                        (parseInt(quantityInput, 10) || 0)
                     )}
                   </p>
                 </div>
