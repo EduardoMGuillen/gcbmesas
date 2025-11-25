@@ -81,7 +81,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
     })
   }
 
-  const handleDeleteUser = async (user: any) {
+  const handleDeleteUser = async (user: any) => {
     if (
       !confirm(
         `¿Seguro que deseas eliminar al usuario "${user.username}"? Esta acción no se puede deshacer.`
