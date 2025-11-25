@@ -68,7 +68,7 @@ export function Navbar() {
           {/* User Info and Mobile Menu Button */}
           <div className="flex items-center space-x-2 sm:space-x-4">
             {/* User info - Hidden on small mobile */}
-            <span className="hidden sm:inline-block text-xs sm:text-sm text-dark-100 truncate max-w-[150px] lg:max-w-none">
+            <span className="hidden sm:inline-block text-xs sm:text-sm text-white/80 truncate max-w-[150px] lg:max-w-none">
               {session?.user.name || session?.user.username} ({session?.user.role})
             </span>
             
@@ -105,7 +105,7 @@ export function Navbar() {
             {/* Logout Button - Desktop */}
             <button
               onClick={handleLogout}
-              className="hidden md:block px-3 lg:px-4 py-2 text-xs sm:text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-200 rounded-md transition-colors touch-manipulation"
+              className="hidden md:block px-3 lg:px-4 py-2 text-xs sm:text-sm font-medium text-white/80 hover:text-white hover:bg-dark-200 rounded-md transition-colors touch-manipulation"
             >
               Cerrar Sesión
             </button>
@@ -116,7 +116,7 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-dark-200 py-4 space-y-2">
             {/* User info in mobile menu */}
-            <div className="px-2 py-2 text-sm text-dark-100 border-b border-dark-200 mb-2">
+            <div className="px-2 py-2 text-sm text-white/80 border-b border-dark-200 mb-2">
               <div className="font-medium text-white">{session?.user.name || session?.user.username}</div>
               <div className="text-xs">{session?.user.role}</div>
             </div>
@@ -140,7 +140,7 @@ export function Navbar() {
             {/* Logout in mobile menu */}
             <button
               onClick={handleLogout}
-              className="w-full text-left px-4 py-3 rounded-lg text-base font-medium text-dark-300 hover:text-white hover:bg-dark-200 transition-colors touch-manipulation"
+              className="w-full text-left px-4 py-3 rounded-lg text-base font-medium text-white/80 hover:text-white hover:bg-dark-200 transition-colors touch-manipulation"
             >
               Cerrar Sesión
             </button>
