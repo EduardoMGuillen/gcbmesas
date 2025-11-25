@@ -33,6 +33,36 @@ async function getCurrentUser() {
   return session.user
 }
 
+const SHORT_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const SHORT_CODE_LENGTH = 4
+
+async function generateUniqueTableCode() {
+  for (let attempt = 0; attempt < 25; attempt++) {
+    let code = ''
+    for (let i = 0; i < SHORT_CODE_LENGTH; i++) {
+      const index = Math.floor(Math.random() * SHORT_CODE_CHARS.length)
+      code += SHORT_CODE_CHARS[index]
+    }
+
+    const existing = await prisma.table.findUnique({
+      where: { shortCode: code },
+      select: { id: true },
+    })
+
+    if (!existing) {
+      return code
+    }
+  }
+
+  throw new Error('No se pudo generar un código corto único. Intenta nuevamente.')
+}
+
+function ensureCashierAccess(role: string) {
+  if (!['ADMIN', 'CAJERO'].includes(role)) {
+    throw new Error('Solo cajeros o administradores pueden acceder a esta sección')
+  }
+}
+
 // ========== USER ACTIONS ==========
 
 export async function createUser(data: {
@@ -151,10 +181,12 @@ export async function createTable(data: { name: string; zone?: string }) {
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const shortCode = await generateUniqueTableCode()
   const table = await prisma.table.create({
     data: {
       name: data.name,
       zone: data.zone,
+      shortCode,
       qrUrl: `${appUrl}/mesa/${crypto.randomUUID()}`,
     },
   })
@@ -169,6 +201,7 @@ export async function createTable(data: { name: string; zone?: string }) {
   await createLog(LogAction.TABLE_CREATED, currentUser.id, table.id, {
     tableName: table.name,
     zone: table.zone,
+    shortCode,
   })
 
   revalidatePath('/admin/mesas')
@@ -231,6 +264,87 @@ export async function deleteTable(tableId: string) {
   })
 
   revalidatePath('/admin/mesas')
+}
+
+// ========== CAJERO DASHBOARD ==========
+
+export async function getCashierDashboardData() {
+  const currentUser = await getCurrentUser()
+  ensureCashierAccess(currentUser.role)
+
+  const [accounts, pendingOrders, recentServed] = await Promise.all([
+    prisma.account.findMany({
+      where: { status: 'OPEN' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        table: {
+          select: { id: true, name: true, zone: true, shortCode: true },
+        },
+        orders: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            product: { select: { name: true } },
+            user: { select: { username: true, name: true } },
+          },
+          take: 15,
+        },
+      },
+    }),
+    prisma.order.findMany({
+      where: { served: false },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        product: { select: { name: true, price: true } },
+        account: {
+          select: {
+            id: true,
+            table: { select: { name: true, shortCode: true, zone: true } },
+          },
+        },
+        user: { select: { username: true, name: true } },
+      },
+    }),
+    prisma.order.findMany({
+      where: { served: true },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: {
+        product: { select: { name: true, price: true } },
+        account: {
+          select: {
+            id: true,
+            table: { select: { name: true, shortCode: true, zone: true } },
+          },
+        },
+        user: { select: { username: true, name: true } },
+      },
+    }),
+  ])
+
+  return { accounts, pendingOrders, recentServed }
+}
+
+export async function setOrderServed(orderId: string, served: boolean) {
+  const currentUser = await getCurrentUser()
+  ensureCashierAccess(currentUser.role)
+
+  const order = await prisma.order.update({
+    where: { id: orderId },
+    data: { served },
+    include: {
+      account: {
+        select: {
+          tableId: true,
+          table: { select: { shortCode: true, name: true } },
+        },
+      },
+      product: { select: { name: true } },
+    },
+  })
+
+  revalidatePath('/cajero')
+  revalidatePath(`/mesa/${order.account.tableId}`)
+  return order
 }
 
 // ========== ACCOUNT ACTIONS ==========

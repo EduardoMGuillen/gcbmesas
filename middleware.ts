@@ -14,11 +14,11 @@ export default withAuth(
       userAgent: req.headers.get('user-agent')?.includes('iPhone') ? 'iPhone' : 'Other',
     })
 
+    const fromCallback = req.nextUrl.searchParams.get('from') === 'callback'
+
     // Admin routes - only allow ADMIN role
     if (path.startsWith('/admin')) {
       // If coming from auth-callback, allow access (session was just verified server-side)
-      const fromCallback = req.nextUrl.searchParams.get('from') === 'callback'
-      
       if (fromCallback) {
         // Coming from auth-callback, session was verified there - allow access
         console.log('[Middleware] Allowing /admin - coming from auth-callback (session verified server-side)')
@@ -27,6 +27,19 @@ export default withAuth(
       
       if (!token || token.role !== 'ADMIN') {
         console.log('[Middleware] Blocked /admin - no token or wrong role')
+        return NextResponse.redirect(new URL('/login', req.url))
+      }
+    }
+
+    // Cajero routes - allow CAJERO and ADMIN roles
+    if (path.startsWith('/cajero')) {
+      if (fromCallback) {
+        console.log('[Middleware] Allowing /cajero - coming from auth-callback (session verified server-side)')
+        return NextResponse.next()
+      }
+
+      if (!token || !['CAJERO', 'ADMIN'].includes(token.role as string)) {
+        console.log('[Middleware] Blocked /cajero - no token or wrong role')
         return NextResponse.redirect(new URL('/login', req.url))
       }
     }
@@ -66,7 +79,7 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/cajero/:path*'],
   // Don't match auth-callback to allow it to work
 }
 

@@ -128,9 +128,10 @@ export function TableView({ table, account: initialAccount, products }: TableVie
           <h1 className="text-3xl font-bold text-white mb-2">
             Mesa: {table.name}
           </h1>
-          {table.zone && (
-            <p className="text-dark-400">Zona: {table.zone}</p>
-          )}
+          <p className="text-dark-100">
+            Código: <span className="font-semibold">{table.shortCode}</span>
+          </p>
+          {table.zone && <p className="text-dark-400">Zona: {table.zone}</p>}
         </div>
 
         <div className="bg-dark-100 border border-dark-200 rounded-xl p-8">
@@ -178,6 +179,9 @@ export function TableView({ table, account: initialAccount, products }: TableVie
           <h1 className="text-3xl font-bold text-white mb-2">
             Mesa: {table.name}
           </h1>
+          <p className="text-dark-100">
+            Código: <span className="font-semibold">{table.shortCode}</span>
+          </p>
         </div>
         <div className="bg-dark-100 border border-dark-200 rounded-xl p-8">
           <p className="text-dark-400">No hay cuenta abierta para esta mesa</p>
@@ -195,6 +199,9 @@ export function TableView({ table, account: initialAccount, products }: TableVie
         <h1 className="text-3xl font-bold text-white mb-2">
           Mesa: {table.name}
         </h1>
+        <p className="text-dark-100">
+          Código: <span className="font-semibold">{table.shortCode}</span>
+        </p>
         {table.zone && <p className="text-dark-400">Zona: {table.zone}</p>}
       </div>
 
