@@ -11,7 +11,7 @@ interface CashierOrdersProps {
     createdAt: string | Date
     quantity: number
     served: boolean
-    product: { name: string; price: string | number }
+    product: { name: string; price: string | number | { toString(): string } }
     account: {
       id: string
       table: { name: string; shortCode: string; zone?: string | null }
@@ -22,7 +22,7 @@ interface CashierOrdersProps {
     id: string
     createdAt: string | Date
     quantity: number
-    product: { name: string; price: string | number }
+    product: { name: string; price: string | number | { toString(): string } }
     account: {
       id: string
       table: { name: string; shortCode: string; zone?: string | null }
