@@ -53,17 +53,17 @@ export function CashierOrders({
             <h2 className="text-2xl font-semibold text-white">
               Pedidos pendientes
             </h2>
-            <p className="text-sm text-dark-300">
+            <p className="text-sm text-white/80">
               Marca como realizado cuando el pedido esté listo.
             </p>
           </div>
-          <span className="text-sm text-dark-100">
+          <span className="text-sm text-white/80">
             Total: {pendingOrders.length}
           </span>
         </div>
 
         {pendingOrders.length === 0 ? (
-          <p className="text-dark-300">No hay pedidos pendientes.</p>
+          <p className="text-white/80">No hay pedidos pendientes.</p>
         ) : (
           <div className="space-y-4">
             {pendingOrders.map((order) => (
@@ -78,12 +78,12 @@ export function CashierOrders({
                       {order.account.table.name}
                     </p>
                     {order.account.table.zone && (
-                      <p className="text-xs text-dark-300">
+                      <p className="text-xs text-white/70">
                         Zona: {order.account.table.zone}
                       </p>
                     )}
                   </div>
-                  <span className="text-xs text-dark-300">
+                  <span className="text-xs text-white/70">
                     {formatDate(order.createdAt)}
                   </span>
                 </div>
@@ -93,7 +93,7 @@ export function CashierOrders({
                     <p className="text-white">
                       {order.quantity} × {order.product.name}
                     </p>
-                    <p className="text-xs text-dark-300">
+                    <p className="text-xs text-white/70">
                       Solicitado por {order.user?.name || order.user?.username}
                     </p>
                   </div>
@@ -123,14 +123,14 @@ export function CashierOrders({
             <h2 className="text-2xl font-semibold text-white">
               Pedidos recientes
             </h2>
-            <p className="text-sm text-dark-300">
+            <p className="text-sm text-white/80">
               Últimos pedidos marcados como realizados.
             </p>
           </div>
         </div>
 
         {recentServed.length === 0 ? (
-          <p className="text-dark-300">Aún no hay pedidos completados.</p>
+          <p className="text-white/80">Aún no hay pedidos completados.</p>
         ) : (
           <div className="space-y-3">
             {recentServed.map((order) => (
@@ -142,18 +142,18 @@ export function CashierOrders({
                   <p className="text-white text-sm">
                     {order.quantity} × {order.product.name}
                   </p>
-                  <p className="text-xs text-dark-300">
+                  <p className="text-xs text-white/70">
                     Mesa {order.account.table.shortCode} ·{' '}
                     {order.account.table.name}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-dark-100">
+                  <p className="text-sm text-white/80">
                     {formatCurrency(
                       Number(order.product.price) * order.quantity
                     )}
                   </p>
-                  <p className="text-xs text-dark-300">
+                  <p className="text-xs text-white/70">
                     {formatDate(order.createdAt)}
                   </p>
                 </div>
