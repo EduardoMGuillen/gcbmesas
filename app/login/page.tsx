@@ -44,97 +44,48 @@ export default function LoginPage() {
     try {
       console.log('[Login] Attempting login for user:', username)
       
-      // Use NextAuth signIn directly - most reliable for mobile
-      // NextAuth handles cookies correctly across all browsers and devices
-      const result = await signIn('credentials', {
-        username,
-        password,
-        redirect: false,
-      })
-      
-      console.log('[Login] SignIn result:', { ok: result?.ok, error: result?.error })
+      // For iOS, use NextAuth signIn with redirect to let NextAuth handle everything
+      // This is more reliable because NextAuth manages the cookie setting and redirect
+      try {
+        const result = await signIn('credentials', {
+          username,
+          password,
+          redirect: false,
+        })
+        
+        console.log('[Login] SignIn result:', { ok: result?.ok, error: result?.error })
 
-      // Check for errors
-      if (result?.error) {
-        console.error('[Login] Login error:', result.error)
-        setLoading(false)
-        if (result.error === 'CredentialsSignin') {
-          setError('Usuario o contraseña incorrectos. Verifica tus credenciales.')
-        } else if (result.error.includes('database') || result.error.includes('connection')) {
-          setError('Error de conexión a la base de datos. Verifica la configuración.')
-        } else {
-          setError(`Error: ${result.error}`)
-        }
-        return
-      }
-
-      // Check if login was successful
-      if (result?.ok) {
-        console.log('[Login] NextAuth login successful, verifying session...')
-        
-        // Wait longer for cookie to be set (iOS needs more time)
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-        
-        // Verify session with server - try multiple times for mobile (especially iOS)
-        let sessionVerified = false
-        let redirectUrl = '/'
-        const maxAttempts = 8 // Increased for iOS
-        
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-          try {
-            // Wait progressively longer between attempts (iOS needs more time)
-            if (attempt > 0) {
-              const delay = Math.min(500 * (attempt + 1), 2000) // Progressive delay, max 2s
-              await new Promise((resolve) => setTimeout(resolve, delay))
-            }
-            
-            const sessionResponse = await fetch('/api/auth-redirect', {
-              method: 'GET',
-              credentials: 'include',
-              cache: 'no-store',
-              headers: {
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
-              },
-            })
-            
-            if (sessionResponse.ok) {
-              const sessionData = await sessionResponse.json()
-              console.log(`[Login] Session check (attempt ${attempt + 1}/${maxAttempts}):`, {
-                hasSession: sessionData.hasSession,
-                role: sessionData.role,
-                redirectUrl: sessionData.redirectUrl,
-              })
-              
-              if (sessionData.hasSession && sessionData.redirectUrl) {
-                sessionVerified = true
-                redirectUrl = sessionData.redirectUrl
-                console.log('[Login] Session verified, redirecting to:', redirectUrl)
-                break
-              }
-            }
-          } catch (sessionError) {
-            console.error(`[Login] Session verification error (attempt ${attempt + 1}):`, sessionError)
+        // Check for errors
+        if (result?.error) {
+          console.error('[Login] Login error:', result.error)
+          setLoading(false)
+          if (result.error === 'CredentialsSignin') {
+            setError('Usuario o contraseña incorrectos. Verifica tus credenciales.')
+          } else if (result.error.includes('database') || result.error.includes('connection')) {
+            setError('Error de conexión a la base de datos. Verifica la configuración.')
+          } else {
+            setError(`Error: ${result.error}`)
           }
+          return
         }
 
-        if (sessionVerified) {
-          // Session verified, redirect immediately
-          console.log('[Login] Redirecting to:', redirectUrl)
-          window.location.replace(redirectUrl)
-          return
-        } else {
-          // Session not verified after all attempts
-          // For iOS, cookies can take longer, so redirect to auth-callback
-          // which will keep trying to verify the session
-          console.log('[Login] Session not verified after attempts, redirecting to auth-callback (iOS may need more time)')
+        // If login successful, redirect to callback which will handle session verification
+        if (result?.ok) {
+          console.log('[Login] NextAuth login successful, redirecting to callback')
+          // Use a small delay to ensure cookie is set, then redirect
+          await new Promise((resolve) => setTimeout(resolve, 500))
           window.location.replace('/auth-callback')
           return
         }
+      } catch (signInError) {
+        console.error('[Login] SignIn exception:', signInError)
+        setError('Error al iniciar sesión. Por favor, intenta nuevamente.')
+        setLoading(false)
+        return
       }
 
       // Unexpected result
-      console.error('[Login] Unexpected login result:', result)
+      console.error('[Login] Unexpected login result')
       setError('Error desconocido. Por favor, intenta nuevamente.')
       setLoading(false)
     } catch (err: any) {
