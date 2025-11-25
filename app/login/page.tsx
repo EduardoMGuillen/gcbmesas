@@ -164,19 +164,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-dark-50">
-      <div className="w-full max-w-md">
-        <div className="bg-dark-100 rounded-2xl shadow-2xl p-6 sm:p-8 border border-dark-200">
-          <div className="text-center mb-6 sm:mb-8">
-            <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">TableControl</h1>
-            <p className="text-sm sm:text-base text-dark-400">Sistema de Gestión de Mesas</p>
+    <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 bg-dark-50 safe-area-inset py-8 sm:py-4">
+      <div className="w-full max-w-md mx-auto my-auto">
+        <div className="bg-dark-100 rounded-xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 border border-dark-200">
+          <div className="text-center mb-5 sm:mb-6 md:mb-8">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1 sm:mb-2">TableControl</h1>
+            <p className="text-xs sm:text-sm md:text-base text-dark-400">Sistema de Gestión de Mesas</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
             <div>
               <label
                 htmlFor="username"
-                className="block text-sm font-medium text-dark-300 mb-2"
+                className="block text-sm sm:text-base font-medium text-dark-300 mb-2"
               >
                 Usuario
               </label>
@@ -187,15 +187,19 @@ export default function LoginPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 autoComplete="username"
-                className="w-full px-4 py-3 text-base sm:text-lg bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                inputMode="text"
+                autoCapitalize="none"
+                autoCorrect="off"
+                className="w-full px-4 py-3.5 sm:py-4 text-base bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                 placeholder="Ingresa tu usuario"
+                style={{ fontSize: '16px' }}
               />
             </div>
 
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-dark-300 mb-2"
+                className="block text-sm sm:text-base font-medium text-dark-300 mb-2"
               >
                 Contraseña
               </label>
@@ -206,8 +210,10 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full px-4 py-3 text-base sm:text-lg bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                inputMode="text"
+                className="w-full px-4 py-3.5 sm:py-4 text-base bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                 placeholder="Ingresa tu contraseña"
+                style={{ fontSize: '16px' }}
               />
             </div>
 
@@ -220,13 +226,13 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold py-3 sm:py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-lg touch-manipulation"
+              className="w-full bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold py-4 sm:py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-lg touch-manipulation min-h-[48px] shadow-lg active:scale-[0.98]"
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               {loading ? (
                 <span className="flex items-center justify-center">
                   <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></span>
-                  Iniciando sesión...
+                  <span className="text-sm sm:text-base">Iniciando sesión...</span>
                 </span>
               ) : (
                 'Iniciar Sesión'
