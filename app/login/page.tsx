@@ -72,19 +72,20 @@ export default function LoginPage() {
       if (result?.ok) {
         console.log('[Login] NextAuth login successful, verifying session...')
         
-        // Wait a bit for cookie to be set (important for mobile)
-        await new Promise((resolve) => setTimeout(resolve, 500))
+        // Wait longer for cookie to be set (iOS needs more time)
+        await new Promise((resolve) => setTimeout(resolve, 1500))
         
-        // Verify session with server - try multiple times for mobile
+        // Verify session with server - try multiple times for mobile (especially iOS)
         let sessionVerified = false
         let redirectUrl = '/'
-        const maxAttempts = 5
+        const maxAttempts = 8 // Increased for iOS
         
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           try {
-            // Wait progressively longer between attempts
+            // Wait progressively longer between attempts (iOS needs more time)
             if (attempt > 0) {
-              await new Promise((resolve) => setTimeout(resolve, 300 * attempt))
+              const delay = Math.min(500 * (attempt + 1), 2000) // Progressive delay, max 2s
+              await new Promise((resolve) => setTimeout(resolve, delay))
             }
             
             const sessionResponse = await fetch('/api/auth-redirect', {
@@ -123,31 +124,10 @@ export default function LoginPage() {
           window.location.replace(redirectUrl)
           return
         } else {
-          // Session not verified, but login was successful
-          // Try to get role from debug-session as fallback
-          try {
-            const debugResponse = await fetch('/api/debug-session', {
-              method: 'GET',
-              credentials: 'include',
-              cache: 'no-store',
-            })
-            
-            if (debugResponse.ok) {
-              const debugData = await debugResponse.json()
-              if (debugData.hasSession && debugData.session?.user?.role) {
-                const role = debugData.session.user.role
-                redirectUrl = role === 'ADMIN' ? '/admin' : role === 'MESERO' ? '/mesero' : '/'
-                console.log('[Login] Using debug-session, redirecting to:', redirectUrl)
-                window.location.replace(redirectUrl)
-                return
-              }
-            }
-          } catch (debugError) {
-            console.error('[Login] Debug session error:', debugError)
-          }
-          
-          // Last resort: redirect to auth-callback which will handle it
-          console.log('[Login] Session not verified, redirecting to auth-callback')
+          // Session not verified after all attempts
+          // For iOS, cookies can take longer, so redirect to auth-callback
+          // which will keep trying to verify the session
+          console.log('[Login] Session not verified after attempts, redirecting to auth-callback (iOS may need more time)')
           window.location.replace('/auth-callback')
           return
         }

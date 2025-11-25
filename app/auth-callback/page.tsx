@@ -8,16 +8,18 @@ export const runtime = 'nodejs'
 export default async function AuthCallbackPage() {
   console.log('[AuthCallback] Server-side session check started')
   
-  // Try to get session with multiple attempts (important for mobile)
+  // Try to get session with multiple attempts (important for mobile, especially iOS)
   let session = null
-  const maxAttempts = 3
-  const attemptDelay = 500 // 500ms between attempts
+  const maxAttempts = 5 // Increased for iOS
+  const baseDelay = 800 // Longer base delay for iOS
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       if (attempt > 0) {
         console.log(`[AuthCallback] Retry attempt ${attempt + 1}/${maxAttempts}`)
-        await new Promise((resolve) => setTimeout(resolve, attemptDelay))
+        // Progressive delay: 800ms, 1600ms, 2400ms, 3200ms
+        const delay = baseDelay * attempt
+        await new Promise((resolve) => setTimeout(resolve, delay))
       }
       
       session = await getServerSession(authOptions)
@@ -47,8 +49,9 @@ export default async function AuthCallbackPage() {
     console.log('[AuthCallback] Redirecting to:', redirectUrl)
     redirect(redirectUrl)
   } else {
-    console.warn('[AuthCallback] No session found after all attempts, using client-side fallback')
+    console.warn('[AuthCallback] No session found after server attempts, using client-side fallback (iOS may need more time)')
     // If no session found, use client-side component for polling
+    // This is especially important for iOS where cookies can take longer to propagate
     const { default: AuthCallbackClient } = await import('./AuthCallbackClient')
     return <AuthCallbackClient initialRedirectUrl={null} />
   }
