@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createUser, updateUser } from '@/lib/actions'
+import { createUser, updateUser, deleteUser } from '@/lib/actions'
 import { formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
@@ -19,8 +19,10 @@ export function UsersList({ initialUsers }: UsersListProps) {
     username: '',
     password: '',
     role: 'MESERO' as 'ADMIN' | 'MESERO' | 'CAJERO',
+    name: '',
   })
   const router = useRouter()
+  const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,10 +34,11 @@ export function UsersList({ initialUsers }: UsersListProps) {
         username: formData.username,
         password: formData.password,
         role: formData.role,
+        name: formData.name || undefined,
       })
       setUsers([...users, newUser])
       setShowCreateModal(false)
-      setFormData({ username: '', password: '', role: 'MESERO' })
+      setFormData({ username: '', password: '', role: 'MESERO', name: '' })
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Error al crear usuario')
@@ -54,11 +57,12 @@ export function UsersList({ initialUsers }: UsersListProps) {
       if (formData.username) updateData.username = formData.username
       if (formData.password) updateData.password = formData.password
       if (formData.role) updateData.role = formData.role
+      updateData.name = formData.name || null
 
       const updatedUser = await updateUser(editingUser.id, updateData)
       setUsers(users.map((u) => (u.id === updatedUser.id ? updatedUser : u)))
       setEditingUser(null)
-      setFormData({ username: '', password: '', role: 'MESERO' })
+      setFormData({ username: '', password: '', role: 'MESERO', name: '' })
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Error al actualizar usuario')
@@ -73,7 +77,31 @@ export function UsersList({ initialUsers }: UsersListProps) {
       username: user.username,
       password: '',
       role: user.role,
+      name: user.name || '',
     })
+  }
+
+  const handleDeleteUser = async (user: any) {
+    if (
+      !confirm(
+        `¿Seguro que deseas eliminar al usuario "${user.username}"? Esta acción no se puede deshacer.`
+      )
+    ) {
+      return
+    }
+
+    setError('')
+    setDeleteLoadingId(user.id)
+
+    try {
+      await deleteUser(user.id)
+      setUsers(users.filter((u) => u.id !== user.id))
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || 'Error al eliminar usuario')
+    } finally {
+      setDeleteLoadingId(null)
+    }
   }
 
   return (
@@ -107,6 +135,9 @@ export function UsersList({ initialUsers }: UsersListProps) {
                 Usuario
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+                Nombre
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
                 Rol
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
@@ -125,6 +156,9 @@ export function UsersList({ initialUsers }: UsersListProps) {
                     {user.username}
                   </div>
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-300">
+                  {user.name || '—'}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -141,12 +175,19 @@ export function UsersList({ initialUsers }: UsersListProps) {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-400">
                   {formatDate(user.createdAt)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                   <button
                     onClick={() => openEditModal(user)}
                     className="text-primary-400 hover:text-primary-300"
                   >
                     Editar
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(user)}
+                    disabled={deleteLoadingId === user.id}
+                    className="text-red-400 hover:text-red-300 disabled:opacity-50"
+                  >
+                    {deleteLoadingId === user.id ? 'Eliminando...' : 'Eliminar'}
                   </button>
                 </td>
               </tr>
@@ -174,6 +215,20 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   }
                   required
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Nombre (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Nombre completo"
                 />
               </div>
               <div>
@@ -215,7 +270,12 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onClick={() => {
                     setShowCreateModal(false)
                     setError('')
-                    setFormData({ username: '', password: '', role: 'MESERO' })
+                    setFormData({
+                      username: '',
+                      password: '',
+                      role: 'MESERO',
+                      name: '',
+                    })
                   }}
                   className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                 >
@@ -257,6 +317,19 @@ export function UsersList({ initialUsers }: UsersListProps) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Nombre (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
                   Nueva Contraseña (dejar vacío para no cambiar)
                 </label>
                 <input
@@ -293,7 +366,12 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onClick={() => {
                     setEditingUser(null)
                     setError('')
-                    setFormData({ username: '', password: '', role: 'MESERO' })
+                    setFormData({
+                      username: '',
+                      password: '',
+                      role: 'MESERO',
+                      name: '',
+                    })
                   }}
                   className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                 >

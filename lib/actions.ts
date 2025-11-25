@@ -39,6 +39,7 @@ export async function createUser(data: {
   username: string
   password: string
   role: 'ADMIN' | 'MESERO' | 'CAJERO'
+  name?: string
 }) {
   const currentUser = await getCurrentUser()
   if (currentUser.role !== 'ADMIN') {
@@ -53,6 +54,7 @@ export async function createUser(data: {
       username: data.username,
       password: hashedPassword,
       role: data.role,
+      name: data.name?.trim() || null,
     },
   })
 
@@ -60,6 +62,7 @@ export async function createUser(data: {
     createdUserId: user.id,
     username: user.username,
     role: user.role,
+    name: user.name,
   })
 
   revalidatePath('/admin/usuarios')
@@ -72,6 +75,7 @@ export async function updateUser(
     username?: string
     password?: string
     role?: 'ADMIN' | 'MESERO' | 'CAJERO'
+    name?: string | null
   }
 ) {
   const currentUser = await getCurrentUser()
@@ -82,6 +86,7 @@ export async function updateUser(
   const updateData: any = {}
   if (data.username) updateData.username = data.username
   if (data.role) updateData.role = data.role
+  if (data.name !== undefined) updateData.name = data.name?.trim() || null
   if (data.password) {
     const bcrypt = require('bcryptjs')
     updateData.password = await bcrypt.hash(data.password, 10)
@@ -99,6 +104,42 @@ export async function updateUser(
 
   revalidatePath('/admin/usuarios')
   return user
+}
+
+export async function deleteUser(userId: string) {
+  const currentUser = await getCurrentUser()
+  if (currentUser.role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden eliminar usuarios')
+  }
+  if (currentUser.id === userId) {
+    throw new Error('No puedes eliminar tu propio usuario')
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, username: true, name: true },
+  })
+
+  if (!user) {
+    throw new Error('Usuario no encontrado')
+  }
+
+  const ordersCount = await prisma.order.count({ where: { userId } })
+  if (ordersCount > 0) {
+    throw new Error(
+      'No puedes eliminar este usuario porque tiene pedidos registrados'
+    )
+  }
+
+  await prisma.user.delete({ where: { id: userId } })
+
+  await createLog(LogAction.USER_DELETED, currentUser.id, undefined, {
+    deletedUserId: userId,
+    username: user.username,
+    name: user.name,
+  })
+
+  revalidatePath('/admin/usuarios')
 }
 
 // ========== TABLE ACTIONS ==========
@@ -154,6 +195,42 @@ export async function updateTable(
 
   revalidatePath('/admin/mesas')
   return table
+}
+
+export async function deleteTable(tableId: string) {
+  const currentUser = await getCurrentUser()
+  if (currentUser.role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden eliminar mesas')
+  }
+
+  const table = await prisma.table.findUnique({
+    where: { id: tableId },
+    select: { id: true, name: true, zone: true },
+  })
+
+  if (!table) {
+    throw new Error('Mesa no encontrada')
+  }
+
+  const openAccounts = await prisma.account.count({
+    where: { tableId, status: 'OPEN' },
+  })
+
+  if (openAccounts > 0) {
+    throw new Error(
+      'No puedes eliminar esta mesa porque tiene cuentas abiertas'
+    )
+  }
+
+  await prisma.table.delete({ where: { id: tableId } })
+
+  await createLog(LogAction.TABLE_DELETED, currentUser.id, tableId, {
+    tableId,
+    tableName: table.name,
+    zone: table.zone,
+  })
+
+  revalidatePath('/admin/mesas')
 }
 
 // ========== ACCOUNT ACTIONS ==========
@@ -504,6 +581,7 @@ export async function getUsers() {
       username: true,
       role: true,
       createdAt: true,
+      name: true,
     },
     orderBy: { createdAt: 'desc' },
   })
