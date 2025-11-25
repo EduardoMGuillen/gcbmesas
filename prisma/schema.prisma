@@ -31,8 +31,10 @@ enum LogAction {
   PRODUCT_DEACTIVATED
   TABLE_CREATED
   TABLE_UPDATED
+  TABLE_DELETED
   USER_CREATED
   USER_UPDATED
+  USER_DELETED
   LOGIN
   LOGOUT
 }
@@ -40,6 +42,7 @@ enum LogAction {
 model User {
   id        String   @id @default(cuid())
   username  String   @unique
+  name      String?
   password  String
   role      UserRole @default(MESERO)
   createdAt DateTime @default(now())

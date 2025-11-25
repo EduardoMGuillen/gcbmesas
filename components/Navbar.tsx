@@ -59,8 +59,8 @@ export function Navbar() {
           {/* User Info and Mobile Menu Button */}
           <div className="flex items-center space-x-2 sm:space-x-4">
             {/* User info - Hidden on small mobile */}
-            <span className="hidden sm:inline-block text-xs sm:text-sm text-dark-300 truncate max-w-[120px] lg:max-w-none">
-              {session?.user.username} ({session?.user.role})
+            <span className="hidden sm:inline-block text-xs sm:text-sm text-dark-300 truncate max-w-[150px] lg:max-w-none">
+              {session?.user.name || session?.user.username} ({session?.user.role})
             </span>
             
             {/* Mobile Menu Button */}
@@ -108,7 +108,7 @@ export function Navbar() {
           <div className="md:hidden border-t border-dark-200 py-4 space-y-2">
             {/* User info in mobile menu */}
             <div className="px-2 py-2 text-sm text-dark-300 border-b border-dark-200 mb-2">
-              <div className="font-medium text-white">{session?.user.username}</div>
+              <div className="font-medium text-white">{session?.user.name || session?.user.username}</div>
               <div className="text-xs">{session?.user.role}</div>
             </div>
             

@@ -70,6 +70,7 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             username: user.username,
             role: user.role,
+            name: user.name,
           }
         } catch (error: any) {
           console.error('Auth: Error in authorize:', error)
@@ -90,17 +91,19 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.role = user.role
         token.username = user.username
+        token.name = (user as any).name || null
       }
       // Session update trigger
       if (trigger === 'update') {
         // Optionally refresh user data from database
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { role: true, username: true },
+          select: { role: true, username: true, name: true },
         })
         if (dbUser) {
           token.role = dbUser.role
           token.username = dbUser.username
+          token.name = dbUser.name
         }
       }
       return token
@@ -110,6 +113,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string
         session.user.role = token.role as string
         session.user.username = (token.username as string) || ''
+        session.user.name = (token.name as string) || null
         console.log('Session callback - Session created:', {
           userId: session.user.id,
           username: session.user.username,

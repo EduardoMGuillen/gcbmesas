@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createTable, updateTable } from '@/lib/actions'
+import { createTable, updateTable, deleteTable } from '@/lib/actions'
 import { generateQRCode } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
@@ -20,6 +20,7 @@ export function TablesList({ initialTables }: TablesListProps) {
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({ name: '', zone: '' })
   const router = useRouter()
+  const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
 
   const handleCreateTable = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,6 +40,29 @@ export function TablesList({ initialTables }: TablesListProps) {
       setError(err.message || 'Error al crear mesa')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteTable = async (table: any) => {
+    if (
+      !confirm(
+        `¿Eliminar la mesa "${table.name}"? Esta acción eliminará sus datos históricos (excepto pedidos) y no se puede deshacer.`
+      )
+    ) {
+      return
+    }
+
+    setError('')
+    setDeleteLoadingId(table.id)
+
+    try {
+      await deleteTable(table.id)
+      setTables(tables.filter((t) => t.id !== table.id))
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || 'Error al eliminar mesa')
+    } finally {
+      setDeleteLoadingId(null)
     }
   }
 
@@ -94,6 +118,20 @@ export function TablesList({ initialTables }: TablesListProps) {
                   <p className="text-sm text-dark-400">Zona: {table.zone}</p>
                 )}
               </div>
+              <button
+                onClick={() => handleDeleteTable(table)}
+                disabled={
+                  deleteLoadingId === table.id || table.accounts.length > 0
+                }
+                className="text-red-400 hover:text-red-300 text-xs disabled:opacity-50"
+                title={
+                  table.accounts.length > 0
+                    ? 'Cierra las cuentas abiertas antes de eliminar esta mesa'
+                    : 'Eliminar mesa'
+                }
+              >
+                {deleteLoadingId === table.id ? 'Eliminando...' : 'Eliminar'}
+              </button>
             </div>
 
             <div className="space-y-2 mb-4">
