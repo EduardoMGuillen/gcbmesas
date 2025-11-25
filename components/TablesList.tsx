@@ -122,7 +122,7 @@ export function TablesList({ initialTables }: TablesListProps) {
                   </span>
                 </div>
                 {table.zone && (
-                  <p className="text-sm text-dark-100">Zona: {table.zone}</p>
+                  <p className="text-sm text-white/80">Zona: {table.zone}</p>
                 )}
               </div>
               <button
@@ -143,13 +143,13 @@ export function TablesList({ initialTables }: TablesListProps) {
 
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-sm">
-                <span className="text-dark-100">Cuentas abiertas:</span>
+                <span className="text-white/80">Cuentas abiertas:</span>
                 <span className="text-white font-semibold">
                   {table.accounts.length}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-dark-100">Total cuentas:</span>
+                <span className="text-white/80">Total cuentas:</span>
                 <span className="text-white font-semibold">
                   {table._count.accounts}
                 </span>
