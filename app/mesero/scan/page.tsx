@@ -7,11 +7,19 @@ import { useRouter } from 'next/navigation'
 export default function ScanPage() {
   const [tableId, setTableId] = useState('')
   const [error, setError] = useState('')
+  const [isScanning, setIsScanning] = useState(false)
+  const [scannerError, setScannerError] = useState('')
+  const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown')
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
+  const scannerRef = useRef<any>(null)
+  const scannerContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
+    return () => {
+      stopScanner()
+    }
   }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -23,18 +31,109 @@ export default function ScanPage() {
       return
     }
 
-    // Navigate to table page
     router.push(`/mesa/${tableId.trim()}`)
   }
 
+  const parseTableId = (scannedText: string) => {
+    try {
+      const url = new URL(scannedText)
+      const parts = url.pathname.split('/').filter(Boolean)
+      const mesaIndex = parts.findIndex((part) => part === 'mesa')
+      if (mesaIndex !== -1 && parts[mesaIndex + 1]) {
+        return parts[mesaIndex + 1]
+      }
+      return parts.pop() || scannedText
+    } catch (error) {
+      return scannedText
+    }
+  }
+
+  const stopScanner = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop()
+        await scannerRef.current.clear()
+      } catch (error) {
+        console.warn('[QR Scanner] Error stopping scanner:', error)
+      } finally {
+        scannerRef.current = null
+      }
+    }
+    setIsScanning(false)
+    setScannerError('')
+  }
+
+  const startScanner = async () => {
+    setScannerError('')
+
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setScannerError('Tu dispositivo no soporta el acceso a la cámara desde el navegador.')
+      return
+    }
+
+    try {
+      const permissionStatus = await navigator.mediaDevices.getUserMedia({ video: true })
+      permissionStatus.getTracks().forEach((track) => track.stop())
+      setCameraPermission('granted')
+    } catch (permissionError) {
+      console.error('[QR Scanner] Camera permission denied:', permissionError)
+      setCameraPermission('denied')
+      setScannerError('No pudimos acceder a la cámara. Por favor, otorga permisos en la configuración del navegador.')
+      return
+    }
+
+    setIsScanning(true)
+
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode')
+      if (!scannerContainerRef.current) {
+        return
+      }
+
+      const cameras = await Html5Qrcode.getCameras()
+      if (!cameras.length) {
+        setScannerError('No encontramos una cámara disponible en este dispositivo.')
+        setIsScanning(false)
+        return
+      }
+
+      const preferredCamera = cameras.find((camera) => camera.label.toLowerCase().includes('back')) || cameras[0]
+
+      const html5QrCode = new Html5Qrcode(scannerContainerRef.current.id, {
+        verbose: false,
+      })
+      scannerRef.current = html5QrCode
+
+      await html5QrCode.start(
+        preferredCamera.id,
+        {
+          fps: 10,
+          qrbox: window.innerWidth < 640 ? { width: 220, height: 220 } : { width: 300, height: 300 },
+          aspectRatio: 1.0,
+        },
+        (decodedText: string) => {
+          const parsedId = parseTableId(decodedText)
+          setTableId(parsedId)
+          stopScanner()
+          router.push(`/mesa/${parsedId}`)
+        },
+        undefined,
+        (errorMessage: string) => {
+          console.debug('[QR Scanner] Scanning', errorMessage)
+        }
+      )
+    } catch (error: any) {
+      console.error('[QR Scanner] Error initializing scanner:', error)
+      setScannerError(error?.message || 'Error al iniciar el escáner. Intenta nuevamente.')
+      setIsScanning(false)
+    }
+  }
+
   const handleQRScan = () => {
-    // This would integrate with a QR scanner library
-    // For now, we'll use manual input
-    if (typeof window !== 'undefined' && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-      // QR scanner implementation would go here
-      alert('Funcionalidad de escaneo QR se implementará con una librería como html5-qrcode')
+    if (isScanning) {
+      stopScanner()
     } else {
-      alert('Funcionalidad de escaneo QR se implementará con una librería como html5-qrcode')
+      startScanner()
     }
   }
 
@@ -77,7 +176,7 @@ export default function ScanPage() {
               </div>
             )}
 
-            <div className="flex space-x-4">
+            <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
               <button
                 type="submit"
                 className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
@@ -87,11 +186,40 @@ export default function ScanPage() {
               <button
                 type="button"
                 onClick={handleQRScan}
-                className="px-6 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-3 rounded-lg transition-colors"
+                className={`flex-1 px-6 font-semibold py-3 rounded-lg transition-colors ${
+                  isScanning
+                    ? 'bg-red-500/20 border border-red-500/40 text-red-200'
+                    : 'bg-dark-200 hover:bg-dark-300 text-white'
+                }`}
               >
-                Escanear QR
+                {isScanning ? 'Detener escaneo' : 'Escanear QR'}
               </button>
             </div>
+
+            {scannerError && (
+              <div className="bg-amber-500/10 border border-amber-500/40 text-amber-200 px-4 py-3 rounded-lg text-sm">
+                {scannerError}
+              </div>
+            )}
+
+            {cameraPermission === 'denied' && (
+              <div className="bg-red-500/10 border border-red-500/40 text-red-200 px-4 py-3 rounded-lg text-sm">
+                Debes otorgar permisos de cámara desde la configuración del navegador para poder escanear códigos QR.
+              </div>
+            )}
+
+            {isScanning && (
+              <div className="space-y-3">
+                <div className="text-sm text-dark-300">
+                  Apunta la cámara al código QR de la mesa. El escaneo se detendrá automáticamente cuando lo detectemos.
+                </div>
+                <div
+                  id="qr-reader"
+                  ref={scannerContainerRef}
+                  className="w-full bg-dark-50 rounded-xl overflow-hidden border border-dark-200 min-h-[260px]"
+                ></div>
+              </div>
+            )}
           </form>
 
           <div className="mt-8 pt-8 border-t border-dark-200">

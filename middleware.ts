@@ -66,7 +66,7 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/admin/:path*', '/mesa/:path*'],
+  matcher: ['/admin/:path*'],
   // Don't match auth-callback to allow it to work
 }
 

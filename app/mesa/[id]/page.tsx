@@ -12,7 +12,7 @@ export default async function MesaPage({
 }) {
   const session = await getServerSession(authOptions)
 
-  if (!session) {
+  if (!session || !['MESERO', 'ADMIN'].includes(session.user.role)) {
     redirect('/login')
   }
 
