@@ -47,7 +47,9 @@ export default async function AuthCallbackPage() {
       : '/'
     
     console.log('[AuthCallback] Redirecting to:', redirectUrl)
-    redirect(redirectUrl)
+    // Add a query parameter to indicate we're coming from auth-callback
+    // This helps the middleware know the session is valid
+    redirect(`${redirectUrl}?from=callback`)
   } else {
     console.warn('[AuthCallback] No session found after server attempts, using client-side fallback (iOS may need more time)')
     // If no session found, use client-side component for polling
