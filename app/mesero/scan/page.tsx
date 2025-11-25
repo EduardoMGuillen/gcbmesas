@@ -117,7 +117,6 @@ export default function ScanPage() {
           stopScanner()
           router.push(`/mesa/${parsedId}`)
         },
-        undefined,
         (errorMessage: string) => {
           console.debug('[QR Scanner] Scanning', errorMessage)
         }
