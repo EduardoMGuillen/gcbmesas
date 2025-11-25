@@ -44,92 +44,8 @@ export default function LoginPage() {
     try {
       console.log('[Login] Attempting login for user:', username)
       
-      // Try custom mobile login endpoint first (more reliable for mobile)
-      try {
-        const mobileResponse = await fetch('/api/login-mobile', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ username, password }),
-        })
-
-        if (mobileResponse.ok) {
-          const data = await mobileResponse.json()
-          console.log('[Login] Mobile login successful:', data)
-          
-          if (data.success && data.redirectUrl) {
-            // Wait for cookie to be set
-            await new Promise((resolve) => setTimeout(resolve, 800))
-            
-            // Verify cookie was set
-            const hasCookie = checkSessionCookie()
-            console.log('[Login] Cookie check after mobile login:', hasCookie)
-            
-            // CRITICAL: Verify that NextAuth recognizes the session
-            // This is essential for mobile - NextAuth must recognize the session
-            // Try multiple times with increasing delays (mobile can be slow)
-            let sessionVerified = false
-            let redirectUrl = data.redirectUrl
-            const maxVerificationAttempts = 3
-            
-            for (let attempt = 0; attempt < maxVerificationAttempts; attempt++) {
-              try {
-                // Wait progressively longer between attempts
-                if (attempt > 0) {
-                  await new Promise((resolve) => setTimeout(resolve, 500 * attempt))
-                }
-                
-                // Try to verify session with NextAuth
-                const sessionCheck = await fetch('/api/auth-redirect', {
-                  method: 'GET',
-                  credentials: 'include',
-                  cache: 'no-store',
-                  headers: {
-                    'Cache-Control': 'no-cache',
-                  },
-                })
-                
-                if (sessionCheck.ok) {
-                  const sessionData = await sessionCheck.json()
-                  console.log(`[Login] NextAuth session check (attempt ${attempt + 1}):`, sessionData)
-                  
-                  if (sessionData.hasSession && sessionData.redirectUrl) {
-                    sessionVerified = true
-                    redirectUrl = sessionData.redirectUrl
-                    console.log('[Login] NextAuth session verified, redirecting to:', redirectUrl)
-                    break
-                  }
-                }
-              } catch (sessionError) {
-                console.error(`[Login] Error checking NextAuth session (attempt ${attempt + 1}):`, sessionError)
-              }
-            }
-            
-            // If NextAuth doesn't recognize the session after all attempts, use NextAuth signIn as fallback
-            if (!sessionVerified) {
-              console.log('[Login] NextAuth session not verified after attempts, using NextAuth signIn as fallback')
-              // Fall through to NextAuth signIn below
-            } else {
-              // Session verified, redirect
-              console.log('[Login] Redirecting to:', redirectUrl)
-              window.location.replace(redirectUrl)
-              return
-            }
-          }
-        } else {
-          const errorData = await mobileResponse.json()
-          console.warn('[Login] Mobile login failed, trying NextAuth:', errorData.error)
-          // Fall through to NextAuth
-        }
-      } catch (mobileError) {
-        console.warn('[Login] Mobile login endpoint error, trying NextAuth:', mobileError)
-        // Fall through to NextAuth
-      }
-
-      // Fallback to NextAuth signIn
-      console.log('[Login] Using NextAuth signIn as fallback')
+      // Use NextAuth signIn directly - most reliable for mobile
+      // NextAuth handles cookies correctly across all browsers and devices
       const result = await signIn('credentials', {
         username,
         password,
@@ -156,44 +72,85 @@ export default function LoginPage() {
       if (result?.ok) {
         console.log('[Login] NextAuth login successful, verifying session...')
         
-        // Wait and verify cookie
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        // Wait a bit for cookie to be set (important for mobile)
+        await new Promise((resolve) => setTimeout(resolve, 500))
         
-        if (checkSessionCookie()) {
-          console.log('[Login] Cookie verified')
-        } else {
-          console.warn('[Login] Cookie not found after NextAuth login')
-        }
-
-        // Verify session with server
-        try {
-          const sessionResponse = await fetch('/api/debug-session', {
-            method: 'GET',
-            credentials: 'include',
-            cache: 'no-store',
-          })
-          
-          const sessionData = await sessionResponse.json()
-          console.log('[Login] Session verification:', {
-            hasSession: sessionData.hasSession,
-            role: sessionData.session?.user?.role,
-          })
-          
-          if (sessionData.hasSession && sessionData.session?.user?.role) {
-            const role = sessionData.session.user.role
-            const redirectUrl = role === 'ADMIN' ? '/admin' : role === 'MESERO' ? '/mesero' : '/'
-            console.log('[Login] Redirecting to:', redirectUrl)
-            window.location.replace(redirectUrl)
-            return
+        // Verify session with server - try multiple times for mobile
+        let sessionVerified = false
+        let redirectUrl = '/'
+        const maxAttempts = 5
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            // Wait progressively longer between attempts
+            if (attempt > 0) {
+              await new Promise((resolve) => setTimeout(resolve, 300 * attempt))
+            }
+            
+            const sessionResponse = await fetch('/api/auth-redirect', {
+              method: 'GET',
+              credentials: 'include',
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+              },
+            })
+            
+            if (sessionResponse.ok) {
+              const sessionData = await sessionResponse.json()
+              console.log(`[Login] Session check (attempt ${attempt + 1}/${maxAttempts}):`, {
+                hasSession: sessionData.hasSession,
+                role: sessionData.role,
+                redirectUrl: sessionData.redirectUrl,
+              })
+              
+              if (sessionData.hasSession && sessionData.redirectUrl) {
+                sessionVerified = true
+                redirectUrl = sessionData.redirectUrl
+                console.log('[Login] Session verified, redirecting to:', redirectUrl)
+                break
+              }
+            }
+          } catch (sessionError) {
+            console.error(`[Login] Session verification error (attempt ${attempt + 1}):`, sessionError)
           }
-        } catch (sessionError) {
-          console.error('[Login] Session verification error:', sessionError)
         }
 
-        // Fallback: redirect to callback
-        console.log('[Login] Redirecting to callback page')
-        window.location.replace('/auth-callback')
-        return
+        if (sessionVerified) {
+          // Session verified, redirect immediately
+          console.log('[Login] Redirecting to:', redirectUrl)
+          window.location.replace(redirectUrl)
+          return
+        } else {
+          // Session not verified, but login was successful
+          // Try to get role from debug-session as fallback
+          try {
+            const debugResponse = await fetch('/api/debug-session', {
+              method: 'GET',
+              credentials: 'include',
+              cache: 'no-store',
+            })
+            
+            if (debugResponse.ok) {
+              const debugData = await debugResponse.json()
+              if (debugData.hasSession && debugData.session?.user?.role) {
+                const role = debugData.session.user.role
+                redirectUrl = role === 'ADMIN' ? '/admin' : role === 'MESERO' ? '/mesero' : '/'
+                console.log('[Login] Using debug-session, redirecting to:', redirectUrl)
+                window.location.replace(redirectUrl)
+                return
+              }
+            }
+          } catch (debugError) {
+            console.error('[Login] Debug session error:', debugError)
+          }
+          
+          // Last resort: redirect to auth-callback which will handle it
+          console.log('[Login] Session not verified, redirecting to auth-callback')
+          window.location.replace('/auth-callback')
+          return
+        }
       }
 
       // Unexpected result
