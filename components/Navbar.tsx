@@ -56,7 +56,7 @@ export function Navbar() {
                   className={`px-2 lg:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors touch-manipulation ${
                     link.match
                       ? 'bg-primary-600 text-white'
-                      : 'text-dark-100 hover:text-white hover:bg-dark-200'
+                      : 'text-white/70 hover:text-white hover:bg-dark-200'
                   }`}
                 >
                   {link.label}
@@ -75,7 +75,7 @@ export function Navbar() {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-dark-100 hover:text-white hover:bg-dark-200 rounded-md transition-colors touch-manipulation"
+              className="md:hidden p-2 text-white/70 hover:text-white hover:bg-dark-200 rounded-md transition-colors touch-manipulation"
               aria-label="Toggle menu"
             >
               <svg
@@ -130,7 +130,7 @@ export function Navbar() {
                 className={`block px-4 py-3 rounded-lg text-base font-medium transition-colors touch-manipulation ${
                   link.match
                     ? 'bg-primary-600 text-white'
-                    : 'text-dark-100 hover:text-white hover:bg-dark-200'
+                    : 'text-white/70 hover:text-white hover:bg-dark-200'
                 }`}
               >
                 {link.label}
