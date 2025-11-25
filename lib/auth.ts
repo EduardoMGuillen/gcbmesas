@@ -136,8 +136,9 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        // iOS/Safari compatibility: ensure domain is not set (use default)
-        // This allows cookies to work across subdomains and on mobile
+        // Mobile compatibility: don't set domain explicitly
+        // This allows cookies to work on all mobile browsers
+        maxAge: 30 * 24 * 60 * 60, // 30 days
       },
     },
     callbackUrl: {
@@ -147,6 +148,7 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60, // 1 hour
       },
     },
     csrfToken: {
@@ -156,6 +158,7 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60, // 1 hour
       },
     },
   },

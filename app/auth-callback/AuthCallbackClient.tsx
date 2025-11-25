@@ -9,7 +9,7 @@ interface AuthCallbackClientProps {
 export default function AuthCallbackClient({ initialRedirectUrl }: AuthCallbackClientProps) {
   const [status, setStatus] = useState<'checking' | 'redirecting' | 'error'>('checking')
   const [attempts, setAttempts] = useState(0)
-  const maxAttempts = 8 // Reduced from 10, faster failure
+  const maxAttempts = 10 // Increased for mobile - cookies can take longer to propagate
 
   useEffect(() => {
     // If we already have a redirect URL from server, use it immediately
@@ -79,14 +79,16 @@ export default function AuthCallbackClient({ initialRedirectUrl }: AuthCallbackC
           console.warn(`[AuthCallback Client] Server responded with status: ${response.status}`)
         }
 
-        // Session not ready yet, try again
+        // Session not ready yet, try again with progressive delay
         setAttempts(prev => prev + 1)
-        setTimeout(checkSession, 600) // Slightly longer delay
+        const delay = Math.min(300 * (attemptNum + 1), 2000) // Progressive delay, max 2s
+        setTimeout(checkSession, delay)
       } catch (error) {
         console.error('[AuthCallback Client] Error checking session:', error)
         setAttempts(prev => prev + 1)
         if (attemptNum < maxAttempts) {
-          setTimeout(checkSession, 600)
+          const delay = Math.min(300 * (attemptNum + 1), 2000) // Progressive delay
+          setTimeout(checkSession, delay)
         } else {
           setStatus('error')
           setTimeout(() => {
@@ -96,10 +98,10 @@ export default function AuthCallbackClient({ initialRedirectUrl }: AuthCallbackC
       }
     }
 
-    // Start checking after a short delay
+    // Start checking after a short delay (longer for mobile)
     const timeout = setTimeout(() => {
       checkSession()
-    }, 500)
+    }, 800)
 
     return () => clearTimeout(timeout)
   }, [initialRedirectUrl, attempts, maxAttempts])
