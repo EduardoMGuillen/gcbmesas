@@ -4,8 +4,8 @@ interface CashierAccountsProps {
   accounts: Array<{
     id: string
     table: { name: string; shortCode: string; zone?: string | null }
-    initialBalance: string | number
-    currentBalance: string | number
+    initialBalance: string | number | { toString(): string }
+    currentBalance: string | number | { toString(): string }
     createdAt: string
     orders: Array<{
       id: string
