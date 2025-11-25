@@ -40,11 +40,14 @@ export default async function AuthCallbackPage() {
   }
 
   if (session?.user?.role) {
-    const redirectUrl = session.user.role === 'ADMIN' 
-      ? '/admin' 
-      : session.user.role === 'MESERO' 
-      ? '/mesero' 
-      : '/'
+    const redirectUrl =
+      session.user.role === 'ADMIN'
+        ? '/admin'
+        : session.user.role === 'MESERO'
+        ? '/mesero'
+        : session.user.role === 'CAJERO'
+        ? '/cajero'
+        : '/'
     
     console.log('[AuthCallback] Redirecting to:', redirectUrl)
     // Add a query parameter to indicate we're coming from auth-callback
