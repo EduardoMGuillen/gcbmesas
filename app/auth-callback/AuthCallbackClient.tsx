@@ -9,7 +9,7 @@ interface AuthCallbackClientProps {
 export default function AuthCallbackClient({ initialRedirectUrl }: AuthCallbackClientProps) {
   const [status, setStatus] = useState<'checking' | 'redirecting' | 'error'>('checking')
   const [attempts, setAttempts] = useState(0)
-  const maxAttempts = 10 // Increased for mobile - cookies can take longer to propagate
+  const maxAttempts = 15 // Increased significantly for iOS - cookies can take much longer
 
   useEffect(() => {
     // If we already have a redirect URL from server, use it immediately
@@ -98,10 +98,10 @@ export default function AuthCallbackClient({ initialRedirectUrl }: AuthCallbackC
       }
     }
 
-    // Start checking after a short delay (longer for mobile)
+    // Start checking after a delay (longer for iOS)
     const timeout = setTimeout(() => {
       checkSession()
-    }, 800)
+    }, 1200)
 
     return () => clearTimeout(timeout)
   }, [initialRedirectUrl, attempts, maxAttempts])
