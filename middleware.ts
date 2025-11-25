@@ -31,29 +31,6 @@ export default withAuth(
       }
     }
 
-    // Mesero routes - allow MESERO and ADMIN roles
-    if (path.startsWith('/mesero')) {
-      // If coming from auth-callback, allow access (session was just verified server-side)
-      // This is important for iOS where edge middleware may not read cookies immediately
-      const fromCallback = req.nextUrl.searchParams.get('from') === 'callback'
-      
-      if (fromCallback) {
-        // Coming from auth-callback, session was verified there - allow access
-        console.log('[Middleware] Allowing /mesero - coming from auth-callback (session verified server-side)')
-        return NextResponse.next()
-      }
-      
-      if (!token || !['MESERO', 'ADMIN'].includes(token.role as string)) {
-        console.log('[Middleware] Blocked /mesero - no token or wrong role', {
-          hasToken: !!token,
-          role: token?.role,
-        })
-        return NextResponse.redirect(new URL('/login', req.url))
-      } else {
-        console.log('[Middleware] Allowed /mesero - token valid', { role: token.role })
-      }
-    }
-
     // Mesa routes - allow any authenticated user
     if (path.startsWith('/mesa')) {
       if (!token) {
@@ -89,7 +66,7 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/admin/:path*', '/mesero/:path*', '/mesa/:path*'],
+  matcher: ['/admin/:path*', '/mesa/:path*'],
   // Don't match auth-callback to allow it to work
 }
 
