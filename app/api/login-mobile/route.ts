@@ -52,8 +52,10 @@ export async function POST(request: Request) {
     }
 
     // Create JWT token with same format as NextAuth
+    // NextAuth requires 'sub' field (subject) which should be the user ID
     const token = await encode({
       token: {
+        sub: user.id, // Required by NextAuth
         id: user.id,
         username: user.username,
         role: user.role,

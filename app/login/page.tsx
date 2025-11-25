@@ -60,17 +60,61 @@ export default function LoginPage() {
           console.log('[Login] Mobile login successful:', data)
           
           if (data.success && data.redirectUrl) {
-            // Wait a bit for cookie to be set
-            await new Promise((resolve) => setTimeout(resolve, 500))
+            // Wait for cookie to be set
+            await new Promise((resolve) => setTimeout(resolve, 800))
             
             // Verify cookie was set
-            if (checkSessionCookie()) {
-              console.log('[Login] Cookie verified, redirecting to:', data.redirectUrl)
-              window.location.replace(data.redirectUrl)
-              return
+            const hasCookie = checkSessionCookie()
+            console.log('[Login] Cookie check after mobile login:', hasCookie)
+            
+            // CRITICAL: Verify that NextAuth recognizes the session
+            // This is essential for mobile - NextAuth must recognize the session
+            // Try multiple times with increasing delays (mobile can be slow)
+            let sessionVerified = false
+            let redirectUrl = data.redirectUrl
+            const maxVerificationAttempts = 3
+            
+            for (let attempt = 0; attempt < maxVerificationAttempts; attempt++) {
+              try {
+                // Wait progressively longer between attempts
+                if (attempt > 0) {
+                  await new Promise((resolve) => setTimeout(resolve, 500 * attempt))
+                }
+                
+                // Try to verify session with NextAuth
+                const sessionCheck = await fetch('/api/auth-redirect', {
+                  method: 'GET',
+                  credentials: 'include',
+                  cache: 'no-store',
+                  headers: {
+                    'Cache-Control': 'no-cache',
+                  },
+                })
+                
+                if (sessionCheck.ok) {
+                  const sessionData = await sessionCheck.json()
+                  console.log(`[Login] NextAuth session check (attempt ${attempt + 1}):`, sessionData)
+                  
+                  if (sessionData.hasSession && sessionData.redirectUrl) {
+                    sessionVerified = true
+                    redirectUrl = sessionData.redirectUrl
+                    console.log('[Login] NextAuth session verified, redirecting to:', redirectUrl)
+                    break
+                  }
+                }
+              } catch (sessionError) {
+                console.error(`[Login] Error checking NextAuth session (attempt ${attempt + 1}):`, sessionError)
+              }
+            }
+            
+            // If NextAuth doesn't recognize the session after all attempts, use NextAuth signIn as fallback
+            if (!sessionVerified) {
+              console.log('[Login] NextAuth session not verified after attempts, using NextAuth signIn as fallback')
+              // Fall through to NextAuth signIn below
             } else {
-              console.warn('[Login] Cookie not found, but redirecting anyway')
-              window.location.replace(data.redirectUrl)
+              // Session verified, redirect
+              console.log('[Login] Redirecting to:', redirectUrl)
+              window.location.replace(redirectUrl)
               return
             }
           }
