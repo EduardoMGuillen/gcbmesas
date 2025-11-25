@@ -53,13 +53,21 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                 <div>
                   <p className="text-xs text-dark-300">Inicial</p>
                   <p className="text-white font-semibold">
-                    {formatCurrency(account.initialBalance)}
+                    {formatCurrency(
+                      typeof account.initialBalance === 'object'
+                        ? account.initialBalance.toString()
+                        : account.initialBalance
+                    )}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-dark-300">Consumido</p>
                   <p className="text-primary-400 font-semibold">
-                    {formatCurrency(totalConsumed)}
+                    {formatCurrency(
+                      typeof totalConsumed === 'object'
+                        ? totalConsumed.toString()
+                        : totalConsumed
+                    )}
                   </p>
                 </div>
                 <div>
@@ -71,7 +79,11 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                         : 'text-green-400'
                     }`}
                   >
-                    {formatCurrency(account.currentBalance)}
+                    {formatCurrency(
+                      typeof account.currentBalance === 'object'
+                        ? account.currentBalance.toString()
+                        : account.currentBalance
+                    )}
                   </p>
                 </div>
               </div>

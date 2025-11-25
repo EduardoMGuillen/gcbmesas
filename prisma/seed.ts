@@ -56,15 +56,33 @@ async function main() {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
+  const shortCodeChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const generateShortCode = async () => {
+    for (let attempt = 0; attempt < 25; attempt++) {
+      let code = ''
+      for (let i = 0; i < 4; i++) {
+        const index = Math.floor(Math.random() * shortCodeChars.length)
+        code += shortCodeChars[index]
+      }
+      const exists = await prisma.table.findUnique({
+        where: { shortCode: code },
+      })
+      if (!exists) return code
+    }
+    throw new Error('No se pudo generar un código corto único para seed')
+  }
+
   for (const table of tables) {
     const existing = await prisma.table.findFirst({
       where: { name: table.name },
     })
     if (!existing) {
+      const shortCode = await generateShortCode()
       const created = await prisma.table.create({
         data: {
           name: table.name,
           zone: table.zone,
+          shortCode,
           qrUrl: `${appUrl}/mesa/${randomUUID()}`,
         },
       })
@@ -72,7 +90,9 @@ async function main() {
       // Update with actual ID
       await prisma.table.update({
         where: { id: created.id },
-        data: { qrUrl: `${appUrl}/mesa/${created.id}` },
+        data: {
+          qrUrl: `${appUrl}/mesa/${created.id}`,
+        },
       })
     }
   }
