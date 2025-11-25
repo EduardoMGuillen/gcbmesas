@@ -8,7 +8,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 interface CashierOrdersProps {
   pendingOrders: Array<{
     id: string
-    createdAt: string
+    createdAt: string | Date
     quantity: number
     served: boolean
     product: { name: string; price: string | number }
@@ -20,7 +20,7 @@ interface CashierOrdersProps {
   }>
   recentServed: Array<{
     id: string
-    createdAt: string
+    createdAt: string | Date
     quantity: number
     product: { name: string; price: string | number }
     account: {
