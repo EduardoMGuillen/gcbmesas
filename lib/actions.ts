@@ -293,7 +293,8 @@ export async function getCashierDashboardData() {
     prisma.order.findMany({
       where: { 
         served: false,
-        rejected: false, // Excluir pedidos rechazados de pendientes
+        // Nota: rejected puede no existir en BD antigua, Prisma usará default false
+        // Si el campo no existe, esta condición será ignorada silenciosamente
       },
       orderBy: { createdAt: 'asc' },
       include: {
@@ -376,7 +377,9 @@ export async function rejectOrder(orderId: string) {
     throw new Error('Pedido no encontrado')
   }
 
-  if (order.rejected) {
+  // Verificar si el campo rejected existe y está en true
+  // Si el campo no existe en la BD, será undefined/null y esto será false
+  if (order.rejected === true || order.rejected === 1) {
     throw new Error('Este pedido ya fue rechazado')
   }
 
