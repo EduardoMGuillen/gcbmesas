@@ -531,49 +531,76 @@ export async function exportAccountToExcel(accountId: string) {
   // Dynamic import of xlsx (server-side only)
   const XLSX = await import('xlsx')
 
-  // Prepare data for Excel
+  // Calculate statistics
   const totalConsumed = Number(account.initialBalance) - Number(account.currentBalance)
+  const rejectedOrders = account.orders.filter((o) => o.rejected === true)
+  const servedOrders = account.orders.filter((o) => o.served === true && o.rejected !== true)
+  const pendingOrders = account.orders.filter((o) => !o.served && o.rejected !== true)
   
-  // Summary sheet
+  const totalRejectedValue = rejectedOrders.reduce((sum, o) => sum + Number(o.price), 0)
+  const totalServedValue = servedOrders.reduce((sum, o) => sum + Number(o.price), 0)
+  const totalPendingValue = pendingOrders.reduce((sum, o) => sum + Number(o.price), 0)
+  
+  // Summary sheet with complete information
   const summaryData = [
-    ['Resumen de Cuenta'],
+    ['RESUMEN COMPLETO DE CUENTA'],
     [],
+    ['INFORMACIÓN DE LA MESA'],
     ['Mesa', account.table.name],
     ['Código', account.table.shortCode],
     ['Zona', account.table.zone || 'N/A'],
-    ['Fecha', account.createdAt.toLocaleDateString('es-ES')],
-    ['Hora', account.createdAt.toLocaleTimeString('es-ES')],
+    [],
+    ['INFORMACIÓN TEMPORAL'],
+    ['Fecha de Apertura', account.createdAt.toLocaleDateString('es-ES')],
+    ['Hora de Apertura', account.createdAt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })],
+    account.closedAt ? ['Fecha de Cierre', account.closedAt.toLocaleDateString('es-ES')] : ['Fecha de Cierre', 'N/A'],
+    account.closedAt ? ['Hora de Cierre', account.closedAt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })] : ['Hora de Cierre', 'N/A'],
     ['Estado', account.status === 'OPEN' ? 'Abierta' : 'Cerrada'],
     [],
-    ['Saldo Inicial', Number(account.initialBalance)],
-    ['Total Consumido', totalConsumed],
-    ['Saldo Disponible', Number(account.currentBalance)],
+    ['INFORMACIÓN FINANCIERA'],
+    ['Saldo Inicial', `$${Number(account.initialBalance).toFixed(2)}`],
+    ['Total Consumido', `$${totalConsumed.toFixed(2)}`],
+    ['Saldo Disponible', `$${Number(account.currentBalance).toFixed(2)}`],
     [],
+    ['RESUMEN DE PEDIDOS'],
     ['Total de Pedidos', account.orders.length],
+    ['Pedidos Realizados', `${servedOrders.length} ($${totalServedValue.toFixed(2)})`],
+    ['Pedidos Rechazados', `${rejectedOrders.length} ($${totalRejectedValue.toFixed(2)})`],
+    ['Pedidos Pendientes', `${pendingOrders.length} ($${totalPendingValue.toFixed(2)})`],
+    [],
+    ['NOTA', 'Los pedidos rechazados no afectan el saldo final de la cuenta.'],
   ]
 
-  // Orders sheet
+  // Orders sheet with all details
   const ordersData = [
-    ['Fecha', 'Hora', 'Mesero', 'Producto', 'Cantidad', 'Precio Unitario', 'Total', 'Estado'],
+    ['#', 'Fecha', 'Hora', 'Mesero', 'Producto', 'Cantidad', 'Precio Unitario', 'Total', 'Estado', 'Observaciones'],
   ]
 
-  account.orders.forEach((order) => {
+  account.orders.forEach((order, index) => {
     const orderDate = new Date(order.createdAt)
-    const status = order.rejected === true
-      ? 'Rechazado' 
-      : order.served 
-        ? 'Realizado' 
-        : 'Pendiente'
+    let status = 'Pendiente'
+    let observations = ''
+    
+    if (order.rejected === true) {
+      status = 'Rechazado'
+      observations = 'Pedido rechazado - Fuera de stock'
+    } else if (order.served) {
+      status = 'Realizado'
+    }
+    
+    const waiterName = order.user?.name || order.user?.username || 'N/A'
     
     ordersData.push([
+      (index + 1).toString(), // Número de orden
       orderDate.toLocaleDateString('es-ES'),
-      orderDate.toLocaleTimeString('es-ES'),
-      order.user?.name || order.user?.username || 'N/A',
+      orderDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      waiterName,
       order.product.name,
       order.quantity.toString(),
-      Number(order.product.price).toString(),
-      Number(order.price).toString(),
+      `$${Number(order.product.price).toFixed(2)}`,
+      `$${Number(order.price).toFixed(2)}`,
       status,
+      observations,
     ])
   })
 
