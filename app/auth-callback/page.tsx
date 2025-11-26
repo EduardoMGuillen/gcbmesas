@@ -8,10 +8,10 @@ export const runtime = 'nodejs'
 export default async function AuthCallbackPage() {
   console.log('[AuthCallback] Server-side session check started')
   
-  // Try to get session with multiple attempts (important for mobile, especially iOS)
+  // Try to get session with multiple attempts (important for mobile, especially iOS/iPad)
   let session = null
-  const maxAttempts = 5 // Increased for iOS
-  const baseDelay = 800 // Longer base delay for iOS
+  const maxAttempts = 8 // Increased for iPad - cookies can take longer
+  const baseDelay = 1000 // Longer base delay for iPad/iOS
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {

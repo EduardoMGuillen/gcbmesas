@@ -5,13 +5,23 @@ export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token
     const path = req.nextUrl.pathname
+    const userAgent = req.headers.get('user-agent') || ''
+    
+    // Detect iPad/iOS devices
+    // Note: In middleware (server-side), we can't access navigator.maxTouchPoints
+    // So we rely on user agent detection only
+    const isIPad = /iPad/.test(userAgent) || 
+                   (/Macintosh/.test(userAgent) && /Mobile/.test(userAgent))
+    const isIOS = /iPhone|iPad|iPod/.test(userAgent) || isIPad
 
-    // Log for debugging (especially important for iOS)
+    // Log for debugging (especially important for iOS/iPad)
     console.log('[Middleware] Request:', {
       path,
       hasToken: !!token,
       tokenRole: token?.role,
-      userAgent: req.headers.get('user-agent')?.includes('iPhone') ? 'iPhone' : 'Other',
+      userAgent: isIOS ? (isIPad ? 'iPad' : 'iPhone') : 'Other',
+      isIPad,
+      isIOS,
     })
 
     const fromCallback = req.nextUrl.searchParams.get('from') === 'callback'
@@ -20,7 +30,6 @@ export default withAuth(
     if (path.startsWith('/admin')) {
       // If coming from auth-callback, allow access (session was just verified server-side)
       if (fromCallback) {
-        // Coming from auth-callback, session was verified there - allow access
         console.log('[Middleware] Allowing /admin - coming from auth-callback (session verified server-side)')
         return NextResponse.next()
       }
@@ -40,6 +49,19 @@ export default withAuth(
 
       if (!token || !['CAJERO', 'ADMIN'].includes(token.role as string)) {
         console.log('[Middleware] Blocked /cajero - no token or wrong role')
+        return NextResponse.redirect(new URL('/login', req.url))
+      }
+    }
+
+    // Mesero routes - allow MESERO and ADMIN roles
+    if (path.startsWith('/mesero')) {
+      if (fromCallback) {
+        console.log('[Middleware] Allowing /mesero - coming from auth-callback (session verified server-side)')
+        return NextResponse.next()
+      }
+
+      if (!token || !['MESERO', 'ADMIN'].includes(token.role as string)) {
+        console.log('[Middleware] Blocked /mesero - no token or wrong role')
         return NextResponse.redirect(new URL('/login', req.url))
       }
     }
@@ -79,7 +101,7 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/admin/:path*', '/cajero/:path*'],
+  matcher: ['/admin/:path*', '/cajero/:path*', '/mesero/:path*'],
   // Don't match auth-callback to allow it to work
 }
 

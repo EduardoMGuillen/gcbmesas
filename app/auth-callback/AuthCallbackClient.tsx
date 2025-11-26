@@ -9,7 +9,13 @@ interface AuthCallbackClientProps {
 export default function AuthCallbackClient({ initialRedirectUrl }: AuthCallbackClientProps) {
   const [status, setStatus] = useState<'checking' | 'redirecting' | 'error'>('checking')
   const [attempts, setAttempts] = useState(0)
-  const maxAttempts = 15 // Increased significantly for iOS - cookies can take much longer
+  
+  // Detect iPad/iOS for longer timeout
+  const isIPad = typeof navigator !== 'undefined' && (
+    /iPad/.test(navigator.userAgent) || 
+    (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+  )
+  const maxAttempts = isIPad ? 20 : 15 // Even more attempts for iPad
 
   useEffect(() => {
     // If we already have a redirect URL from server, use it immediately
@@ -121,10 +127,12 @@ export default function AuthCallbackClient({ initialRedirectUrl }: AuthCallbackC
       }
     }
 
-    // Start checking after a delay (longer for iOS)
+    // Start checking after a delay (longer for iPad/iOS)
+    const initialDelay = isIPad ? 2000 : 1200
+    console.log(`[AuthCallback Client] Starting session check after ${initialDelay}ms (iPad: ${isIPad})`)
     const timeout = setTimeout(() => {
       checkSession()
-    }, 1200)
+    }, initialDelay)
 
     return () => clearTimeout(timeout)
   }, [initialRedirectUrl, attempts, maxAttempts])
