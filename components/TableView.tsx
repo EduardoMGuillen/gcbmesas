@@ -282,7 +282,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
                       <div>
                         <p className="font-semibold text-white">
                           {order.product.name}
-                          {order.rejected && (
+                          {(order.rejected === true || order.rejected === 1) && (
                             <span className="ml-2 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
                               Rechazado
                             </span>

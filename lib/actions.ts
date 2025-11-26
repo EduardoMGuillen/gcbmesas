@@ -556,7 +556,7 @@ export async function exportAccountToExcel(accountId: string) {
 
   account.orders.forEach((order) => {
     const orderDate = new Date(order.createdAt)
-    const status = order.rejected 
+    const status = (order.rejected === true || order.rejected === 1)
       ? 'Rechazado' 
       : order.served 
         ? 'Realizado' 
