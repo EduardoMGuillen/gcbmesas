@@ -11,6 +11,7 @@ interface CashierAccountsProps {
       id: string
       createdAt: string | Date
       served: boolean
+      rejected?: boolean
       quantity: number
       product: { name: string }
       user?: { username: string; name?: string | null }
@@ -107,12 +108,14 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                       </div>
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
-                          order.served
+                          order.rejected
+                            ? 'bg-red-500/20 text-red-300'
+                            : order.served
                             ? 'bg-green-500/20 text-green-300'
                             : 'bg-amber-500/20 text-amber-200'
                         }`}
                       >
-                        {order.served ? 'Realizado' : 'Pendiente'}
+                        {order.rejected ? 'Rechazado' : order.served ? 'Realizado' : 'Pendiente'}
                       </span>
                     </div>
                   ))}

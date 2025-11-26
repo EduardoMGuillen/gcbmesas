@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { setOrderServed } from '@/lib/actions'
+import { setOrderServed, rejectOrder } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface CashierOrdersProps {
@@ -42,6 +42,20 @@ export function CashierOrders({
     startTransition(async () => {
       await setOrderServed(orderId, true)
       router.refresh()
+    })
+  }
+
+  const handleRejectOrder = (orderId: string) => {
+    if (!confirm('¿Estás seguro de rechazar este pedido? El saldo se revertirá en la cuenta.')) {
+      return
+    }
+    startTransition(async () => {
+      try {
+        await rejectOrder(orderId)
+        router.refresh()
+      } catch (error: any) {
+        alert(error.message || 'Error al rechazar pedido')
+      }
     })
   }
 
@@ -104,13 +118,22 @@ export function CashierOrders({
                   </p>
                 </div>
 
-                <button
-                  onClick={() => handleMarkServed(order.id)}
-                  disabled={isPending}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {isPending ? 'Actualizando...' : 'Marcar como realizado'}
-                </button>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleMarkServed(order.id)}
+                    disabled={isPending}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {isPending ? 'Actualizando...' : 'Aceptar'}
+                  </button>
+                  <button
+                    onClick={() => handleRejectOrder(order.id)}
+                    disabled={isPending}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {isPending ? 'Actualizando...' : 'Rechazar'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>

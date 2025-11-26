@@ -8,17 +8,24 @@ async function main() {
   console.log('🌱 Iniciando seed...')
 
   // Crear usuario administrador por defecto
-  const adminPassword = await bcrypt.hash('admin123', 10)
-  
-  const admin = await prisma.user.upsert({
+  // Solo crear si no existe - no actualizar contraseña si ya existe
+  const existingAdmin = await prisma.user.findUnique({
     where: { username: 'admin' },
-    update: {},
-    create: {
-      username: 'admin',
-      password: adminPassword,
-      role: 'ADMIN',
-    },
   })
+  
+  if (!existingAdmin) {
+    const adminPassword = await bcrypt.hash('admin123gcb', 10)
+    const admin = await prisma.user.create({
+      data: {
+        username: 'admin',
+        password: adminPassword,
+        role: 'ADMIN',
+      },
+    })
+    console.log('✅ Usuario administrador creado:', admin.username)
+  } else {
+    console.log('✅ Usuario administrador ya existe (contraseña no modificada)')
+  }
 
   console.log('✅ Usuario administrador creado:', admin.username)
 
@@ -100,10 +107,12 @@ async function main() {
   console.log('✅ Mesas de ejemplo creadas')
 
   console.log('🎉 Seed completado!')
-  console.log('\n📝 Credenciales por defecto:')
-  console.log('   Usuario: admin')
-  console.log('   Contraseña: admin123')
-  console.log('\n⚠️  IMPORTANTE: Cambia la contraseña después del primer inicio de sesión!')
+  if (!existingAdmin) {
+    console.log('\n📝 Credenciales por defecto (solo si se creó el usuario):')
+    console.log('   Usuario: admin')
+    console.log('   Contraseña: admin123gcb')
+    console.log('\n⚠️  IMPORTANTE: Cambia la contraseña después del primer inicio de sesión!')
+  }
 }
 
 main()

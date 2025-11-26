@@ -17,7 +17,7 @@ async function main() {
   }
 
   // Hashear la contraseña correctamente
-  const hashedPassword = await bcrypt.hash('admin123', 10)
+  const hashedPassword = await bcrypt.hash('admin123gcb', 10)
 
   // Actualizar la contraseña
   await prisma.user.update({
@@ -28,7 +28,7 @@ async function main() {
   console.log('✅ Contraseña del usuario admin corregida (ahora está hasheada)')
   console.log('📝 Puedes iniciar sesión con:')
   console.log('   Usuario: admin')
-  console.log('   Contraseña: admin123')
+  console.log('   Contraseña: admin123gcb')
 }
 
 main()
