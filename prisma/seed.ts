@@ -27,8 +27,6 @@ async function main() {
     console.log('✅ Usuario administrador ya existe (contraseña no modificada)')
   }
 
-  console.log('✅ Usuario administrador creado:', admin.username)
-
   // Crear algunos productos de ejemplo
   const products = [
     { name: 'Cerveza', price: 50, category: 'Bebidas' },
