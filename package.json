@@ -4,6 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:network": "next dev -H 0.0.0.0",
+    "dev:tunnel": "concurrently \"npm run dev\" \"lt --port 3000\"",
+    "dev:ngrok": "concurrently \"npm run dev\" \"ngrok http 3000\"",
+    "get-ip": "node scripts/get-ip.js",
     "build": "node scripts/setup-env.js && prisma generate && npm run db:setup && next build",
     "db:setup": "node scripts/db-setup-with-timeout.js",
     "start": "next start",
@@ -40,6 +44,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
+    "concurrently": "^8.2.2",
     "eslint": "^8",
     "eslint-config-next": "14.0.4",
     "postcss": "^8",

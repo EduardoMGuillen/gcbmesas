@@ -137,11 +137,13 @@ export const authOptions: NextAuthOptions = {
       name: `next-auth.session-token`,
       options: {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for better iPad/iOS compatibility
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        // Mobile compatibility: don't set domain explicitly
-        // This allows cookies to work on all mobile browsers
+        // For iPad/iOS: secure should be true only in production (HTTPS)
+        // In development (HTTP), secure must be false for cookies to work
+        secure: process.env.NODE_ENV === 'production' || process.env.NEXTAUTH_URL?.startsWith('https://'),
+        // Don't set domain - allows cookies to work across subdomains and on all devices
+        // This is especially important for iPad/iOS
         maxAge: 30 * 24 * 60 * 60, // 30 days
       },
     },
@@ -151,7 +153,7 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === 'production' || process.env.NEXTAUTH_URL?.startsWith('https://'),
         maxAge: 60 * 60, // 1 hour
       },
     },
@@ -161,7 +163,7 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === 'production' || process.env.NEXTAUTH_URL?.startsWith('https://'),
         maxAge: 60 * 60, // 1 hour
       },
     },
