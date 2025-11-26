@@ -379,7 +379,7 @@ export async function rejectOrder(orderId: string) {
 
   // Verificar si el campo rejected existe y está en true
   // Si el campo no existe en la BD, será undefined/null y esto será false
-  if (order.rejected === true || order.rejected === 1) {
+  if (order.rejected === true) {
     throw new Error('Este pedido ya fue rechazado')
   }
 
@@ -559,7 +559,7 @@ export async function exportAccountToExcel(accountId: string) {
 
   account.orders.forEach((order) => {
     const orderDate = new Date(order.createdAt)
-    const status = (order.rejected === true || order.rejected === 1)
+    const status = order.rejected === true
       ? 'Rechazado' 
       : order.served 
         ? 'Realizado' 

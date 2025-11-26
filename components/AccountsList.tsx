@@ -196,7 +196,7 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
                       <div>
                         <p className="font-semibold text-white">
                           {order.product.name}
-                          {(order.rejected === true || order.rejected === 1) && (
+                          {order.rejected === true && (
                             <span className="ml-2 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
                               Rechazado
                             </span>
