@@ -567,9 +567,9 @@ export async function exportAccountToExcel(accountId: string) {
       orderDate.toLocaleTimeString('es-ES'),
       order.user?.name || order.user?.username || 'N/A',
       order.product.name,
-      order.quantity,
-      Number(order.product.price),
-      Number(order.price),
+      order.quantity.toString(),
+      Number(order.product.price).toString(),
+      Number(order.price).toString(),
       status,
     ])
   })

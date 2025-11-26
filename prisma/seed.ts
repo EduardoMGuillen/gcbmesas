@@ -15,14 +15,14 @@ async function main() {
   
   if (!existingAdmin) {
     const adminPassword = await bcrypt.hash('admin123gcb', 10)
-    const admin = await prisma.user.create({
+    const newAdmin = await prisma.user.create({
       data: {
         username: 'admin',
         password: adminPassword,
         role: 'ADMIN',
       },
     })
-    console.log('✅ Usuario administrador creado:', admin.username)
+    console.log('✅ Usuario administrador creado:', newAdmin.username)
   } else {
     console.log('✅ Usuario administrador ya existe (contraseña no modificada)')
   }
