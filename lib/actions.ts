@@ -291,7 +291,10 @@ export async function getCashierDashboardData() {
       },
     }),
     prisma.order.findMany({
-      where: { served: false },
+      where: { 
+        served: false,
+        rejected: false, // Excluir pedidos rechazados de pendientes
+      },
       orderBy: { createdAt: 'asc' },
       include: {
         product: { select: { name: true, price: true } },
@@ -345,6 +348,89 @@ export async function setOrderServed(orderId: string, served: boolean) {
   revalidatePath('/cajero')
   revalidatePath(`/mesa/${order.account.tableId}`)
   return order
+}
+
+export async function rejectOrder(orderId: string) {
+  const currentUser = await getCurrentUser()
+  ensureCashierAccess(currentUser.role)
+
+  // Get order with account info
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      account: {
+        select: {
+          id: true,
+          tableId: true,
+          currentBalance: true,
+          status: true,
+          table: { select: { shortCode: true, name: true } },
+        },
+      },
+      product: { select: { name: true, price: true } },
+      user: { select: { username: true } },
+    },
+  })
+
+  if (!order) {
+    throw new Error('Pedido no encontrado')
+  }
+
+  if (order.rejected) {
+    throw new Error('Este pedido ya fue rechazado')
+  }
+
+  if (order.account.status === 'CLOSED') {
+    throw new Error('No se puede rechazar un pedido de una cuenta cerrada')
+  }
+
+  // Use transaction to ensure atomicity
+  const result = await prisma.$transaction(async (tx) => {
+    // Lock account row
+    const lockedAccount = await tx.account.findUnique({
+      where: { id: order.account.id },
+    })
+
+    if (!lockedAccount) {
+      throw new Error('Cuenta no encontrada')
+    }
+
+    // Mark order as rejected
+    const rejectedOrder = await tx.order.update({
+      where: { id: orderId },
+      data: { rejected: true },
+    })
+
+    // Revert balance (add back the price)
+    const newBalance = Number(lockedAccount.currentBalance) + Number(order.price)
+
+    await tx.account.update({
+      where: { id: order.account.id },
+      data: { currentBalance: newBalance },
+    })
+
+    // Log the rejection
+    await tx.log.create({
+      data: {
+        userId: currentUser.id,
+        tableId: order.account.tableId,
+        action: 'ORDER_REJECTED',
+        details: {
+          orderId: order.id,
+          productName: order.product.name,
+          price: order.price.toString(),
+          quantity: order.quantity,
+          reason: 'Fuera de stock',
+        },
+      },
+    })
+
+    return rejectedOrder
+  })
+
+  revalidatePath('/cajero')
+  revalidatePath(`/mesa/${order.account.tableId}`)
+  return result
 }
 
 // ========== ACCOUNT ACTIONS ==========
@@ -415,6 +501,100 @@ export async function closeAccount(accountId: string) {
   revalidatePath(`/mesa/${account.tableId}`)
   revalidatePath('/admin/cuentas')
   return closedAccount
+}
+
+export async function exportAccountToExcel(accountId: string) {
+  const currentUser = await getCurrentUser()
+  
+  // Get account with all details
+  const account = await prisma.account.findUnique({
+    where: { id: accountId },
+    include: {
+      table: true,
+      orders: {
+        include: {
+          product: true,
+          user: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      },
+    },
+  })
+
+  if (!account) {
+    throw new Error('Cuenta no encontrada')
+  }
+
+  // Dynamic import of xlsx (server-side only)
+  const XLSX = await import('xlsx')
+
+  // Prepare data for Excel
+  const totalConsumed = Number(account.initialBalance) - Number(account.currentBalance)
+  
+  // Summary sheet
+  const summaryData = [
+    ['Resumen de Cuenta'],
+    [],
+    ['Mesa', account.table.name],
+    ['Código', account.table.shortCode],
+    ['Zona', account.table.zone || 'N/A'],
+    ['Fecha', account.createdAt.toLocaleDateString('es-ES')],
+    ['Hora', account.createdAt.toLocaleTimeString('es-ES')],
+    ['Estado', account.status === 'OPEN' ? 'Abierta' : 'Cerrada'],
+    [],
+    ['Saldo Inicial', Number(account.initialBalance)],
+    ['Total Consumido', totalConsumed],
+    ['Saldo Disponible', Number(account.currentBalance)],
+    [],
+    ['Total de Pedidos', account.orders.length],
+  ]
+
+  // Orders sheet
+  const ordersData = [
+    ['Fecha', 'Hora', 'Mesero', 'Producto', 'Cantidad', 'Precio Unitario', 'Total', 'Estado'],
+  ]
+
+  account.orders.forEach((order) => {
+    const orderDate = new Date(order.createdAt)
+    const status = order.rejected 
+      ? 'Rechazado' 
+      : order.served 
+        ? 'Realizado' 
+        : 'Pendiente'
+    
+    ordersData.push([
+      orderDate.toLocaleDateString('es-ES'),
+      orderDate.toLocaleTimeString('es-ES'),
+      order.user?.name || order.user?.username || 'N/A',
+      order.product.name,
+      order.quantity,
+      Number(order.product.price),
+      Number(order.price),
+      status,
+    ])
+  })
+
+  // Create workbook
+  const workbook = XLSX.utils.book_new()
+
+  // Add summary sheet
+  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
+  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen')
+
+  // Add orders sheet
+  const ordersSheet = XLSX.utils.aoa_to_sheet(ordersData)
+  XLSX.utils.book_append_sheet(workbook, ordersSheet, 'Pedidos')
+
+  // Generate buffer
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+
+  // Return buffer and filename
+  const fileName = `Cuenta_${account.table.shortCode}_${account.createdAt.toISOString().split('T')[0]}.xlsx`
+  
+  return {
+    buffer,
+    fileName,
+  }
 }
 
 // ========== PRODUCT ACTIONS ==========

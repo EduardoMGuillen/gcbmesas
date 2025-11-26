@@ -41,6 +41,32 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
   const totalConsumed = (account: any) =>
     Number(account.initialBalance) - Number(account.currentBalance)
 
+  const handleExportExcel = async (accountId: string) => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/export-account?accountId=${accountId}`)
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Error al exportar')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Cuenta_${accountId}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err: any) {
+      alert(err.message || 'Error al exportar cuenta')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div>
       <div className="mb-8">
@@ -109,15 +135,24 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
               >
                 Ver {account.orders.length} pedidos
               </button>
-              {account.status === 'OPEN' && (
+              <div className="flex gap-2">
                 <button
-                  onClick={() => handleCloseAccount(account.id)}
+                  onClick={() => handleExportExcel(account.id)}
                   disabled={loading}
-                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
                 >
-                  Cerrar Cuenta
+                  Exportar Excel
                 </button>
-              )}
+                {account.status === 'OPEN' && (
+                  <button
+                    onClick={() => handleCloseAccount(account.id)}
+                    disabled={loading}
+                    className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
+                  >
+                    Cerrar Cuenta
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -130,12 +165,21 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
               <h2 className="text-2xl font-semibold text-white">
                 Pedidos - Mesa {selectedAccount.table.name}
               </h2>
-              <button
-                onClick={() => setSelectedAccount(null)}
-                className="text-dark-400 hover:text-white"
-              >
-                ✕
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleExportExcel(selectedAccount.id)}
+                  disabled={loading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
+                >
+                  Exportar Excel
+                </button>
+                <button
+                  onClick={() => setSelectedAccount(null)}
+                  className="text-dark-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <div className="space-y-3">
               {selectedAccount.orders.length === 0 ? (
@@ -152,6 +196,11 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
                       <div>
                         <p className="font-semibold text-white">
                           {order.product.name}
+                          {order.rejected && (
+                            <span className="ml-2 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
+                              Rechazado
+                            </span>
+                          )}
                         </p>
                         <p className="text-sm text-dark-400">
                           {order.quantity}x {formatCurrency(order.product.price)}

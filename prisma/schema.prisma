@@ -26,6 +26,7 @@ enum LogAction {
   ACCOUNT_CLOSED
   ORDER_CREATED
   ORDER_CANCELLED
+  ORDER_REJECTED
   PRODUCT_ADDED
   PRODUCT_UPDATED
   PRODUCT_DEACTIVATED
@@ -106,6 +107,7 @@ model Order {
   price     Decimal  @db.Decimal(10, 2)
   quantity  Int      @default(1)
   served    Boolean  @default(false)
+  rejected  Boolean  @default(false)
   createdAt DateTime @default(now())
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)

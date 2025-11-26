@@ -15,7 +15,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
   const [account, setAccount] = useState(initialAccount)
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<string>('')
-  const [quantity, setQuantity] = useState(1)
+  const [quantity, setQuantity] = useState<string>('1') // Cambiar a string para manejar input temporal
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showCreateAccount, setShowCreateAccount] = useState(!account)
@@ -65,10 +65,18 @@ export function TableView({ table, account: initialAccount, products }: TableVie
         return
       }
 
+      // Validar y convertir cantidad
+      const quantityNum = parseInt(quantity, 10)
+      if (!quantityNum || quantityNum < 1) {
+        setError('La cantidad debe ser un número mayor o igual a 1')
+        setLoading(false)
+        return
+      }
+
       const newOrder = await createOrder({
         accountId: account.id,
         productId: selectedProduct,
-        quantity: quantity,
+        quantity: quantityNum,
       })
 
       // Refresh account data
@@ -76,7 +84,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
       
       // Update local state
       const product = products.find((p) => p.id === selectedProduct)
-      const totalPrice = Number(product?.price || 0) * quantity
+      const totalPrice = Number(product?.price || 0) * quantityNum
       
       setAccount({
         ...account,
@@ -96,7 +104,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
 
       setShowAddProduct(false)
       setSelectedProduct('')
-      setQuantity(1)
+      setQuantity('1')
     } catch (err: any) {
       setError(err.message || 'Error al agregar pedido')
     } finally {
@@ -274,6 +282,11 @@ export function TableView({ table, account: initialAccount, products }: TableVie
                       <div>
                         <p className="font-semibold text-white">
                           {order.product.name}
+                          {order.rejected && (
+                            <span className="ml-2 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
+                              Rechazado
+                            </span>
+                          )}
                         </p>
                         <p className="text-sm text-dark-400">
                           {order.quantity}x {formatCurrency(order.product.price)}
@@ -347,10 +360,25 @@ export function TableView({ table, account: initialAccount, products }: TableVie
                   Cantidad
                 </label>
                 <input
-                  type="number"
-                  min="1"
+                  type="text"
+                  inputMode="numeric"
                   value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    // Permitir solo números
+                    if (/^\d*$/.test(value)) {
+                      setQuantity(value)
+                    }
+                  }}
+                  onBlur={() => {
+                    // Validar al perder foco
+                    const num = parseInt(quantity, 10)
+                    if (!num || num < 1) {
+                      setQuantity('1')
+                    } else {
+                      setQuantity(num.toString())
+                    }
+                  }}
                   required
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -363,7 +391,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
                       Number(
                         products.find((p) => p.id === selectedProduct)?.price ||
                           0
-                      ) * quantity
+                      ) * (parseInt(quantity, 10) || 1)
                     )}
                   </p>
                 </div>

@@ -40,20 +40,20 @@ async function main() {
     console.log('✅ La contraseña ya está hasheada correctamente')
   }
 
-  // Verificar que la contraseña 'admin123' funciona
-  const testPassword = 'admin123'
+  // Verificar que la contraseña 'admin123gcb' funciona
+  const testPassword = 'admin123gcb'
   const isValid = await bcrypt.compare(testPassword, admin.password)
   
   if (isValid) {
-    console.log('✅ La contraseña "admin123" es válida')
+    console.log('✅ La contraseña "admin123gcb" es válida')
   } else {
-    console.log('⚠️  La contraseña "admin123" NO es válida')
+    console.log('⚠️  La contraseña "admin123gcb" NO es válida')
     console.log('💡 Si necesitas resetear la contraseña, ejecuta: npm run fix-admin-password')
   }
 
-  console.log('\n📝 Credenciales:')
+  console.log('\n📝 Credenciales por defecto (solo si se creó nuevo):')
   console.log('   Usuario: admin')
-  console.log('   Contraseña: admin123')
+  console.log('   Contraseña: admin123gcb')
 }
 
 main()
