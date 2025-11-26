@@ -101,7 +101,8 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/admin/:path*', '/cajero/:path*', '/mesero/:path*'],
-  // Don't match auth-callback to allow it to work
+  // Middleware deshabilitado - las páginas manejan la autenticación directamente
+  // Esto evita problemas con cookies en móvil/iPad
+  matcher: [],
 }
 
