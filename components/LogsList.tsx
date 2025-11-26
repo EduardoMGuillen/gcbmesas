@@ -13,6 +13,7 @@ const actionLabels: Record<LogAction, string> = {
   ACCOUNT_CLOSED: 'Cuenta Cerrada',
   ORDER_CREATED: 'Pedido Creado',
   ORDER_CANCELLED: 'Pedido Cancelado',
+  ORDER_REJECTED: 'Pedido Rechazado',
   PRODUCT_ADDED: 'Producto Agregado',
   PRODUCT_UPDATED: 'Producto Actualizado',
   PRODUCT_DEACTIVATED: 'Producto Desactivado',
