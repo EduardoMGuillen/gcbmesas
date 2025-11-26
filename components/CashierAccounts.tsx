@@ -108,14 +108,14 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                       </div>
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
-                          order.rejected
+                          (order.rejected === true || order.rejected === 1)
                             ? 'bg-red-500/20 text-red-300'
                             : order.served
                             ? 'bg-green-500/20 text-green-300'
                             : 'bg-amber-500/20 text-amber-200'
                         }`}
                       >
-                        {order.rejected ? 'Rechazado' : order.served ? 'Realizado' : 'Pendiente'}
+                        {(order.rejected === true || order.rejected === 1) ? 'Rechazado' : order.served ? 'Realizado' : 'Pendiente'}
                       </span>
                     </div>
                   ))}
