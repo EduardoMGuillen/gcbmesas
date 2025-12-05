@@ -123,7 +123,7 @@ export function TablesList({ initialTables }: TablesListProps) {
         const titleHeight = 15
         const qrSize = 80 // Size in mm
         const infoHeight = 8
-        const spacing1 = 8 // Space between title and QR
+        const spacing1 = 4 // Space between title and QR (reduced for closer spacing)
         const spacing2 = 8 // Space between QR and info
         const totalHeight = titleHeight + spacing1 + qrSize + spacing2 + infoHeight
         const startY = centerY - totalHeight / 2
