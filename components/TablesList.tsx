@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createTable, updateTable, deleteTable } from '@/lib/actions'
 import { generateQRCode } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
+import { jsPDF } from 'jspdf'
 
 interface TablesListProps {
   initialTables: any[]
@@ -20,6 +21,7 @@ export function TablesList({ initialTables }: TablesListProps) {
   const [formData, setFormData] = useState({ name: '', zone: '' })
   const router = useRouter()
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   const handleCreateTable = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -81,6 +83,80 @@ export function TablesList({ initialTables }: TablesListProps) {
     }
   }
 
+  const handleGeneratePDF = async () => {
+    setError('')
+    setPdfLoading(true)
+
+    try {
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      // Generate QR codes and create PDF pages for each table
+      for (let i = 0; i < tables.length; i++) {
+        const table = tables[i]
+        
+        // Add new page for each table (except the first one)
+        if (i > 0) {
+          pdf.addPage()
+        }
+
+        // Generate QR code for this table
+        let qrCodeDataURL = ''
+        if (table.qrUrl) {
+          try {
+            qrCodeDataURL = await generateQRCode(table.qrUrl)
+          } catch (err) {
+            console.error(`Error generating QR for table ${table.name}:`, err)
+          }
+        }
+
+        // Page dimensions
+        const pageWidth = pdf.internal.pageSize.getWidth()
+        const pageHeight = pdf.internal.pageSize.getHeight()
+        const centerX = pageWidth / 2
+
+        // Title: Table name (centered, large font, top of page)
+        pdf.setFontSize(28)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(table.name, centerX, 40, { align: 'center' })
+
+        // QR Code (centered, below title)
+        if (qrCodeDataURL) {
+          const qrSize = 90 // Size in mm
+          const qrX = centerX - qrSize / 2
+          const qrY = 60
+          pdf.addImage(qrCodeDataURL, 'PNG', qrX, qrY, qrSize, qrSize)
+        }
+
+        // Short code and zone (below QR code, side by side)
+        const infoY = qrCodeDataURL ? 165 : 100
+        pdf.setFontSize(16)
+        pdf.setFont('helvetica', 'normal')
+        
+        // Short code (left)
+        if (table.shortCode) {
+          pdf.text(table.shortCode, 40, infoY, { align: 'left' })
+        }
+
+        // Zone (right)
+        if (table.zone) {
+          pdf.text(table.zone, pageWidth - 40, infoY, { align: 'right' })
+        }
+      }
+
+      // Save the PDF
+      pdf.save('mesas-qr-codes.pdf')
+    } catch (err: any) {
+      setError('Error al generar PDF: ' + (err.message || 'Error desconocido'))
+      console.error('Error generating PDF:', err)
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
@@ -91,12 +167,36 @@ export function TablesList({ initialTables }: TablesListProps) {
             ingreso manual si no puedes escanear el QR.
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-        >
-          Crear Mesa
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={handleGeneratePDF}
+            disabled={pdfLoading || tables.length === 0}
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {pdfLoading ? (
+              <>
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Generando...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Descargar PDF
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+          >
+            Crear Mesa
+          </button>
+        </div>
       </div>
 
       {error && (
