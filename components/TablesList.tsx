@@ -121,14 +121,12 @@ export function TablesList({ initialTables }: TablesListProps) {
 
         // Calculate dimensions
         const qrSize = 80 // Size in mm
-        const boxWidth = qrSize // Orange box width (same as QR)
-        const boxHeight = 20 // Orange box height
-        const yellowMargin = 2 // Margin for yellow box inside orange
-        const spacing1 = 8 // Space between QR and orange box
-        const spacing2 = 6 // Space between orange box and bottom text
+        const spacing1 = 8 // Space between QR and title
+        const spacing2 = 8 // Space between title and bottom text
         const infoHeight = 8
+        const titleHeight = 10
         
-        const totalHeight = qrSize + spacing1 + boxHeight + spacing2 + infoHeight
+        const totalHeight = qrSize + spacing1 + titleHeight + spacing2 + infoHeight
         const startY = centerY - totalHeight / 2
 
         // QR Code (centered, at top)
@@ -138,31 +136,15 @@ export function TablesList({ initialTables }: TablesListProps) {
           pdf.addImage(qrCodeDataURL, 'PNG', qrX, qrY, qrSize, qrSize)
         }
 
-        // Orange box with border (below QR code)
-        const orangeBoxX = centerX - boxWidth / 2
-        const orangeBoxY = startY + qrSize + spacing1
-        pdf.setDrawColor(255, 165, 0) // Orange color
-        pdf.setFillColor(255, 165, 0) // Orange fill
-        pdf.setLineWidth(1)
-        pdf.rect(orangeBoxX, orangeBoxY, boxWidth, boxHeight, 'S') // Draw orange border
-
-        // Yellow box inside orange box
-        const yellowBoxX = orangeBoxX + yellowMargin
-        const yellowBoxY = orangeBoxY + yellowMargin
-        const yellowBoxWidth = boxWidth - (yellowMargin * 2)
-        const yellowBoxHeight = boxHeight - (yellowMargin * 2)
-        pdf.setFillColor(255, 255, 0) // Yellow color
-        pdf.rect(yellowBoxX, yellowBoxY, yellowBoxWidth, yellowBoxHeight, 'F') // Fill yellow
-
-        // Title: Table name (centered inside yellow box)
+        // Title: Table name (centered, below QR code, on white background)
         pdf.setFontSize(24)
         pdf.setFont('helvetica', 'bold')
         pdf.setTextColor(0, 0, 0) // Black text
-        const titleY = orangeBoxY + boxHeight / 2 + 3 // Center vertically in box
+        const titleY = startY + qrSize + spacing1 + titleHeight / 2
         pdf.text(table.name, centerX, titleY, { align: 'center' })
 
-        // Short code and zone (below orange box, side by side)
-        const infoY = orangeBoxY + boxHeight + spacing2
+        // Short code and zone (below title, side by side)
+        const infoY = startY + qrSize + spacing1 + titleHeight + spacing2
         pdf.setFontSize(16)
         pdf.setFont('helvetica', 'normal')
         
