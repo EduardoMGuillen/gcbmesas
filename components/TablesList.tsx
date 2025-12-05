@@ -117,33 +117,44 @@ export function TablesList({ initialTables }: TablesListProps) {
         const pageWidth = pdf.internal.pageSize.getWidth()
         const pageHeight = pdf.internal.pageSize.getHeight()
         const centerX = pageWidth / 2
+        const centerY = pageHeight / 2
 
-        // Title: Table name (centered, large font, top of page)
+        // Calculate total height of content to center it vertically
+        const titleHeight = 15
+        const qrSize = 80 // Size in mm
+        const infoHeight = 8
+        const spacing1 = 8 // Space between title and QR
+        const spacing2 = 8 // Space between QR and info
+        const totalHeight = titleHeight + spacing1 + qrSize + spacing2 + infoHeight
+        const startY = centerY - totalHeight / 2
+
+        // Title: Table name (centered, large font)
         pdf.setFontSize(28)
         pdf.setFont('helvetica', 'bold')
-        pdf.text(table.name, centerX, 40, { align: 'center' })
+        pdf.text(table.name, centerX, startY, { align: 'center' })
 
-        // QR Code (centered, below title)
+        // QR Code (centered, below title with small gap)
         if (qrCodeDataURL) {
-          const qrSize = 90 // Size in mm
           const qrX = centerX - qrSize / 2
-          const qrY = 60
+          const qrY = startY + titleHeight + spacing1
           pdf.addImage(qrCodeDataURL, 'PNG', qrX, qrY, qrSize, qrSize)
         }
 
-        // Short code and zone (below QR code, side by side)
-        const infoY = qrCodeDataURL ? 165 : 100
+        // Short code and zone (below QR code, side by side, closer to QR)
+        const infoY = startY + titleHeight + spacing1 + qrSize + spacing2
         pdf.setFontSize(16)
         pdf.setFont('helvetica', 'normal')
         
-        // Short code (left)
+        // Short code (left, aligned with QR left edge)
         if (table.shortCode) {
-          pdf.text(table.shortCode, 40, infoY, { align: 'left' })
+          const qrLeftEdge = centerX - qrSize / 2
+          pdf.text(table.shortCode, qrLeftEdge, infoY, { align: 'left' })
         }
 
-        // Zone (right)
+        // Zone (right, aligned with QR right edge)
         if (table.zone) {
-          pdf.text(table.zone, pageWidth - 40, infoY, { align: 'right' })
+          const qrRightEdge = centerX + qrSize / 2
+          pdf.text(table.zone, qrRightEdge, infoY, { align: 'right' })
         }
       }
 
