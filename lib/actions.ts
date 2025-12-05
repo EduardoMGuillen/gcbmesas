@@ -205,7 +205,20 @@ export async function createTable(data: { name: string; zone?: string }) {
   })
 
   revalidatePath('/admin/mesas')
-  return updatedTable
+  
+  // Return table with same structure as getTables
+  return prisma.table.findUnique({
+    where: { id: updatedTable.id },
+    include: {
+      accounts: {
+        where: { status: 'OPEN' },
+        orderBy: { createdAt: 'desc' },
+      },
+      _count: {
+        select: { accounts: true },
+      },
+    },
+  })
 }
 
 export async function updateTable(
