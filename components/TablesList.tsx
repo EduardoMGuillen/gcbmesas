@@ -57,7 +57,7 @@ export function TablesList({ initialTables }: TablesListProps) {
     try {
       await deleteTable(table.id)
       setTables(tables.filter((t) => t.id !== table.id))
-      router.refresh()
+      // No need to refresh since we're updating local state
     } catch (err: any) {
       setError(err.message || 'Error al eliminar mesa')
     } finally {
@@ -128,11 +128,11 @@ export function TablesList({ initialTables }: TablesListProps) {
               <button
                 onClick={() => handleDeleteTable(table)}
                 disabled={
-                  deleteLoadingId === table.id || table.accounts.length > 0
+                  deleteLoadingId === table.id || (table.accounts?.length ?? 0) > 0
                 }
                 className="text-red-400 hover:text-red-300 text-xs disabled:opacity-50"
                 title={
-                  table.accounts.length > 0
+                  (table.accounts?.length ?? 0) > 0
                     ? 'Cierra las cuentas abiertas antes de eliminar esta mesa'
                     : 'Eliminar mesa'
                 }
@@ -145,13 +145,13 @@ export function TablesList({ initialTables }: TablesListProps) {
               <div className="flex justify-between text-sm">
                 <span className="text-white/80">Cuentas abiertas:</span>
                 <span className="text-white font-semibold">
-                  {table.accounts.length}
+                  {table.accounts?.length ?? 0}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-white/80">Total cuentas:</span>
                 <span className="text-white font-semibold">
-                  {table._count.accounts}
+                  {table._count?.accounts ?? 0}
                 </span>
               </div>
             </div>
