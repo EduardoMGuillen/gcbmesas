@@ -12,6 +12,7 @@ interface TablesListProps {
 
 export function TablesList({ initialTables }: TablesListProps) {
   const [tables, setTables] = useState(initialTables)
+  const [selectedZone, setSelectedZone] = useState<string>('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showQRModal, setShowQRModal] = useState(false)
   const [selectedTable, setSelectedTable] = useState<any>(null)
@@ -22,6 +23,11 @@ export function TablesList({ initialTables }: TablesListProps) {
   const router = useRouter()
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
   const [pdfLoading, setPdfLoading] = useState(false)
+
+  // Filtrar mesas por zona
+  const filteredTables = selectedZone
+    ? tables.filter((t) => t.zone === selectedZone)
+    : tables
 
   const handleCreateTable = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -94,9 +100,10 @@ export function TablesList({ initialTables }: TablesListProps) {
         format: 'a4',
       })
 
-      // Generate QR codes and create PDF pages for each table
-      for (let i = 0; i < tables.length; i++) {
-        const table = tables[i]
+      // Generate QR codes and create PDF pages for each table (use filtered tables if filter is active)
+      const tablesToExport = selectedZone ? filteredTables : tables
+      for (let i = 0; i < tablesToExport.length; i++) {
+        const table = tablesToExport[i]
         
         // Add new page for each table (except the first one)
         if (i > 0) {
@@ -219,8 +226,39 @@ export function TablesList({ initialTables }: TablesListProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tables.map((table) => (
+      {/* Filtro por zona */}
+      <div className="mb-6 flex items-center gap-4">
+        <label className="text-sm font-medium text-dark-300 whitespace-nowrap">
+          Filtrar por zona:
+        </label>
+        <select
+          value={selectedZone}
+          onChange={(e) => setSelectedZone(e.target.value)}
+          className="px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[200px]"
+        >
+          <option value="">Todas las zonas</option>
+          <option value="Astronomical">Astronomical</option>
+          <option value="Studio54">Studio54</option>
+          <option value="Beer Garden">Beer Garden</option>
+        </select>
+        {selectedZone && (
+          <span className="text-sm text-dark-400">
+            ({filteredTables.length} mesa{filteredTables.length !== 1 ? 's' : ''})
+          </span>
+        )}
+      </div>
+
+      {filteredTables.length === 0 ? (
+        <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center">
+          <p className="text-dark-400 text-lg">
+            {selectedZone
+              ? `No hay mesas en la zona "${selectedZone}"`
+              : 'No hay mesas disponibles'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredTables.map((table) => (
           <div
             key={table.id}
             className="bg-dark-100 border border-dark-200 rounded-xl p-6"
@@ -287,8 +325,9 @@ export function TablesList({ initialTables }: TablesListProps) {
               </a>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -314,17 +353,21 @@ export function TablesList({ initialTables }: TablesListProps) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-dark-300 mb-2">
-                  Zona (opcional)
+                  Zona
                 </label>
-                <input
-                  type="text"
+                <select
                   value={formData.zone}
                   onChange={(e) =>
                     setFormData({ ...formData, zone: e.target.value })
                   }
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  placeholder="Terraza, Interior, VIP"
-                />
+                  required
+                >
+                  <option value="">Selecciona una zona</option>
+                  <option value="Astronomical">Astronomical</option>
+                  <option value="Studio54">Studio54</option>
+                  <option value="Beer Garden">Beer Garden</option>
+                </select>
               </div>
               <div className="flex space-x-3">
                 <button

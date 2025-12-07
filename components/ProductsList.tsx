@@ -15,6 +15,7 @@ interface ProductsListProps {
 
 export function ProductsList({ initialProducts }: ProductsListProps) {
   const [products, setProducts] = useState(initialProducts)
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -25,6 +26,20 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
     category: '',
   })
   const router = useRouter()
+
+  // Extraer categorías únicas de los productos
+  const categories = Array.from(
+    new Set(
+      products
+        .map((p) => p.category)
+        .filter((cat): cat is string => cat !== null && cat !== undefined && cat !== '')
+    )
+  ).sort()
+
+  // Filtrar productos por categoría
+  const filteredProducts = selectedCategory
+    ? products.filter((p) => p.category === selectedCategory)
+    : products
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,6 +60,7 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
         category: formData.category || undefined,
       })
       setProducts([...products, newProduct])
+      // Si el nuevo producto tiene categoría y estamos filtrando por esa categoría, se mostrará automáticamente
       setShowCreateModal(false)
       setFormData({ name: '', price: '', category: '' })
       router.refresh()
@@ -78,6 +94,7 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
       setProducts(
         products.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
       )
+      // Si cambió la categoría y estamos filtrando, ajustar el filtro si es necesario
       setEditingProduct(null)
       setFormData({ name: '', price: '', category: '' })
       router.refresh()
@@ -138,61 +155,95 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {products.map((product) => (
-          <div
-            key={product.id}
-            className={`bg-dark-100 border rounded-xl p-6 ${
-              product.isActive
-                ? 'border-dark-200'
-                : 'border-red-500/50 opacity-60'
-            }`}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-xl font-semibold text-white mb-1">
-                  {product.name}
-                </h3>
-                {product.category && (
-                  <p className="text-sm text-dark-400">
-                    {product.category}
-                  </p>
+      {/* Filtro por categoría */}
+      <div className="mb-6 flex items-center gap-4">
+        <label className="text-sm font-medium text-dark-300 whitespace-nowrap">
+          Filtrar por categoría:
+        </label>
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          className="px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[200px]"
+        >
+          <option value="">Todas las categorías</option>
+          {categories.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+        {selectedCategory && (
+          <span className="text-sm text-dark-400">
+            ({filteredProducts.length} producto{filteredProducts.length !== 1 ? 's' : ''})
+          </span>
+        )}
+      </div>
+
+      {filteredProducts.length === 0 ? (
+        <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center">
+          <p className="text-dark-400 text-lg">
+            {selectedCategory
+              ? `No hay productos en la categoría "${selectedCategory}"`
+              : 'No hay productos disponibles'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProducts.map((product) => (
+            <div
+              key={product.id}
+              className={`bg-dark-100 border rounded-xl p-6 ${
+                product.isActive
+                  ? 'border-dark-200'
+                  : 'border-red-500/50 opacity-60'
+              }`}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-white mb-1">
+                    {product.name}
+                  </h3>
+                  {product.category && (
+                    <p className="text-sm text-dark-400">
+                      {product.category}
+                    </p>
+                  )}
+                </div>
+                <div
+                  className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                    product.isActive
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-red-500/20 text-red-400'
+                  }`}
+                >
+                  {product.isActive ? 'Activo' : 'Inactivo'}
+                </div>
+              </div>
+
+              <p className="text-2xl font-bold text-primary-400 mb-4">
+                {formatCurrency(product.price)}
+              </p>
+
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => openEditModal(product)}
+                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                >
+                  Editar
+                </button>
+                {product.isActive && (
+                  <button
+                    onClick={() => handleDeactivate(product.id)}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                  >
+                    Desactivar
+                  </button>
                 )}
               </div>
-              <div
-                className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                  product.isActive
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-red-500/20 text-red-400'
-                }`}
-              >
-                {product.isActive ? 'Activo' : 'Inactivo'}
-              </div>
             </div>
-
-            <p className="text-2xl font-bold text-primary-400 mb-4">
-              {formatCurrency(product.price)}
-            </p>
-
-            <div className="flex space-x-2">
-              <button
-                onClick={() => openEditModal(product)}
-                className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
-              >
-                Editar
-              </button>
-              {product.isActive && (
-                <button
-                  onClick={() => handleDeactivate(product.id)}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
-                >
-                  Desactivar
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
