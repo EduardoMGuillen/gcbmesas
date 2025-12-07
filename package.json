@@ -18,7 +18,8 @@
     "db:generate": "prisma generate",
     "db:seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",
     "db:fix-password": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/fix-admin-password.ts",
-    "db:verify-password": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/verify-admin-password.ts"
+    "db:verify-password": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/verify-admin-password.ts",
+    "import:bebidas": "node scripts/import-bebidas-wrapper.js"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",
@@ -47,6 +48,7 @@
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
     "concurrently": "^8.2.2",
+    "dotenv": "^17.2.3",
     "eslint": "^8",
     "eslint-config-next": "14.0.4",
     "postcss": "^8",

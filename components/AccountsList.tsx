@@ -11,9 +11,15 @@ interface AccountsListProps {
 
 export function AccountsList({ initialAccounts }: AccountsListProps) {
   const [accounts, setAccounts] = useState(initialAccounts)
+  const [selectedZone, setSelectedZone] = useState<string>('')
   const [selectedAccount, setSelectedAccount] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  // Filtrar cuentas por zona de la mesa
+  const filteredAccounts = selectedZone
+    ? accounts.filter((acc) => acc.table?.zone === selectedZone)
+    : accounts
 
   const handleCloseAccount = async (accountId: string) => {
     if (!confirm('¿Estás seguro de cerrar esta cuenta?')) {
@@ -76,8 +82,39 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
         </p>
       </div>
 
-      <div className="space-y-4">
-        {accounts.map((account) => (
+      {/* Filtro por zona */}
+      <div className="mb-6 flex items-center gap-4">
+        <label className="text-sm font-medium text-dark-300 whitespace-nowrap">
+          Filtrar por zona:
+        </label>
+        <select
+          value={selectedZone}
+          onChange={(e) => setSelectedZone(e.target.value)}
+          className="px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[200px]"
+        >
+          <option value="">Todas las zonas</option>
+          <option value="Astronomical">Astronomical</option>
+          <option value="Studio54">Studio54</option>
+          <option value="Beer Garden">Beer Garden</option>
+        </select>
+        {selectedZone && (
+          <span className="text-sm text-dark-400">
+            ({filteredAccounts.length} cuenta{filteredAccounts.length !== 1 ? 's' : ''})
+          </span>
+        )}
+      </div>
+
+      {filteredAccounts.length === 0 ? (
+        <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center">
+          <p className="text-dark-400 text-lg">
+            {selectedZone
+              ? `No hay cuentas en la zona "${selectedZone}"`
+              : 'No hay cuentas disponibles'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredAccounts.map((account) => (
           <div
             key={account.id}
             className="bg-dark-100 border border-dark-200 rounded-xl p-6"
@@ -155,8 +192,9 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
               </div>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {selectedAccount && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
