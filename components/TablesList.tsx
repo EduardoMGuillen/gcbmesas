@@ -116,10 +116,11 @@ export function TablesList({ initialTables }: TablesListProps) {
     setPdfLoading(true)
 
     try {
+      // 4 x 2.5 inches = 101.6 x 63.5 mm
       const pdf = new jsPDF({
-        orientation: 'portrait',
+        orientation: 'landscape',
         unit: 'mm',
-        format: 'a4',
+        format: [63.5, 101.6], // [height, width] for landscape
       })
 
       // Generate QR codes and create PDF pages for each table (use filtered tables if filter is active)
@@ -156,47 +157,48 @@ export function TablesList({ initialTables }: TablesListProps) {
           console.error(`Error loading logo for zone ${table.zone}:`, err)
         }
 
-        // Page dimensions
+        // Page dimensions (landscape: 101.6mm x 63.5mm)
         const pageWidth = pdf.internal.pageSize.getWidth()
         const pageHeight = pdf.internal.pageSize.getHeight()
         const centerY = pageHeight / 2
 
-        // Layout: QR a la izquierda, texto al lado (nombre, código, logo) - todo compacto
-        const qrSize = 60 // QR size in mm
-        const logoSize = 25 // Logo size in mm (below text)
-        const spacingQRText = 5 // Small space between QR and text
+        // Layout optimized for 4x2.5" card: QR left, text and logo right
+        const qrSize = 45 // QR size in mm (smaller to fit card)
+        const logoSize = 18 // Logo size in mm
+        const margin = 5 // Edge margin
+        const spacingQRText = 4 // Space between QR and text
         
-        // Calculate QR position (horizontally on left side, vertically centered)
-        const qrX = 40 // Start from left with margin
+        // Calculate QR position (left side, vertically centered)
+        const qrX = margin + 5
         const qrY = centerY - qrSize / 2
 
-        // Draw QR Code (clean, no overlay)
+        // Draw QR Code
         if (qrCodeDataURL) {
           pdf.addImage(qrCodeDataURL, 'PNG', qrX, qrY, qrSize, qrSize)
         }
 
-        // Text next to QR - very compact and aligned
+        // Text and logo next to QR - compact layout
         const textX = qrX + qrSize + spacingQRText
-        const textStartY = qrY + 20 // Start text about 1/3 down from QR top
+        const textStartY = qrY + 12
         
-        // Table name - large and bold
-        pdf.setFontSize(28)
+        // Table name - bold and prominent
+        pdf.setFontSize(18)
         pdf.setFont('helvetica', 'bold')
         pdf.setTextColor(0, 0, 0)
         pdf.text(table.name, textX, textStartY)
         
-        // Short code - right below name, slightly smaller
+        // Short code - below name
         if (table.shortCode) {
-          pdf.setFontSize(20)
+          pdf.setFontSize(14)
           pdf.setFont('helvetica', 'normal')
           pdf.setTextColor(60, 60, 60)
-          pdf.text(`Código: ${table.shortCode}`, textX, textStartY + 10)
+          pdf.text(`Código: ${table.shortCode}`, textX, textStartY + 7)
         }
 
-        // Logo - below code (no need for zone text, logo represents it)
+        // Logo - below code text
         if (logoDataURL) {
           const logoX = textX
-          const logoY = textStartY + 15 // Below the code text
+          const logoY = textStartY + 10
           pdf.addImage(logoDataURL, 'PNG', logoX, logoY, logoSize, logoSize)
         }
       }
