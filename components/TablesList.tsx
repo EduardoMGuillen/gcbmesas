@@ -159,39 +159,37 @@ export function TablesList({ initialTables }: TablesListProps) {
         // Page dimensions
         const pageWidth = pdf.internal.pageSize.getWidth()
         const pageHeight = pdf.internal.pageSize.getHeight()
-        const centerY = pageHeight / 2
+        const centerX = pageWidth / 2
 
-        // Layout: QR with logo on left, then name and code on right - all very compact
+        // Layout: Logo arriba, luego QR en el centro, texto al lado del QR - todo compacto
         const qrSize = 60 // QR size in mm
-        const logoSize = 20 // Logo size in mm (overlaid on QR)
-        const spacing = 5 // Small space between QR and text
+        const logoSize = 25 // Logo size in mm (ABOVE QR, not overlaid)
+        const spacingLogoQR = 8 // Space between logo and QR
+        const spacingQRText = 5 // Small space between QR and text
         
-        // Calculate starting X to center everything horizontally
-        const startX = 30 // Start from left with some margin
+        // Calculate total height and start position to center vertically
+        const totalHeight = logoSize + spacingLogoQR + qrSize
+        const startY = (pageHeight - totalHeight) / 2
         
-        // Vertical centering
-        const startY = centerY - qrSize / 2
-
-        // Draw QR Code
-        if (qrCodeDataURL) {
-          pdf.addImage(qrCodeDataURL, 'PNG', startX, startY, qrSize, qrSize)
-        }
-
-        // Draw logo overlaid on QR (bottom-right corner of QR)
+        // Draw logo centered ABOVE the QR
         if (logoDataURL) {
-          const logoX = startX + qrSize - logoSize - 2 // 2mm padding from edge
-          const logoY = startY + qrSize - logoSize - 2 // 2mm padding from edge
-          
-          // Add white background circle for logo
-          pdf.setFillColor(255, 255, 255)
-          pdf.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 1, 'F')
-          
+          const logoX = centerX - logoSize / 2
+          const logoY = startY
           pdf.addImage(logoDataURL, 'PNG', logoX, logoY, logoSize, logoSize)
         }
 
-        // Text next to QR - very compact
-        const textX = startX + qrSize + spacing
-        const textStartY = startY + 20 // Start text about 1/3 down from QR top
+        // Calculate QR position (horizontally on left side)
+        const qrStartY = startY + logoSize + spacingLogoQR
+        const qrX = 40 // Start from left with margin
+
+        // Draw QR Code (clean, no overlay)
+        if (qrCodeDataURL) {
+          pdf.addImage(qrCodeDataURL, 'PNG', qrX, qrStartY, qrSize, qrSize)
+        }
+
+        // Text next to QR - very compact and aligned
+        const textX = qrX + qrSize + spacingQRText
+        const textStartY = qrStartY + 20 // Start text about 1/3 down from QR top
         
         // Table name - large and bold
         pdf.setFontSize(28)
