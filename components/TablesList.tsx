@@ -89,6 +89,28 @@ export function TablesList({ initialTables }: TablesListProps) {
     }
   }
 
+  // Helper function to load image as base64
+  const loadImageAsBase64 = (imagePath: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(img, 0, 0)
+          resolve(canvas.toDataURL('image/png'))
+        } else {
+          reject(new Error('Failed to get canvas context'))
+        }
+      }
+      img.onerror = () => reject(new Error(`Failed to load image: ${imagePath}`))
+      img.src = imagePath
+    })
+  }
+
   const handleGeneratePDF = async () => {
     setError('')
     setPdfLoading(true)
@@ -120,51 +142,77 @@ export function TablesList({ initialTables }: TablesListProps) {
           }
         }
 
+        // Load logo based on zone
+        let logoDataURL = ''
+        try {
+          if (table.zone === 'Astronomical') {
+            logoDataURL = await loadImageAsBase64('/LogoAstronomical.png')
+          } else if (table.zone === 'Studio54') {
+            logoDataURL = await loadImageAsBase64('/LogoStudio54.png')
+          } else if (table.zone === 'Beer Garden') {
+            logoDataURL = await loadImageAsBase64('/LogoCasaBlanca.png')
+          }
+        } catch (err) {
+          console.error(`Error loading logo for zone ${table.zone}:`, err)
+        }
+
         // Page dimensions
         const pageWidth = pdf.internal.pageSize.getWidth()
         const pageHeight = pdf.internal.pageSize.getHeight()
-        const centerX = pageWidth / 2
         const centerY = pageHeight / 2
 
-        // Calculate dimensions
-        const qrSize = 80 // Size in mm
-        const spacing1 = 8 // Space between QR and title
-        const spacing2 = 8 // Space between title and bottom text
-        const infoHeight = 8
-        const titleHeight = 10
+        // Layout: QR with logo on left, then name and code on right - all very compact
+        const qrSize = 60 // QR size in mm
+        const logoSize = 20 // Logo size in mm (overlaid on QR)
+        const spacing = 5 // Small space between QR and text
         
-        const totalHeight = qrSize + spacing1 + titleHeight + spacing2 + infoHeight
-        const startY = centerY - totalHeight / 2
+        // Calculate starting X to center everything horizontally
+        const startX = 30 // Start from left with some margin
+        
+        // Vertical centering
+        const startY = centerY - qrSize / 2
 
-        // QR Code (centered, at top)
+        // Draw QR Code
         if (qrCodeDataURL) {
-          const qrX = centerX - qrSize / 2
-          const qrY = startY
-          pdf.addImage(qrCodeDataURL, 'PNG', qrX, qrY, qrSize, qrSize)
+          pdf.addImage(qrCodeDataURL, 'PNG', startX, startY, qrSize, qrSize)
         }
 
-        // Title: Table name (centered, below QR code, on white background)
-        pdf.setFontSize(24)
-        pdf.setFont('helvetica', 'bold')
-        pdf.setTextColor(0, 0, 0) // Black text
-        const titleY = startY + qrSize + spacing1 + titleHeight / 2
-        pdf.text(table.name, centerX, titleY, { align: 'center' })
+        // Draw logo overlaid on QR (bottom-right corner of QR)
+        if (logoDataURL) {
+          const logoX = startX + qrSize - logoSize - 2 // 2mm padding from edge
+          const logoY = startY + qrSize - logoSize - 2 // 2mm padding from edge
+          
+          // Add white background circle for logo
+          pdf.setFillColor(255, 255, 255)
+          pdf.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 1, 'F')
+          
+          pdf.addImage(logoDataURL, 'PNG', logoX, logoY, logoSize, logoSize)
+        }
 
-        // Short code and zone (below title, side by side)
-        const infoY = startY + qrSize + spacing1 + titleHeight + spacing2
-        pdf.setFontSize(16)
-        pdf.setFont('helvetica', 'normal')
+        // Text next to QR - very compact
+        const textX = startX + qrSize + spacing
+        const textStartY = startY + 20 // Start text about 1/3 down from QR top
         
-        // Short code (left, aligned with QR left edge)
+        // Table name - large and bold
+        pdf.setFontSize(28)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(0, 0, 0)
+        pdf.text(table.name, textX, textStartY)
+        
+        // Short code - right below name, slightly smaller
         if (table.shortCode) {
-          const qrLeftEdge = centerX - qrSize / 2
-          pdf.text(table.shortCode, qrLeftEdge, infoY, { align: 'left' })
+          pdf.setFontSize(20)
+          pdf.setFont('helvetica', 'normal')
+          pdf.setTextColor(60, 60, 60)
+          pdf.text(`Código: ${table.shortCode}`, textX, textStartY + 10)
         }
 
-        // Zone (right, aligned with QR right edge)
+        // Zone info - even smaller, below code
         if (table.zone) {
-          const qrRightEdge = centerX + qrSize / 2
-          pdf.text(table.zone, qrRightEdge, infoY, { align: 'right' })
+          pdf.setFontSize(14)
+          pdf.setFont('helvetica', 'normal')
+          pdf.setTextColor(100, 100, 100)
+          pdf.text(table.zone, textX, textStartY + 18)
         }
       }
 
