@@ -159,37 +159,25 @@ export function TablesList({ initialTables }: TablesListProps) {
         // Page dimensions
         const pageWidth = pdf.internal.pageSize.getWidth()
         const pageHeight = pdf.internal.pageSize.getHeight()
-        const centerX = pageWidth / 2
+        const centerY = pageHeight / 2
 
-        // Layout: Logo arriba, luego QR en el centro, texto al lado del QR - todo compacto
+        // Layout: QR a la izquierda, texto al lado (nombre, código, logo) - todo compacto
         const qrSize = 60 // QR size in mm
-        const logoSize = 25 // Logo size in mm (ABOVE QR, not overlaid)
-        const spacingLogoQR = 8 // Space between logo and QR
+        const logoSize = 25 // Logo size in mm (below text)
         const spacingQRText = 5 // Small space between QR and text
         
-        // Calculate total height and start position to center vertically
-        const totalHeight = logoSize + spacingLogoQR + qrSize
-        const startY = (pageHeight - totalHeight) / 2
-        
-        // Draw logo centered ABOVE the QR
-        if (logoDataURL) {
-          const logoX = centerX - logoSize / 2
-          const logoY = startY
-          pdf.addImage(logoDataURL, 'PNG', logoX, logoY, logoSize, logoSize)
-        }
-
-        // Calculate QR position (horizontally on left side)
-        const qrStartY = startY + logoSize + spacingLogoQR
+        // Calculate QR position (horizontally on left side, vertically centered)
         const qrX = 40 // Start from left with margin
+        const qrY = centerY - qrSize / 2
 
         // Draw QR Code (clean, no overlay)
         if (qrCodeDataURL) {
-          pdf.addImage(qrCodeDataURL, 'PNG', qrX, qrStartY, qrSize, qrSize)
+          pdf.addImage(qrCodeDataURL, 'PNG', qrX, qrY, qrSize, qrSize)
         }
 
         // Text next to QR - very compact and aligned
         const textX = qrX + qrSize + spacingQRText
-        const textStartY = qrStartY + 20 // Start text about 1/3 down from QR top
+        const textStartY = qrY + 20 // Start text about 1/3 down from QR top
         
         // Table name - large and bold
         pdf.setFontSize(28)
@@ -205,12 +193,11 @@ export function TablesList({ initialTables }: TablesListProps) {
           pdf.text(`Código: ${table.shortCode}`, textX, textStartY + 10)
         }
 
-        // Zone info - even smaller, below code
-        if (table.zone) {
-          pdf.setFontSize(14)
-          pdf.setFont('helvetica', 'normal')
-          pdf.setTextColor(100, 100, 100)
-          pdf.text(table.zone, textX, textStartY + 18)
+        // Logo - below code (no need for zone text, logo represents it)
+        if (logoDataURL) {
+          const logoX = textX
+          const logoY = textStartY + 15 // Below the code text
+          pdf.addImage(logoDataURL, 'PNG', logoX, logoY, logoSize, logoSize)
         }
       }
 
