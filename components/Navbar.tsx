@@ -26,6 +26,7 @@ export function Navbar() {
 
   const meseroLinks = [
     { href: '/mesero', label: 'Panel', match: pathname === '/mesero' },
+    { href: '/admin/cuentas', label: 'Cuentas', match: pathname?.startsWith('/admin/cuentas') },
   ]
 
   const cajeroLinks = [

@@ -19,11 +19,17 @@ export function ManualOrderForm({ tables, products }: ManualOrderFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [productSearchTerm, setProductSearchTerm] = useState('')
   const router = useRouter()
 
   const selectedTable = tables.find((t) => t.id === selectedTableId)
   const hasOpenAccount = selectedTable?.accounts?.length > 0
   const account = selectedTable?.accounts?.[0]
+
+  // Filtrar productos por término de búsqueda
+  const filteredProducts = products.filter((product) =>
+    product.name.toLowerCase().includes(productSearchTerm.toLowerCase())
+  )
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -214,6 +220,13 @@ export function ManualOrderForm({ tables, products }: ManualOrderFormProps) {
                 <label className="block text-sm font-medium text-dark-300 mb-2">
                   Producto
                 </label>
+                <input
+                  type="text"
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                  placeholder="Buscar producto..."
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2"
+                />
                 <select
                   value={selectedProductId}
                   onChange={(e) => setSelectedProductId(e.target.value)}
@@ -221,12 +234,22 @@ export function ManualOrderForm({ tables, products }: ManualOrderFormProps) {
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">Selecciona un producto</option>
-                  {products.map((product) => (
+                  {filteredProducts.map((product) => (
                     <option key={product.id} value={product.id}>
                       {product.name} - {formatCurrency(product.price)}
                     </option>
                   ))}
                 </select>
+                {productSearchTerm && filteredProducts.length === 0 && (
+                  <p className="text-sm text-yellow-400 mt-2">
+                    No se encontraron productos con "{productSearchTerm}"
+                  </p>
+                )}
+                {productSearchTerm && filteredProducts.length > 0 && (
+                  <p className="text-sm text-dark-400 mt-2">
+                    {filteredProducts.length} producto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
+                  </p>
+                )}
               </div>
 
               <div>
