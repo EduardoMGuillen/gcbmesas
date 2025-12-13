@@ -12,14 +12,58 @@ interface AccountsListProps {
 export function AccountsList({ initialAccounts }: AccountsListProps) {
   const [accounts, setAccounts] = useState(initialAccounts)
   const [selectedZone, setSelectedZone] = useState<string>('')
+  const [selectedStatus, setSelectedStatus] = useState<string>('')
+  const [startDate, setStartDate] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
   const [selectedAccount, setSelectedAccount] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  // Filtrar cuentas por zona de la mesa
-  const filteredAccounts = selectedZone
-    ? accounts.filter((acc) => acc.table?.zone === selectedZone)
-    : accounts
+  // Función auxiliar para comparar solo fechas (sin hora)
+  const isSameOrAfterDate = (date: Date, compareDate: Date) => {
+    const d1 = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    const d2 = new Date(compareDate.getFullYear(), compareDate.getMonth(), compareDate.getDate())
+    return d1 >= d2
+  }
+
+  const isSameOrBeforeDate = (date: Date, compareDate: Date) => {
+    const d1 = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    const d2 = new Date(compareDate.getFullYear(), compareDate.getMonth(), compareDate.getDate())
+    return d1 <= d2
+  }
+
+  // Filtrar cuentas por zona, estado y fechas
+  const filteredAccounts = accounts.filter((acc) => {
+    // Filtro por zona
+    if (selectedZone && acc.table?.zone !== selectedZone) {
+      return false
+    }
+
+    // Filtro por estado
+    if (selectedStatus && acc.status !== selectedStatus) {
+      return false
+    }
+
+    // Filtro por fecha de inicio
+    if (startDate) {
+      const accDate = new Date(acc.createdAt)
+      const filterDate = new Date(startDate)
+      if (!isSameOrAfterDate(accDate, filterDate)) {
+        return false
+      }
+    }
+
+    // Filtro por fecha de fin
+    if (endDate) {
+      const accDate = new Date(acc.createdAt)
+      const filterDate = new Date(endDate)
+      if (!isSameOrBeforeDate(accDate, filterDate)) {
+        return false
+      }
+    }
+
+    return true
+  })
 
   const handleCloseAccount = async (accountId: string) => {
     if (!confirm('¿Estás seguro de cerrar esta cuenta?')) {
@@ -82,25 +126,89 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
         </p>
       </div>
 
-      {/* Filtro por zona */}
-      <div className="mb-6 flex items-center gap-4">
-        <label className="text-sm font-medium text-dark-300 whitespace-nowrap">
-          Filtrar por zona:
-        </label>
-        <select
-          value={selectedZone}
-          onChange={(e) => setSelectedZone(e.target.value)}
-          className="px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[200px]"
-        >
-          <option value="">Todas las zonas</option>
-          <option value="Astronomical">Astronomical</option>
-          <option value="Studio54">Studio54</option>
-          <option value="Beer Garden">Beer Garden</option>
-        </select>
-        {selectedZone && (
-          <span className="text-sm text-dark-400">
-            ({filteredAccounts.length} cuenta{filteredAccounts.length !== 1 ? 's' : ''})
-          </span>
+      {/* Filtros */}
+      <div className="mb-6 bg-dark-100 border border-dark-200 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-white mb-4">Filtros</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Filtro por zona */}
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">
+              Zona
+            </label>
+            <select
+              value={selectedZone}
+              onChange={(e) => setSelectedZone(e.target.value)}
+              className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Todas las zonas</option>
+              <option value="Astronomical">Astronomical</option>
+              <option value="Studio54">Studio54</option>
+              <option value="Beer Garden">Beer Garden</option>
+            </select>
+          </div>
+
+          {/* Filtro por estado */}
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">
+              Estado
+            </label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Todas</option>
+              <option value="OPEN">Abiertas</option>
+              <option value="CLOSED">Cerradas</option>
+            </select>
+          </div>
+
+          {/* Filtro fecha desde */}
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">
+              Desde
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          {/* Filtro fecha hasta */}
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">
+              Hasta
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+        </div>
+
+        {/* Botón para limpiar filtros */}
+        {(selectedZone || selectedStatus || startDate || endDate) && (
+          <div className="mt-4 flex items-center justify-between">
+            <span className="text-sm text-dark-400">
+              {filteredAccounts.length} cuenta{filteredAccounts.length !== 1 ? 's' : ''} encontrada{filteredAccounts.length !== 1 ? 's' : ''}
+            </span>
+            <button
+              onClick={() => {
+                setSelectedZone('')
+                setSelectedStatus('')
+                setStartDate('')
+                setEndDate('')
+              }}
+              className="text-sm text-primary-400 hover:text-primary-300 font-medium"
+            >
+              Limpiar filtros
+            </button>
+          </div>
         )}
       </div>
 
