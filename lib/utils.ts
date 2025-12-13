@@ -19,9 +19,9 @@ export async function generateQRCode(data: string): Promise<string> {
 
 export function formatCurrency(amount: number | string): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
-  return new Intl.NumberFormat('es-MX', {
+  return new Intl.NumberFormat('es-HN', {
     style: 'currency',
-    currency: 'MXN',
+    currency: 'HNL',
   }).format(num)
 }
 
