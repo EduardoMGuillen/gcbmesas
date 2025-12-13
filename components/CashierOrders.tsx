@@ -90,12 +90,12 @@ export function CashierOrders({
                     <p className="text-white font-semibold">
                       Mesa {order.account.table.shortCode} ·{' '}
                       {order.account.table.name}
+                      {order.account.table.zone && (
+                        <span className="ml-2 text-xs bg-primary-600/20 text-primary-400 px-2 py-1 rounded-full">
+                          {order.account.table.zone}
+                        </span>
+                      )}
                     </p>
-                    {order.account.table.zone && (
-                      <p className="text-xs text-white/70">
-                        Zona: {order.account.table.zone}
-                      </p>
-                    )}
                   </div>
                   <span className="text-xs text-white/70">
                     {formatDate(order.createdAt)}
@@ -168,6 +168,7 @@ export function CashierOrders({
                   <p className="text-xs text-white/70">
                     Mesa {order.account.table.shortCode} ·{' '}
                     {order.account.table.name}
+                    {order.account.table.zone && ` · ${order.account.table.zone}`}
                   </p>
                 </div>
                 <div className="text-right">
