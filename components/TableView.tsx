@@ -20,6 +20,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
   const [error, setError] = useState('')
   const [showCreateAccount, setShowCreateAccount] = useState(!account)
   const [initialBalance, setInitialBalance] = useState('')
+  const [productSearchTerm, setProductSearchTerm] = useState('')
   const router = useRouter()
 
   const handleCreateAccount = async (e: React.FormEvent) => {
@@ -128,6 +129,11 @@ export function TableView({ table, account: initialAccount, products }: TableVie
       setLoading(false)
     }
   }
+
+  // Filtrar productos por término de búsqueda
+  const filteredProducts = products.filter((product) =>
+    product.name.toLowerCase().includes(productSearchTerm.toLowerCase())
+  )
 
   if (showCreateAccount) {
     return (
@@ -341,6 +347,13 @@ export function TableView({ table, account: initialAccount, products }: TableVie
                 <label className="block text-sm font-medium text-dark-300 mb-2">
                   Producto
                 </label>
+                <input
+                  type="text"
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                  placeholder="Buscar producto..."
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2"
+                />
                 <select
                   value={selectedProduct}
                   onChange={(e) => setSelectedProduct(e.target.value)}
@@ -348,12 +361,22 @@ export function TableView({ table, account: initialAccount, products }: TableVie
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">Selecciona un producto</option>
-                  {products.map((product) => (
+                  {filteredProducts.map((product) => (
                     <option key={product.id} value={product.id}>
                       {product.name} - {formatCurrency(product.price)}
                     </option>
                   ))}
                 </select>
+                {productSearchTerm && filteredProducts.length === 0 && (
+                  <p className="text-sm text-yellow-400 mt-2">
+                    No se encontraron productos con "{productSearchTerm}"
+                  </p>
+                )}
+                {productSearchTerm && filteredProducts.length > 0 && (
+                  <p className="text-sm text-dark-400 mt-2">
+                    {filteredProducts.length} producto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-dark-300 mb-2">

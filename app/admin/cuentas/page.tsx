@@ -8,7 +8,7 @@ import { AccountsList } from '@/components/AccountsList'
 export default async function CuentasPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session || session.user.role !== 'ADMIN') {
+  if (!session || (session.user.role !== 'ADMIN' && session.user.role !== 'MESERO')) {
     redirect('/login')
   }
 
