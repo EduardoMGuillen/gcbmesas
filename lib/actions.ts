@@ -306,8 +306,7 @@ export async function getCashierDashboardData() {
     prisma.order.findMany({
       where: { 
         served: false,
-        // Nota: rejected puede no existir en BD antigua, Prisma usará default false
-        // Si el campo no existe, esta condición será ignorada silenciosamente
+        rejected: false, // Excluir pedidos rechazados de la lista de pendientes
       },
       orderBy: { createdAt: 'asc' },
       include: {
@@ -717,6 +716,60 @@ export async function deactivateProduct(productId: string) {
 
   revalidatePath('/admin/inventario')
   return product
+}
+
+export async function activateProduct(productId: string) {
+  const currentUser = await getCurrentUser()
+  if (currentUser.role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden activar productos')
+  }
+
+  const product = await prisma.product.update({
+    where: { id: productId },
+    data: { isActive: true },
+  })
+
+  await createLog(LogAction.PRODUCT_ACTIVATED, currentUser.id, undefined, {
+    productId,
+    name: product.name,
+  })
+
+  revalidatePath('/admin/inventario')
+  return product
+}
+
+export async function deleteProduct(productId: string) {
+  const currentUser = await getCurrentUser()
+  if (currentUser.role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden eliminar productos')
+  }
+
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { id: true, name: true, price: true },
+  })
+
+  if (!product) {
+    throw new Error('Producto no encontrado')
+  }
+
+  // Verificar si tiene órdenes asociadas
+  const ordersCount = await prisma.order.count({ where: { productId } })
+  if (ordersCount > 0) {
+    throw new Error(
+      'No puedes eliminar este producto porque tiene pedidos registrados'
+    )
+  }
+
+  await prisma.product.delete({ where: { id: productId } })
+
+  await createLog(LogAction.PRODUCT_DELETED, currentUser.id, undefined, {
+    productId,
+    name: product.name,
+    price: product.price,
+  })
+
+  revalidatePath('/admin/inventario')
 }
 
 // ========== ORDER ACTIONS ==========
