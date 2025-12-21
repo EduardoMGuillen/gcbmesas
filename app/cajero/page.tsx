@@ -31,17 +31,17 @@ export default async function CajeroPage() {
         </div>
 
         <section>
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Cuentas abiertas
-          </h2>
-          <CashierAccounts accounts={accounts} />
-        </section>
-
-        <section>
           <CashierOrders
             pendingOrders={pendingOrders}
             recentServed={recentServed}
           />
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-white mb-4">
+            Cuentas abiertas
+          </h2>
+          <CashierAccounts accounts={accounts} />
         </section>
       </main>
     </div>

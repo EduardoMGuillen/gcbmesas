@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface CashierAccountsProps {
@@ -20,6 +23,16 @@ interface CashierAccountsProps {
 }
 
 export function CashierAccounts({ accounts }: CashierAccountsProps) {
+  const [selectedZone, setSelectedZone] = useState<string>('')
+
+  // Filtrar cuentas por zona
+  const filteredAccounts = accounts.filter((acc) => {
+    if (selectedZone && acc.table?.zone !== selectedZone) {
+      return false
+    }
+    return true
+  })
+
   if (!accounts.length) {
     return (
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
@@ -30,7 +43,33 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
 
   return (
     <div className="space-y-6">
-      {accounts.map((account) => {
+      {/* Filtro por zona */}
+      <div className="bg-dark-100 border border-dark-200 rounded-xl p-4">
+        <label className="block text-sm font-medium text-white mb-2">
+          Filtrar por zona
+        </label>
+        <select
+          value={selectedZone}
+          onChange={(e) => setSelectedZone(e.target.value)}
+          className="w-full md:w-auto px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          <option value="">Todas las zonas</option>
+          <option value="Astronomical">Astronomical</option>
+          <option value="Studio54">Studio54</option>
+          <option value="Beer Garden">Beer Garden</option>
+        </select>
+      </div>
+
+      {filteredAccounts.length === 0 ? (
+        <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
+          <p className="text-white/80">
+            {selectedZone
+              ? `No hay cuentas abiertas en la zona "${selectedZone}"`
+              : 'No hay cuentas abiertas en este momento.'}
+          </p>
+        </div>
+      ) : (
+        filteredAccounts.map((account) => {
         const totalConsumed =
           Number(account.initialBalance) - Number(account.currentBalance)
         return (
@@ -124,7 +163,8 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
             </div>
           </div>
         )
-      })}
+      })
+      )}
     </div>
   )
 }

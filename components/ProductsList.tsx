@@ -4,7 +4,9 @@ import { useState } from 'react'
 import {
   createProduct,
   updateProduct,
+  activateProduct,
   deactivateProduct,
+  deleteProduct,
 } from '@/lib/actions'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
@@ -123,6 +125,34 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
     }
   }
 
+  const handleActivate = async (productId: string) => {
+    try {
+      await activateProduct(productId)
+      setProducts(
+        products.map((p) =>
+          p.id === productId ? { ...p, isActive: true } : p
+        )
+      )
+      router.refresh()
+    } catch (err: any) {
+      alert(err.message || 'Error al activar producto')
+    }
+  }
+
+  const handleDelete = async (productId: string) => {
+    if (!confirm('¿Estás seguro de eliminar este producto? Esta acción no se puede deshacer.')) {
+      return
+    }
+
+    try {
+      await deleteProduct(productId)
+      setProducts(products.filter((p) => p.id !== productId))
+      router.refresh()
+    } catch (err: any) {
+      alert(err.message || 'Error al eliminar producto')
+    }
+  }
+
   const openEditModal = (product: any) => {
     setEditingProduct(product)
     setFormData({
@@ -224,21 +254,36 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
                 {formatCurrency(product.price)}
               </p>
 
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => openEditModal(product)}
-                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
-                >
-                  Editar
-                </button>
-                {product.isActive && (
+              <div className="space-y-2">
+                <div className="flex space-x-2">
                   <button
-                    onClick={() => handleDeactivate(product.id)}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                    onClick={() => openEditModal(product)}
+                    className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
                   >
-                    Desactivar
+                    Editar
                   </button>
-                )}
+                  {product.isActive ? (
+                    <button
+                      onClick={() => handleDeactivate(product.id)}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                    >
+                      Desactivar
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleActivate(product.id)}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                    >
+                      Activar
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDelete(product.id)}
+                  className="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                >
+                  Eliminar
+                </button>
               </div>
             </div>
           ))}
