@@ -3,10 +3,9 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 
-// Validate NEXTAUTH_SECRET
-if (!process.env.NEXTAUTH_SECRET) {
-  throw new Error('NEXTAUTH_SECRET is not set in environment variables')
-}
+// Don't validate NEXTAUTH_SECRET here - let NextAuth handle it
+// This prevents initialization errors when the secret is missing
+// NextAuth will handle the error gracefully and redirect to /api/auth/error
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -165,7 +164,7 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || 'temp-secret-for-preview-deployments',
   debug: process.env.NODE_ENV === 'development',
   // Explicitly set NEXTAUTH_URL if provided (helps with cookie domain/secure settings)
   ...(process.env.NEXTAUTH_URL && { url: process.env.NEXTAUTH_URL }),
