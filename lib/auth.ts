@@ -170,8 +170,5 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
-  // Permitir que NextAuth funcione en diferentes URLs (útil para preview deployments)
-  // No configurar NEXTAUTH_URL en Vercel para que use la detección automática
-  trustHost: true,
 }
 
