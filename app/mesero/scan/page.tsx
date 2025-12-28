@@ -159,12 +159,6 @@ export default function ScanPage() {
       return
     }
 
-    // Verificar que el contenedor exista
-    if (!scannerContainerRef.current) {
-      setScannerError('Error: El contenedor del escáner no está disponible.')
-      return
-    }
-
     try {
       const permissionStatus = await navigator.mediaDevices.getUserMedia({ video: true })
       permissionStatus.getTracks().forEach((track) => track.stop())
@@ -176,16 +170,40 @@ export default function ScanPage() {
       return
     }
 
+    // Establecer isScanning primero para que React renderice el contenedor
     setIsScanning(true)
+
+    // Esperar a que React renderice el contenedor usando requestAnimationFrame para asegurar que el DOM esté listo
+    await new Promise(resolve => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, 200) // Aumentado a 200ms para dar más tiempo
+        })
+      })
+    })
 
     try {
       const { Html5Qrcode } = await import('html5-qrcode')
       
-      // Verificar nuevamente que el contenedor exista (por si acaso cambió)
+      // Esperar y verificar múltiples veces que el contenedor esté disponible
+      let attempts = 0
+      const maxAttempts = 10
+      while (!scannerContainerRef.current && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        attempts++
+      }
+      
+      // Verificar nuevamente después de esperar
       if (!scannerContainerRef.current) {
-        setScannerError('Error: El contenedor del escáner no está disponible.')
+        console.error('[QR Scanner] Container not available after multiple attempts')
+        setScannerError('Error: El contenedor del escáner no está disponible. Por favor, intenta nuevamente.')
         setIsScanning(false)
         return
+      }
+
+      // Asegurar que el contenedor tenga un ID
+      if (!scannerContainerRef.current.id) {
+        scannerContainerRef.current.id = 'qr-reader'
       }
 
       // Limpiar el contenedor antes de crear una nueva instancia
