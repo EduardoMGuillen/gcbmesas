@@ -163,6 +163,9 @@ export function CustomerPageClient() {
 
     setIsScanning(true)
 
+    // Esperar a que React renderice el contenedor
+    await new Promise(resolve => setTimeout(resolve, 50))
+
     try {
       const { Html5Qrcode } = await import('html5-qrcode')
       
@@ -170,6 +173,11 @@ export function CustomerPageClient() {
         setScannerError('Error: El contenedor del escáner no está disponible.')
         setIsScanning(false)
         return
+      }
+
+      // Asegurar que el contenedor tenga un ID
+      if (!scannerContainerRef.current.id) {
+        scannerContainerRef.current.id = 'qr-reader-customer'
       }
 
       scannerContainerRef.current.innerHTML = ''
@@ -309,7 +317,7 @@ export function CustomerPageClient() {
                   Apunta la cámara al código QR de la mesa. El escaneo se detendrá automáticamente cuando lo detectemos.
                 </div>
                 <div
-                  id="qr-reader"
+                  id="qr-reader-customer"
                   ref={scannerContainerRef}
                   className="w-full bg-dark-50 rounded-xl overflow-hidden border border-dark-200 min-h-[260px]"
                 ></div>
