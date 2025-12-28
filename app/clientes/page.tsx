@@ -44,10 +44,35 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
 
     const products = await getProductsPublic()
 
+    // Convertir Decimal a number para el componente
+    const accountForView = {
+      id: account.id,
+      initialBalance: Number(account.initialBalance),
+      currentBalance: Number(account.currentBalance),
+      orders: account.orders.map((order: any) => ({
+        id: order.id,
+        product: {
+          name: order.product.name,
+          price: Number(order.product.price),
+        },
+        quantity: order.quantity,
+        price: Number(order.price),
+        createdAt: order.createdAt,
+        served: order.served,
+      })),
+    }
+
+    const productsForView = products.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      price: Number(p.price),
+      category: p.category,
+    }))
+
     return (
       <div className="min-h-screen bg-dark-900">
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <CustomerOrderView table={table} account={account} products={products} />
+          <CustomerOrderView table={table} account={accountForView} products={productsForView} />
         </main>
       </div>
     )
