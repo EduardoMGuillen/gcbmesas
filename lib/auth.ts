@@ -1,33 +1,25 @@
-import { NextAuthOptions } from 'next-auth'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import bcrypt from 'bcryptjs'
-import { prisma } from './prisma'
 import crypto from 'crypto'
 
-// Generate a valid secret if NEXTAUTH_SECRET is not set
-// NextAuth requires at least 32 characters in production
-// We generate a deterministic secret based on environment variables
-function getOrCreateSecret(): string {
-  // If NEXTAUTH_SECRET exists and is valid (at least 32 chars), use it
-  if (process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32) {
-    return process.env.NEXTAUTH_SECRET
-  }
-  
+// CRITICAL: Set NEXTAUTH_SECRET in process.env BEFORE importing NextAuth
+// NextAuth checks process.env.NEXTAUTH_SECRET during initialization
+// This must happen at the top level, before any NextAuth imports
+if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
   // Generate a deterministic secret based on VERCEL_URL or a fixed fallback
   // This ensures the secret is consistent across server restarts for preview deployments
   // WARNING: This is NOT secure for production - NEXTAUTH_SECRET should always be set in production
   const deterministicKey = process.env.VERCEL_URL || process.env.VERCEL || 'preview-deployment-fallback-key'
   const hash = crypto.createHash('sha256').update(deterministicKey).digest('base64')
-  
-  // Also set it in process.env so NextAuth can find it if it checks there
   process.env.NEXTAUTH_SECRET = hash
   console.warn('[NextAuth] NEXTAUTH_SECRET not set, using generated secret. This should only happen in preview deployments.')
-  
-  return hash
 }
 
-// Get the secret early and store it - this ensures it's always a valid string
-const NEXTAUTH_SECRET = getOrCreateSecret()
+import { NextAuthOptions } from 'next-auth'
+import CredentialsProvider from 'next-auth/providers/credentials'
+import bcrypt from 'bcryptjs'
+import { prisma } from './prisma'
+
+// Get the secret - it's now guaranteed to be in process.env
+const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET!
 
 export const authOptions: NextAuthOptions = {
   providers: [
