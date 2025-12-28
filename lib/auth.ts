@@ -4,18 +4,32 @@ import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 import crypto from 'crypto'
 
-// Generate a valid secret if NEXTAUTH_SECRET is not set and set it in process.env
-// This ensures NextAuth can find the secret when it validates
+// Generate a valid secret if NEXTAUTH_SECRET is not set
 // NextAuth requires at least 32 characters in production
-if (!process.env.NEXTAUTH_SECRET) {
-  // Use a deterministic secret based on VERCEL_URL or a fixed fallback
+// We generate a deterministic secret based on environment variables
+function getOrCreateSecret(): string {
+  if (process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32) {
+    return process.env.NEXTAUTH_SECRET
+  }
+  
+  // Generate a deterministic secret based on VERCEL_URL or a fixed fallback
   // This ensures the secret is consistent across server restarts for preview deployments
   // WARNING: This is NOT secure for production - NEXTAUTH_SECRET should always be set in production
   const deterministicKey = process.env.VERCEL_URL || process.env.VERCEL || 'preview-deployment-fallback-key'
   const hash = crypto.createHash('sha256').update(deterministicKey).digest('base64')
+  
+  // Also set it in process.env so NextAuth can find it if it checks there
   process.env.NEXTAUTH_SECRET = hash
-  console.warn('[NextAuth] NEXTAUTH_SECRET not set, using generated secret. This should only happen in preview deployments.')
+  
+  if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
+    console.warn('[NextAuth] NEXTAUTH_SECRET not set, using generated secret. This should only happen in preview deployments.')
+  }
+  
+  return hash
 }
+
+// Get the secret early and store it
+const NEXTAUTH_SECRET = getOrCreateSecret()
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -174,8 +188,8 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  // NEXTAUTH_SECRET is now guaranteed to be set (either from env or generated above)
-  secret: process.env.NEXTAUTH_SECRET,
+  // Use the secret that we've ensured is valid (either from env or generated)
+  secret: NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
   // Explicitly set NEXTAUTH_URL if provided (helps with cookie domain/secure settings)
   ...(process.env.NEXTAUTH_URL && { url: process.env.NEXTAUTH_URL }),
