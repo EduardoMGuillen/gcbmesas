@@ -123,7 +123,7 @@ export default function ScanPage() {
       }
 
       const data = await response.json()
-      router.push(`/mesa/${data.id}`)
+      router.push(`/mesero/pedidos?tableId=${data.id}`)
     } catch (err: any) {
       setError(err.message || 'No encontramos una mesa con ese código.')
     } finally {
@@ -244,7 +244,7 @@ export default function ScanPage() {
           const parsedId = parseTableId(decodedText)
           setManualCode(parsedId)
           stopScanner()
-          router.push(`/mesa/${parsedId}`)
+          router.push(`/mesero/pedidos?tableId=${parsedId}`)
         },
         (errorMessage: string) => {
           // Solo loggear errores de escaneo, no son críticos

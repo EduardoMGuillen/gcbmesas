@@ -8,10 +8,11 @@ import { useRouter } from 'next/navigation'
 interface ManualOrderFormProps {
   tables: any[]
   products: any[]
+  initialTableId?: string
 }
 
-export function ManualOrderForm({ tables, products }: ManualOrderFormProps) {
-  const [selectedTableId, setSelectedTableId] = useState('')
+export function ManualOrderForm({ tables, products, initialTableId = '' }: ManualOrderFormProps) {
+  const [selectedTableId, setSelectedTableId] = useState(initialTableId)
   const [selectedProductId, setSelectedProductId] = useState('')
   const [quantityInput, setQuantityInput] = useState('1')
   const [initialBalance, setInitialBalance] = useState('')
