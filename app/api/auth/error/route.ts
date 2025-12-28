@@ -8,10 +8,10 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const error = searchParams.get('error')
   
-  // Si es un error de Configuration (como cuando se escanea un QR con preview URL),
+  // Si es un error de Configuration o NO_SECRET (como cuando se escanea un QR con preview URL),
   // redirigir a /clientes para que el usuario pueda usar la aplicación
-  if (error === 'Configuration') {
-    console.log('[Auth Error Handler] Configuration error detected, redirecting to /clientes')
+  if (error === 'Configuration' || error === 'NO_SECRET') {
+    console.log('[Auth Error Handler] Configuration/NO_SECRET error detected, redirecting to /clientes')
     return NextResponse.redirect(new URL('/clientes', request.url))
   }
   
