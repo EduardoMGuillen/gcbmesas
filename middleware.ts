@@ -6,14 +6,6 @@ export default withAuth(
   function middleware(req: NextRequest & { nextauth: { token: any } }) {
     const path = req.nextUrl.pathname
 
-    // Interceptar errores de Configuration de NextAuth y redirigir a /clientes
-    if (path === '/api/auth/error') {
-      const error = req.nextUrl.searchParams.get('error')
-      if (error === 'Configuration') {
-        console.log('[Middleware] Configuration error detected, redirecting to /clientes')
-        return NextResponse.redirect(new URL('/clientes', req.url))
-      }
-    }
 
     // Rutas /mesa - redirigir directamente a /clientes sin intentar autenticar
     if (path.startsWith('/mesa/')) {
@@ -95,9 +87,8 @@ export default withAuth(
 )
 
 export const config = {
-  // Incluir todas las rutas excepto estáticas, pero incluir /api/auth/error para interceptarlo
+  // Incluir todas las rutas excepto estáticas y API
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-    '/api/auth/error', // Incluir esta ruta para interceptar errores de Configuration
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

@@ -255,20 +255,20 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
               </p>
 
               <div className="space-y-2">
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => openEditModal(product)}
-                    className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
-                  >
-                    Editar
-                  </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => openEditModal(product)}
+                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                >
+                  Editar
+                </button>
                   {product.isActive ? (
-                    <button
-                      onClick={() => handleDeactivate(product.id)}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
-                    >
-                      Desactivar
-                    </button>
+                  <button
+                    onClick={() => handleDeactivate(product.id)}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                  >
+                    Desactivar
+                  </button>
                   ) : (
                     <button
                       onClick={() => handleActivate(product.id)}
