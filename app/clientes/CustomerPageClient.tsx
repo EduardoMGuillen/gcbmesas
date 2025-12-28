@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Navbar } from '@/components/Navbar'
 import { useRouter } from 'next/navigation'
 
-export default function ScanPage() {
+export function CustomerPageClient() {
   const [manualCode, setManualCode] = useState('')
   const [error, setError] = useState('')
   const [isScanning, setIsScanning] = useState(false)
@@ -20,12 +19,9 @@ export default function ScanPage() {
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
       try {
-        // Detener el escáner de forma segura
         const scanner = scannerRef.current
         
-        // Intentar detener con mejor manejo de errores
         try {
-          // Verificar si el escáner tiene el método stop
           if (typeof scanner.stop === 'function') {
             await scanner.stop().catch((err: any) => {
               console.debug('[QR Scanner] Scanner already stopped or error:', err)
@@ -35,7 +31,6 @@ export default function ScanPage() {
           console.debug('[QR Scanner] Error in stop:', error)
         }
 
-        // Limpiar el DOM
         try {
           if (typeof scanner.clear === 'function') {
             await scanner.clear().catch((err: any) => {
@@ -46,7 +41,6 @@ export default function ScanPage() {
           console.debug('[QR Scanner] Error in clear:', error)
         }
 
-        // Limpiar el contenedor manualmente
         if (scannerContainerRef.current) {
           scannerContainerRef.current.innerHTML = ''
         }
@@ -57,16 +51,12 @@ export default function ScanPage() {
       }
     }
 
-    // Nota: html5-qrcode debería detener los tracks de medios automáticamente
-    // pero si hay algún problema, los métodos stop() y clear() deberían manejarlo
-
     if (isMountedRef.current) {
       setIsScanning(false)
       setScannerError('')
     }
   }, [])
 
-  // Limpieza completa al desmontar
   useEffect(() => {
     inputRef.current?.focus()
     isMountedRef.current = true
@@ -77,7 +67,6 @@ export default function ScanPage() {
     }
   }, [stopScanner])
 
-  // Detener escáner cuando la página pierde visibilidad
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -98,39 +87,6 @@ export default function ScanPage() {
     }
   }, [stopScanner])
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-
-    if (!manualCode.trim()) {
-      setError('Por favor ingresa un ID o código corto de mesa')
-      return
-    }
-
-    setManualLoading(true)
-    try {
-      const response = await fetch('/api/table-lookup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code: manualCode.trim() }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.error || 'No encontramos una mesa con ese código.')
-      }
-
-      const data = await response.json()
-      router.push(`/mesa/${data.id}`)
-    } catch (err: any) {
-      setError(err.message || 'No encontramos una mesa con ese código.')
-    } finally {
-      setManualLoading(false)
-    }
-  }
-
   const parseTableId = (scannedText: string) => {
     try {
       const url = new URL(scannedText)
@@ -145,11 +101,41 @@ export default function ScanPage() {
     }
   }
 
-  const startScanner = async () => {
-    // Primero detener cualquier escáner activo
-    await stopScanner()
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
 
-    // Pequeña pausa para asegurar limpieza completa
+    if (!manualCode.trim()) {
+      setError('Por favor ingresa un código de mesa')
+      return
+    }
+
+    setManualLoading(true)
+    try {
+      const response = await fetch('/api/public/table-by-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: manualCode.trim() }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'No encontramos una mesa con ese código.')
+      }
+
+      const data = await response.json()
+      router.push(`/clientes?tableId=${data.id}`)
+    } catch (err: any) {
+      setError(err.message || 'No encontramos una mesa con ese código.')
+    } finally {
+      setManualLoading(false)
+    }
+  }
+
+  const startScanner = async () => {
+    await stopScanner()
     await new Promise(resolve => setTimeout(resolve, 100))
 
     setScannerError('')
@@ -159,7 +145,6 @@ export default function ScanPage() {
       return
     }
 
-    // Verificar que el contenedor exista
     if (!scannerContainerRef.current) {
       setScannerError('Error: El contenedor del escáner no está disponible.')
       return
@@ -181,14 +166,12 @@ export default function ScanPage() {
     try {
       const { Html5Qrcode } = await import('html5-qrcode')
       
-      // Verificar nuevamente que el contenedor exista (por si acaso cambió)
       if (!scannerContainerRef.current) {
         setScannerError('Error: El contenedor del escáner no está disponible.')
         setIsScanning(false)
         return
       }
 
-      // Limpiar el contenedor antes de crear una nueva instancia
       scannerContainerRef.current.innerHTML = ''
 
       const cameras = await Html5Qrcode.getCameras()
@@ -200,12 +183,10 @@ export default function ScanPage() {
 
       const preferredCamera = cameras.find((camera) => camera.label.toLowerCase().includes('back')) || cameras[0]
 
-      // Crear nueva instancia del escáner
       const html5QrCode = new Html5Qrcode(scannerContainerRef.current.id, {
         verbose: false,
       })
       
-      // Verificar que no haya otra instancia activa
       if (scannerRef.current) {
         console.warn('[QR Scanner] Ya existe una instancia activa, limpiando...')
         await stopScanner()
@@ -224,12 +205,10 @@ export default function ScanPage() {
           if (!isMountedRef.current) return
           
           const parsedId = parseTableId(decodedText)
-          setManualCode(parsedId)
           stopScanner()
-          router.push(`/mesa/${parsedId}`)
+          router.push(`/clientes?tableId=${parsedId}`)
         },
         (errorMessage: string) => {
-          // Solo loggear errores de escaneo, no son críticos
           console.debug('[QR Scanner] Scanning:', errorMessage)
         }
       )
@@ -237,7 +216,6 @@ export default function ScanPage() {
       console.error('[QR Scanner] Error initializing scanner:', error)
       setScannerError(error?.message || 'Error al iniciar el escáner. Intenta nuevamente.')
       
-      // Asegurar limpieza en caso de error
       await stopScanner()
       
       if (isMountedRef.current) {
@@ -255,15 +233,14 @@ export default function ScanPage() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
+    <div className="min-h-screen bg-dark-900">
       <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Escanear Mesa
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold text-white mb-2">
+            Hacer Pedido
           </h1>
-          <p className="text-dark-400">
-            Escanea el código QR o ingresa el ID de la mesa manualmente
+          <p className="text-dark-400 text-lg">
+            Escanea el código QR de tu mesa o ingresa el código manualmente
           </p>
         </div>
 
@@ -274,7 +251,7 @@ export default function ScanPage() {
                 htmlFor="manualCode"
                 className="block text-sm font-medium text-dark-300 mb-2"
               >
-                ID o Código de Mesa
+                Código de Mesa
               </label>
               <input
                 ref={inputRef}
@@ -282,7 +259,7 @@ export default function ScanPage() {
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder="Ej. M001 o copia/pega la URL"
+                placeholder="Ej. A3K7 o escanea el QR"
                 className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-lg"
               />
             </div>
@@ -328,7 +305,7 @@ export default function ScanPage() {
 
             {isScanning && (
               <div className="space-y-3">
-                <div className="text-sm text-dark-300">
+                <div className="text-sm text-dark-300 text-center">
                   Apunta la cámara al código QR de la mesa. El escaneo se detendrá automáticamente cuando lo detectemos.
                 </div>
                 <div
@@ -339,18 +316,8 @@ export default function ScanPage() {
               </div>
             )}
           </form>
-
-          <div className="mt-8 pt-8 border-t border-dark-200">
-            <p className="text-sm text-dark-400 mb-4">
-              También puedes acceder directamente a una mesa usando su URL:
-            </p>
-            <code className="block bg-dark-50 px-4 py-2 rounded text-sm text-primary-400">
-              /mesa/[table-id]
-            </code>
-          </div>
         </div>
       </main>
     </div>
   )
 }
-

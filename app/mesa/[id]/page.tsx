@@ -12,7 +12,13 @@ export default async function MesaPage({
 }) {
   const session = await getServerSession(authOptions)
 
-  if (!session || !['MESERO', 'ADMIN'].includes(session.user.role)) {
+  // Si no hay sesión, redirigir a página de clientes
+  if (!session) {
+    redirect(`/clientes?tableId=${params.id}`)
+  }
+
+  // Si hay sesión pero no es MESERO o ADMIN, redirigir a login
+  if (!['MESERO', 'ADMIN'].includes(session.user.role)) {
     redirect('/login')
   }
 

@@ -952,6 +952,177 @@ export async function getTableById(tableId: string) {
   })
 }
 
+// Función pública para obtener mesa (sin autenticación)
+export async function getTableByIdPublic(tableId: string) {
+  return prisma.table.findUnique({
+    where: { id: tableId },
+    include: {
+      accounts: {
+        where: { status: 'OPEN' },
+        include: {
+          orders: {
+            where: { rejected: false },
+            include: {
+              product: true,
+              user: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
+    },
+  })
+}
+
+// Función pública para obtener mesa por código corto
+export async function getTableByShortCodePublic(shortCode: string) {
+  const normalized = shortCode.toUpperCase().trim()
+  return prisma.table.findFirst({
+    where: { shortCode: normalized },
+    include: {
+      accounts: {
+        where: { status: 'OPEN' },
+        include: {
+          orders: {
+            where: { rejected: false },
+            include: {
+              product: true,
+              user: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
+    },
+  })
+}
+
+// Función pública para obtener productos activos
+export async function getProductsPublic() {
+  return prisma.product.findMany({
+    where: { isActive: true },
+    orderBy: { name: 'asc' },
+  })
+}
+
+// Helper para obtener o crear usuario CLIENTE
+async function getOrCreateCustomerUser() {
+  let customerUser = await prisma.user.findFirst({
+    where: { username: 'CLIENTE' },
+  })
+
+  if (!customerUser) {
+    const bcrypt = require('bcryptjs')
+    const hashedPassword = await bcrypt.hash('cliente' + Date.now(), 10)
+    customerUser = await prisma.user.create({
+      data: {
+        username: 'CLIENTE',
+        password: hashedPassword,
+        role: 'MESERO', // Usamos MESERO como rol por defecto
+        name: 'Cliente',
+      },
+    })
+  }
+
+  return customerUser
+}
+
+// Crear pedido desde cliente (público)
+export async function createCustomerOrder(data: {
+  accountId: string
+  productId: string
+  quantity?: number
+}) {
+  // Obtener usuario cliente
+  const customerUser = await getOrCreateCustomerUser()
+
+  // Get account with lock to prevent race conditions
+  const account = await prisma.account.findUnique({
+    where: { id: data.accountId },
+    include: {
+      table: true,
+      orders: true,
+    },
+  })
+
+  if (!account) {
+    throw new Error('Cuenta no encontrada')
+  }
+
+  if (account.status === 'CLOSED') {
+    throw new Error('La cuenta está cerrada')
+  }
+
+  const product = await prisma.product.findUnique({
+    where: { id: data.productId },
+  })
+
+  if (!product) {
+    throw new Error('Producto no encontrado')
+  }
+
+  if (!product.isActive) {
+    throw new Error('Producto no disponible')
+  }
+
+  const quantity = data.quantity || 1
+  const totalPrice = Number(product.price) * quantity
+
+  if (Number(account.currentBalance) < totalPrice) {
+    throw new Error('Saldo insuficiente')
+  }
+
+  // Use transaction to ensure atomicity
+  const result = await prisma.$transaction(async (tx) => {
+    // Lock account row
+    const lockedAccount = await tx.account.findUnique({
+      where: { id: data.accountId },
+    })
+
+    if (!lockedAccount || Number(lockedAccount.currentBalance) < totalPrice) {
+      throw new Error('Saldo insuficiente')
+    }
+
+    // Create order
+    const order = await tx.order.create({
+      data: {
+        accountId: data.accountId,
+        productId: data.productId,
+        userId: customerUser.id,
+        price: totalPrice,
+        quantity,
+      },
+    })
+
+    // Update balance
+    const newBalance = Number(lockedAccount.currentBalance) - totalPrice
+
+    await tx.account.update({
+      where: { id: data.accountId },
+      data: { currentBalance: newBalance },
+    })
+
+    return order
+  })
+
+  await createLog(LogAction.ORDER_CREATED, customerUser.id, account.tableId, {
+    orderId: result.id,
+    accountId: data.accountId,
+    productId: data.productId,
+    productName: product.name,
+    price: totalPrice,
+    quantity,
+    isCustomerOrder: true,
+  })
+
+  revalidatePath(`/clientes`)
+  return result
+}
+
 export async function getProducts(activeOnly: boolean = false) {
   await getCurrentUser()
   return prisma.product.findMany({
