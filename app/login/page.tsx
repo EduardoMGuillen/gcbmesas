@@ -9,10 +9,16 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Clean up callbackUrl from URL to avoid redirect loops
+  // Check for error in URL and clean up callbackUrl
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href)
+      const errorParam = url.searchParams.get('error')
+      if (errorParam === 'SessionNotFound') {
+        setError('No se pudo establecer la sesión. Por favor, intenta iniciar sesión nuevamente.')
+        url.searchParams.delete('error')
+        window.history.replaceState({}, '', url.pathname)
+      }
       if (url.searchParams.get('callbackUrl')) {
         console.log('[Login] Cleaning up callbackUrl from URL')
         url.searchParams.delete('callbackUrl')
