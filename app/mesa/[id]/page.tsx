@@ -10,7 +10,16 @@ export default async function MesaPage({
 }: {
   params: { id: string }
 }) {
-  const session = await getServerSession(authOptions)
+  // Intentar obtener sesión, pero si hay error de configuración, tratar como sin sesión
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch (error: any) {
+    // Si hay error de configuración de NextAuth (como NEXTAUTH_URL no coincide),
+    // tratar como usuario no autenticado y redirigir a clientes
+    console.warn('[MesaPage] Error checking session, redirecting to clientes:', error?.message)
+    redirect(`/clientes?tableId=${params.id}`)
+  }
 
   // Si no hay sesión, redirigir a página de clientes
   if (!session) {
