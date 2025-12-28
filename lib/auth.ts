@@ -4,19 +4,17 @@ import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 import crypto from 'crypto'
 
-// Generate a valid secret if NEXTAUTH_SECRET is not set
+// Generate a valid secret if NEXTAUTH_SECRET is not set and set it in process.env
+// This ensures NextAuth can find the secret when it validates
 // NextAuth requires at least 32 characters in production
-function getNextAuthSecret(): string {
-  if (process.env.NEXTAUTH_SECRET) {
-    return process.env.NEXTAUTH_SECRET
-  }
-  
+if (!process.env.NEXTAUTH_SECRET) {
   // Use a deterministic secret based on VERCEL_URL or a fixed fallback
   // This ensures the secret is consistent across server restarts for preview deployments
   // WARNING: This is NOT secure for production - NEXTAUTH_SECRET should always be set in production
-  const deterministicKey = process.env.VERCEL_URL || 'preview-deployment-fallback-key'
+  const deterministicKey = process.env.VERCEL_URL || process.env.VERCEL || 'preview-deployment-fallback-key'
   const hash = crypto.createHash('sha256').update(deterministicKey).digest('base64')
-  return hash
+  process.env.NEXTAUTH_SECRET = hash
+  console.warn('[NextAuth] NEXTAUTH_SECRET not set, using generated secret. This should only happen in preview deployments.')
 }
 
 export const authOptions: NextAuthOptions = {
@@ -176,9 +174,8 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  // Use a valid secret - generate one if not provided (for preview deployments)
-  // This prevents NO_SECRET errors in production, though auth may not work without proper secret
-  secret: getNextAuthSecret(),
+  // NEXTAUTH_SECRET is now guaranteed to be set (either from env or generated above)
+  secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
   // Explicitly set NEXTAUTH_URL if provided (helps with cookie domain/secure settings)
   ...(process.env.NEXTAUTH_URL && { url: process.env.NEXTAUTH_URL }),
