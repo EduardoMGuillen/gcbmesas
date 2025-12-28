@@ -4,6 +4,8 @@ import type { NextRequest } from 'next/server'
 // Esta ruta intercepta errores de NextAuth cuando se accede desde URLs de preview de Vercel
 // y redirige a /clientes para permitir que los usuarios usen la aplicación sin autenticación
 // Esta ruta específica tiene prioridad sobre el catch-all [...nextauth]
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
