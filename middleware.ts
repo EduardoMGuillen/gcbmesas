@@ -67,7 +67,7 @@ export default function middleware(req: NextRequest) {
     },
     {
       callbacks: {
-        authorized: ({ token, req }) => {
+        authorized: ({ token, req }: { token: any; req: NextRequest }) => {
           const path = req.nextUrl.pathname
           
           // For /clientes, login and auth-callback pages, always allow (don't check token)
