@@ -1,9 +1,8 @@
+import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { withAuth } from 'next-auth/middleware'
 
-// Crear el middleware con withAuth solo para rutas que lo necesitan
-const authMiddleware = withAuth(
+export default withAuth(
   function middleware(req: NextRequest & { nextauth: { token: any } }) {
     const path = req.nextUrl.pathname
 
@@ -67,30 +66,10 @@ const authMiddleware = withAuth(
   }
 )
 
-// Middleware principal que maneja /mesa antes de pasar a authMiddleware
-export default function middleware(req: NextRequest) {
-  const path = req.nextUrl.pathname
-
-  // Manejar rutas /mesa PRIMERO - redirigir sin pasar por NextAuth
-  if (path.startsWith('/mesa/')) {
-    const mesaMatch = path.match(/^\/mesa\/([^/?]+)/)
-    const mesaId = mesaMatch ? mesaMatch[1] : null
-    if (mesaId) {
-      const clientesUrl = new URL(`/clientes?tableId=${mesaId}`, req.url)
-      return NextResponse.redirect(clientesUrl, { status: 307 })
-    }
-    const clientesUrl = new URL('/clientes', req.url)
-    return NextResponse.redirect(clientesUrl, { status: 307 })
-  }
-
-  // Para todas las demás rutas, usar el middleware con autenticación
-  return authMiddleware(req as NextRequest & { nextauth: { token: any } })
-}
-
 export const config = {
-  // Incluir todas las rutas excepto estáticas, API y /mesa
-  // /mesa se maneja manualmente arriba antes de pasar a authMiddleware
+  // EXCLUIR /mesa completamente del matcher
+  // La página del servidor manejará la redirección para /mesa
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|mesa|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
