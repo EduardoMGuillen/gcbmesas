@@ -24,16 +24,10 @@ export default withAuth(
     const token = req.nextauth.token
     const fromCallback = req.nextUrl.searchParams.get('from') === 'callback'
 
-    // If coming from auth-callback, allow access and remove the query parameter
+    // If coming from auth-callback, allow access (session was just verified server-side)
     // The authorized callback already allowed this, so just continue
+    // The CleanUrlParams component will handle removing the query parameter client-side
     if (fromCallback) {
-      // Remove the ?from=callback parameter for clean URLs
-      const url = req.nextUrl.clone()
-      url.searchParams.delete('from')
-      // If there are no other query params, redirect to clean URL
-      if (url.search === '') {
-        return NextResponse.redirect(url)
-      }
       return NextResponse.next()
     }
 
