@@ -71,6 +71,7 @@ export const config = {
   // Excluir /mesa del matcher para que NextAuth no lo procese
   // La página del servidor manejará la redirección
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|mesa|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Excluir rutas que empiezan con /mesa usando lookahead negativo
+    '/((?!api|_next/static|_next/image|favicon.ico|mesa/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
