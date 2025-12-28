@@ -79,14 +79,22 @@ export default function LoginPage() {
         if (result?.ok) {
           console.log('[Login] NextAuth login successful, redirecting to callback')
           
+          // Check if cookie was set immediately after login
+          const cookieAfterLogin = checkSessionCookie()
+          console.log('[Login] Cookie check after login:', { hasCookie: cookieAfterLogin })
+          
           // For iPad/iOS: longer delay to ensure cookie is properly set
           // iPad Safari can be slower to process cookies
           const isIPad = /iPad/.test(navigator.userAgent) || 
                         (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
-          const delay = isIPad ? 1000 : 500
+          const delay = isIPad ? 1500 : 1000 // Increased delay to ensure cookie is set
           
           console.log(`[Login] Waiting ${delay}ms before redirect (iPad: ${isIPad})`)
           await new Promise((resolve) => setTimeout(resolve, delay))
+          
+          // Check cookie again after delay
+          const cookieAfterDelay = checkSessionCookie()
+          console.log('[Login] Cookie check after delay:', { hasCookie: cookieAfterDelay })
           
           // Use replace instead of href to avoid back button issues
           window.location.replace('/auth-callback')
