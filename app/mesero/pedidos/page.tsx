@@ -1,12 +1,17 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { getTables, getProducts } from '@/lib/actions'
+import { getTables, getProducts, getTableById, createAccount } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
-import { ManualOrderForm } from '@/components/ManualOrderForm'
+import { CustomerOrderView } from '@/components/CustomerOrderView'
 
 interface PedidosPageProps {
   searchParams: { tableId?: string }
+}
+
+async function createAccountAction(tableId: string, initialBalance: number) {
+  'use server'
+  await createAccount({ tableId, initialBalance })
 }
 
 export default async function PedidosPage({ searchParams }: PedidosPageProps) {
@@ -20,22 +25,108 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
   const products = await getProducts(true)
   const initialTableId = searchParams.tableId || ''
 
+  // Si hay una mesa inicial seleccionada, obtener sus datos
+  let initialTable = null
+  let initialAccount = null
+
+  if (initialTableId) {
+    const tableData = await getTableById(initialTableId)
+    if (tableData) {
+      initialTable = {
+        id: tableData.id,
+        name: tableData.name,
+        shortCode: tableData.shortCode || '',
+        zone: tableData.zone || null,
+      }
+      initialAccount = tableData.accounts[0]
+        ? {
+            id: tableData.accounts[0].id,
+            initialBalance: Number(tableData.accounts[0].initialBalance),
+            currentBalance: Number(tableData.accounts[0].currentBalance),
+            orders: tableData.accounts[0].orders.map((order: any) => ({
+              id: order.id,
+              product: {
+                name: order.product.name,
+                price: Number(order.product.price),
+              },
+              quantity: order.quantity,
+              price: Number(order.price),
+              createdAt: order.createdAt,
+              served: order.served,
+            })),
+          }
+        : null
+    }
+  }
+
+  // Preparar productos para la vista
+  const productsForView = products.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    price: Number(p.price),
+    category: p.category,
+  }))
+
+  // Preparar tables para la vista
+  const tablesForView = tables.map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    zone: t.zone || null,
+    accounts: t.accounts || [],
+  }))
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
       <Navbar />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
-            Agregar Pedido Manual
+            Agregar Pedido
           </h1>
           <p className="text-dark-400">
             Selecciona una mesa y agrega productos a su cuenta
           </p>
         </div>
-
-        <ManualOrderForm tables={tables} products={products} initialTableId={initialTableId} />
+        {initialTable ? (
+          <CustomerOrderView
+            table={initialTable}
+            account={initialAccount || {
+              id: '',
+              initialBalance: 0,
+              currentBalance: 0,
+              orders: [],
+            }}
+            products={productsForView}
+            tables={tablesForView}
+            initialTableId={initialTableId}
+            isMesero={true}
+            onCreateAccount={createAccountAction}
+            backUrl="/mesero/pedidos"
+          />
+        ) : (
+          <div className="bg-dark-100 border border-dark-200 rounded-xl p-8">
+            <label className="block text-sm font-medium text-dark-300 mb-2">
+              Seleccionar Mesa
+            </label>
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  window.location.href = `/mesero/pedidos?tableId=${e.target.value}`
+                }
+              }}
+              className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Selecciona una mesa</option>
+              {tablesForView.map((table) => (
+                <option key={table.id} value={table.id}>
+                  {table.name} {table.zone ? `- ${table.zone}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </main>
     </div>
   )
 }
-

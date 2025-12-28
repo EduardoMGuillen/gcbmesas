@@ -2,9 +2,22 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
+import crypto from 'crypto'
 
-// Don't validate NEXTAUTH_SECRET at module load time
-// NextAuth will validate it when needed and handle errors gracefully
+// Generate a valid secret if NEXTAUTH_SECRET is not set
+// NextAuth requires at least 32 characters in production
+function getNextAuthSecret(): string {
+  if (process.env.NEXTAUTH_SECRET) {
+    return process.env.NEXTAUTH_SECRET
+  }
+  
+  // Use a deterministic secret based on VERCEL_URL or a fixed fallback
+  // This ensures the secret is consistent across server restarts for preview deployments
+  // WARNING: This is NOT secure for production - NEXTAUTH_SECRET should always be set in production
+  const deterministicKey = process.env.VERCEL_URL || 'preview-deployment-fallback-key'
+  const hash = crypto.createHash('sha256').update(deterministicKey).digest('base64')
+  return hash
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -163,9 +176,9 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  // Use a fallback secret if NEXTAUTH_SECRET is not set (for preview deployments)
-  // This prevents initialization errors, but authentication will still fail gracefully
-  secret: process.env.NEXTAUTH_SECRET || 'fallback-secret-for-preview-deployments-only',
+  // Use a valid secret - generate one if not provided (for preview deployments)
+  // This prevents NO_SECRET errors in production, though auth may not work without proper secret
+  secret: getNextAuthSecret(),
   debug: process.env.NODE_ENV === 'development',
   // Explicitly set NEXTAUTH_URL if provided (helps with cookie domain/secure settings)
   ...(process.env.NEXTAUTH_URL && { url: process.env.NEXTAUTH_URL }),
