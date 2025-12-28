@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Navbar } from '@/components/Navbar'
 import { useRouter } from 'next/navigation'
 
@@ -15,13 +15,88 @@ export default function ScanPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const scannerRef = useRef<any>(null)
   const scannerContainerRef = useRef<HTMLDivElement>(null)
+  const isMountedRef = useRef(true)
 
-  useEffect(() => {
-    inputRef.current?.focus()
-    return () => {
-      stopScanner()
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        // Detener el escáner de forma segura
+        const scanner = scannerRef.current
+        
+        // Intentar detener con mejor manejo de errores
+        try {
+          // Verificar si el escáner tiene el método stop
+          if (typeof scanner.stop === 'function') {
+            await scanner.stop().catch((err: any) => {
+              console.debug('[QR Scanner] Scanner already stopped or error:', err)
+            })
+          }
+        } catch (error) {
+          console.debug('[QR Scanner] Error in stop:', error)
+        }
+
+        // Limpiar el DOM
+        try {
+          if (typeof scanner.clear === 'function') {
+            await scanner.clear().catch((err: any) => {
+              console.debug('[QR Scanner] Error clearing scanner:', err)
+            })
+          }
+        } catch (error) {
+          console.debug('[QR Scanner] Error in clear:', error)
+        }
+
+        // Limpiar el contenedor manualmente
+        if (scannerContainerRef.current) {
+          scannerContainerRef.current.innerHTML = ''
+        }
+      } catch (error) {
+        console.warn('[QR Scanner] Error stopping scanner:', error)
+      } finally {
+        scannerRef.current = null
+      }
+    }
+
+    // Nota: html5-qrcode debería detener los tracks de medios automáticamente
+    // pero si hay algún problema, los métodos stop() y clear() deberían manejarlo
+
+    if (isMountedRef.current) {
+      setIsScanning(false)
+      setScannerError('')
     }
   }, [])
+
+  // Limpieza completa al desmontar
+  useEffect(() => {
+    inputRef.current?.focus()
+    isMountedRef.current = true
+    
+    return () => {
+      isMountedRef.current = false
+      stopScanner()
+    }
+  }, [stopScanner])
+
+  // Detener escáner cuando la página pierde visibilidad
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopScanner()
+      }
+    }
+
+    const handleBeforeUnload = () => {
+      stopScanner()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [stopScanner])
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,26 +145,23 @@ export default function ScanPage() {
     }
   }
 
-  const stopScanner = async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop()
-        await scannerRef.current.clear()
-      } catch (error) {
-        console.warn('[QR Scanner] Error stopping scanner:', error)
-      } finally {
-        scannerRef.current = null
-      }
-    }
-    setIsScanning(false)
-    setScannerError('')
-  }
-
   const startScanner = async () => {
+    // Primero detener cualquier escáner activo
+    await stopScanner()
+
+    // Pequeña pausa para asegurar limpieza completa
+    await new Promise(resolve => setTimeout(resolve, 100))
+
     setScannerError('')
 
     if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setScannerError('Tu dispositivo no soporta el acceso a la cámara desde el navegador.')
+      return
+    }
+
+    // Verificar que el contenedor exista
+    if (!scannerContainerRef.current) {
+      setScannerError('Error: El contenedor del escáner no está disponible.')
       return
     }
 
@@ -108,9 +180,16 @@ export default function ScanPage() {
 
     try {
       const { Html5Qrcode } = await import('html5-qrcode')
+      
+      // Verificar nuevamente que el contenedor exista (por si acaso cambió)
       if (!scannerContainerRef.current) {
+        setScannerError('Error: El contenedor del escáner no está disponible.')
+        setIsScanning(false)
         return
       }
+
+      // Limpiar el contenedor antes de crear una nueva instancia
+      scannerContainerRef.current.innerHTML = ''
 
       const cameras = await Html5Qrcode.getCameras()
       if (!cameras.length) {
@@ -121,9 +200,17 @@ export default function ScanPage() {
 
       const preferredCamera = cameras.find((camera) => camera.label.toLowerCase().includes('back')) || cameras[0]
 
+      // Crear nueva instancia del escáner
       const html5QrCode = new Html5Qrcode(scannerContainerRef.current.id, {
         verbose: false,
       })
+      
+      // Verificar que no haya otra instancia activa
+      if (scannerRef.current) {
+        console.warn('[QR Scanner] Ya existe una instancia activa, limpiando...')
+        await stopScanner()
+      }
+      
       scannerRef.current = html5QrCode
 
       await html5QrCode.start(
@@ -133,20 +220,29 @@ export default function ScanPage() {
           qrbox: window.innerWidth < 640 ? { width: 220, height: 220 } : { width: 300, height: 300 },
           aspectRatio: 1.0,
         },
-                (decodedText: string) => {
-                  const parsedId = parseTableId(decodedText)
-                  setManualCode(parsedId)
-                  stopScanner()
-                  router.push(`/mesa/${parsedId}`)
-                },
+        (decodedText: string) => {
+          if (!isMountedRef.current) return
+          
+          const parsedId = parseTableId(decodedText)
+          setManualCode(parsedId)
+          stopScanner()
+          router.push(`/mesa/${parsedId}`)
+        },
         (errorMessage: string) => {
-          console.debug('[QR Scanner] Scanning', errorMessage)
+          // Solo loggear errores de escaneo, no son críticos
+          console.debug('[QR Scanner] Scanning:', errorMessage)
         }
       )
     } catch (error: any) {
       console.error('[QR Scanner] Error initializing scanner:', error)
       setScannerError(error?.message || 'Error al iniciar el escáner. Intenta nuevamente.')
-      setIsScanning(false)
+      
+      // Asegurar limpieza en caso de error
+      await stopScanner()
+      
+      if (isMountedRef.current) {
+        setIsScanning(false)
+      }
     }
   }
 
