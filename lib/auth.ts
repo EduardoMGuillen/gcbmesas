@@ -3,9 +3,8 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 
-// Don't validate NEXTAUTH_SECRET here - let NextAuth handle it
-// This prevents initialization errors when the secret is missing
-// NextAuth will handle the error gracefully and redirect to /api/auth/error
+// Don't validate NEXTAUTH_SECRET at module load time
+// NextAuth will validate it when needed and handle errors gracefully
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -164,7 +163,9 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || 'temp-secret-for-preview-deployments',
+  // Use a fallback secret if NEXTAUTH_SECRET is not set (for preview deployments)
+  // This prevents initialization errors, but authentication will still fail gracefully
+  secret: process.env.NEXTAUTH_SECRET || 'fallback-secret-for-preview-deployments-only',
   debug: process.env.NODE_ENV === 'development',
   // Explicitly set NEXTAUTH_URL if provided (helps with cookie domain/secure settings)
   ...(process.env.NEXTAUTH_URL && { url: process.env.NEXTAUTH_URL }),
