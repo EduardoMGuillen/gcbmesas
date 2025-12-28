@@ -1,27 +1,12 @@
-import crypto from 'crypto'
-
-// CRITICAL: Set NEXTAUTH_SECRET in process.env at the VERY TOP of this file
-// This must happen before ANY NextAuth-related imports, because NextAuth validates
-// process.env.NEXTAUTH_SECRET during its own module initialization
-// By setting it here at the top level, we ensure it's available when NextAuth loads
-if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
-  // Generate a deterministic secret based on VERCEL_URL or a fixed fallback
-  // This ensures the secret is consistent across server restarts for preview deployments
-  // WARNING: This is NOT secure for production - NEXTAUTH_SECRET should always be set in production
-  const deterministicKey = process.env.VERCEL_URL || process.env.VERCEL || 'preview-deployment-fallback-key'
-  const hash = crypto.createHash('sha256').update(deterministicKey).digest('base64')
-  process.env.NEXTAUTH_SECRET = hash
-  console.warn('[NextAuth] NEXTAUTH_SECRET not set, using generated secret. This should only happen in preview deployments.')
-}
+// IMPORTANT: Import auth-secret FIRST to ensure NEXTAUTH_SECRET is set in process.env
+// This must happen before any NextAuth-related imports
+import './auth-secret'
+import { NEXTAUTH_SECRET } from './auth-secret'
 
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
-
-// Get the secret - it's now guaranteed to be in process.env and valid (32+ chars)
-// This value is used in authOptions, but process.env.NEXTAUTH_SECRET is what NextAuth actually checks
-const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET!
 
 export const authOptions: NextAuthOptions = {
   providers: [

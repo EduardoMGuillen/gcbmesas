@@ -1,3 +1,6 @@
+// IMPORTANT: Import auth-secret FIRST to ensure NEXTAUTH_SECRET is set before NextAuth initializes
+import '@/lib/auth-secret'
+
 import NextAuth from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
