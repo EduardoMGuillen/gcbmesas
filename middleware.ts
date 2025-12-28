@@ -1,3 +1,6 @@
+// IMPORTANT: Import auth-secret FIRST to ensure NEXTAUTH_SECRET is set before withAuth initializes
+import '@/lib/auth-secret'
+
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
