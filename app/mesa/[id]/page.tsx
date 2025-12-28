@@ -5,8 +5,14 @@ export default async function MesaPage({
 }: {
   params: { id: string }
 }) {
-  // Esta ruta siempre redirige a /clientes
-  // El middleware debería manejar esto, pero por si acaso también lo hacemos aquí
-  redirect(`/clientes?tableId=${params.id}`)
+  try {
+    // Esta ruta siempre redirige a /clientes
+    // El middleware debería manejar esto, pero por si acaso también lo hacemos aquí
+    const tableId = params?.id || ''
+    redirect(`/clientes?tableId=${tableId}`)
+  } catch (error) {
+    // Si hay algún error, redirigir a /clientes sin tableId
+    redirect('/clientes')
+  }
 }
 
