@@ -5,7 +5,11 @@ import { getTables, getProducts } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
 import { ManualOrderForm } from '@/components/ManualOrderForm'
 
-export default async function PedidosPage() {
+interface PedidosPageProps {
+  searchParams: { tableId?: string }
+}
+
+export default async function PedidosPage({ searchParams }: PedidosPageProps) {
   const session = await getServerSession(authOptions)
 
   if (!session || !['MESERO', 'ADMIN'].includes(session.user.role)) {
@@ -14,6 +18,7 @@ export default async function PedidosPage() {
 
   const tables = await getTables()
   const products = await getProducts(true)
+  const initialTableId = searchParams.tableId || ''
 
   return (
     <div className="min-h-screen">
@@ -28,7 +33,7 @@ export default async function PedidosPage() {
           </p>
         </div>
 
-        <ManualOrderForm tables={tables} products={products} />
+        <ManualOrderForm tables={tables} products={products} initialTableId={initialTableId} />
       </main>
     </div>
   )
