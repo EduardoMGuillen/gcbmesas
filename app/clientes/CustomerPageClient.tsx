@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export function CustomerPageClient() {
   const [manualCode, setManualCode] = useState('')
@@ -241,23 +242,33 @@ export function CustomerPageClient() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-900">
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
+      <main className="flex-1 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="mb-8 text-center">
+          <div className="mb-6 flex justify-center">
+            <Image
+              src="/LogoCasaBlanca.png"
+              alt="Casa Blanca Logo"
+              width={200}
+              height={200}
+              className="object-contain"
+              priority
+            />
+          </div>
           <h1 className="text-4xl font-bold text-white mb-2">
             Hacer Pedido
           </h1>
-          <p className="text-dark-400 text-lg">
+          <p className="text-white/80 text-lg">
             Escanea el código QR de tu mesa o ingresa el código manualmente
           </p>
         </div>
 
-        <div className="bg-dark-100 border border-dark-200 rounded-xl p-8">
+        <div className="bg-white/10 border border-white/20 rounded-xl p-8 backdrop-blur-sm">
           <form onSubmit={handleManualSubmit} className="space-y-6">
             <div>
               <label
                 htmlFor="manualCode"
-                className="block text-sm font-medium text-dark-300 mb-2"
+                className="block text-sm font-medium text-white mb-2"
               >
                 Código de Mesa
               </label>
@@ -268,7 +279,7 @@ export function CustomerPageClient() {
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 placeholder="Ej. A3K7 o escanea el QR"
-                className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-lg"
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-lg"
               />
             </div>
 
@@ -291,8 +302,8 @@ export function CustomerPageClient() {
                 onClick={handleQRScan}
                 className={`flex-1 px-6 font-semibold py-3 rounded-lg transition-colors ${
                   isScanning
-                    ? 'bg-red-500/20 border border-red-500/40 text-red-200'
-                    : 'bg-dark-200 hover:bg-dark-300 text-white'
+                    ? 'bg-red-500/30 border border-red-500/50 text-white'
+                    : 'bg-white/10 hover:bg-white/20 border border-white/20 text-white'
                 }`}
               >
                 {isScanning ? 'Detener escaneo' : 'Escanear QR'}
@@ -313,19 +324,24 @@ export function CustomerPageClient() {
 
             {isScanning && (
               <div className="space-y-3">
-                <div className="text-sm text-dark-300 text-center">
+                <div className="text-sm text-white/80 text-center">
                   Apunta la cámara al código QR de la mesa. El escaneo se detendrá automáticamente cuando lo detectemos.
                 </div>
                 <div
                   id="qr-reader-customer"
                   ref={scannerContainerRef}
-                  className="w-full bg-dark-50 rounded-xl overflow-hidden border border-dark-200 min-h-[260px]"
+                  className="w-full bg-white/10 rounded-xl overflow-hidden border border-white/20 min-h-[260px]"
                 ></div>
               </div>
             )}
           </form>
         </div>
       </main>
+      <footer className="w-full py-4 text-center">
+        <p className="text-white/60 text-sm">
+          Powered by Nexus Global Suministros
+        </p>
+      </footer>
     </div>
   )
 }
