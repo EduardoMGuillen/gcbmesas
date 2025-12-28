@@ -8,6 +8,7 @@ import crypto from 'crypto'
 // NextAuth requires at least 32 characters in production
 // We generate a deterministic secret based on environment variables
 function getOrCreateSecret(): string {
+  // If NEXTAUTH_SECRET exists and is valid (at least 32 chars), use it
   if (process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32) {
     return process.env.NEXTAUTH_SECRET
   }
@@ -20,15 +21,12 @@ function getOrCreateSecret(): string {
   
   // Also set it in process.env so NextAuth can find it if it checks there
   process.env.NEXTAUTH_SECRET = hash
-  
-  if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
-    console.warn('[NextAuth] NEXTAUTH_SECRET not set, using generated secret. This should only happen in preview deployments.')
-  }
+  console.warn('[NextAuth] NEXTAUTH_SECRET not set, using generated secret. This should only happen in preview deployments.')
   
   return hash
 }
 
-// Get the secret early and store it
+// Get the secret early and store it - this ensures it's always a valid string
 const NEXTAUTH_SECRET = getOrCreateSecret()
 
 export const authOptions: NextAuthOptions = {
