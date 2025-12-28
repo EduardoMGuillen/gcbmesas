@@ -6,10 +6,18 @@ import { Navbar } from '@/components/Navbar'
 import { AccountsList } from '@/components/AccountsList'
 
 export default async function CuentasPage() {
-  const session = await getServerSession(authOptions)
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch (error: any) {
+    console.error('[CuentasPage] Error getting session:', error?.message)
+    redirect('/login')
+    return
+  }
 
   if (!session || (session.user.role !== 'ADMIN' && session.user.role !== 'MESERO')) {
     redirect('/login')
+    return
   }
 
   try {

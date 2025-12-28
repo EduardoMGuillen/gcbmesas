@@ -6,10 +6,18 @@ import { Navbar } from '@/components/Navbar'
 import { TablesList } from '@/components/TablesList'
 
 export default async function MesasPage() {
-  const session = await getServerSession(authOptions)
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch (error: any) {
+    console.error('[MesasPage] Error getting session:', error?.message)
+    redirect('/login')
+    return
+  }
 
   if (!session || session.user.role !== 'ADMIN') {
     redirect('/login')
+    return
   }
 
   const tables = await getTables()
