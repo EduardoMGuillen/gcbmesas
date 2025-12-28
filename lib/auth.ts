@@ -1,8 +1,12 @@
+import { NextAuthOptions } from 'next-auth'
+import CredentialsProvider from 'next-auth/providers/credentials'
+import bcrypt from 'bcryptjs'
+import { prisma } from './prisma'
 import crypto from 'crypto'
 
-// CRITICAL: Set NEXTAUTH_SECRET in process.env BEFORE importing NextAuth
+// CRITICAL: Set NEXTAUTH_SECRET in process.env BEFORE NextAuth initializes
 // NextAuth checks process.env.NEXTAUTH_SECRET during initialization
-// This must happen at the top level, before any NextAuth imports
+// This must happen at module load time, before NextAuth uses it
 if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
   // Generate a deterministic secret based on VERCEL_URL or a fixed fallback
   // This ensures the secret is consistent across server restarts for preview deployments
@@ -13,13 +17,13 @@ if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
   console.warn('[NextAuth] NEXTAUTH_SECRET not set, using generated secret. This should only happen in preview deployments.')
 }
 
-import { NextAuthOptions } from 'next-auth'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import bcrypt from 'bcryptjs'
-import { prisma } from './prisma'
-
-// Get the secret - it's now guaranteed to be in process.env
-const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET!
+// Get the secret - it's now guaranteed to be in process.env and valid (32+ chars)
+const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || (() => {
+  // Fallback - should never reach here if code above works
+  const fallback = crypto.createHash('sha256').update('fallback-key').digest('base64')
+  process.env.NEXTAUTH_SECRET = fallback
+  return fallback
+})()
 
 export const authOptions: NextAuthOptions = {
   providers: [
