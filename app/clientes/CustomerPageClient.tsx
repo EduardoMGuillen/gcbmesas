@@ -160,16 +160,30 @@ export function CustomerPageClient() {
     // Establecer isScanning primero para que React renderice el contenedor
     setIsScanning(true)
 
-    // Esperar a que React renderice el contenedor después de establecer isScanning
-    await new Promise(resolve => setTimeout(resolve, 150))
+    // Esperar a que React renderice el contenedor usando requestAnimationFrame para asegurar que el DOM esté listo
+    await new Promise(resolve => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, 200) // Aumentado a 200ms para dar más tiempo
+        })
+      })
+    })
 
     try {
       const { Html5Qrcode } = await import('html5-qrcode')
       
-      // Verificar nuevamente después de que React haya renderizado
+      // Esperar y verificar múltiples veces que el contenedor esté disponible
+      let attempts = 0
+      const maxAttempts = 10
+      while (!scannerContainerRef.current && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        attempts++
+      }
+      
+      // Verificar nuevamente después de esperar
       if (!scannerContainerRef.current) {
-        console.error('[QR Scanner] Container not available after render')
-        setScannerError('Error: El contenedor del escáner no está disponible.')
+        console.error('[QR Scanner] Container not available after multiple attempts')
+        setScannerError('Error: El contenedor del escáner no está disponible. Por favor, intenta nuevamente.')
         setIsScanning(false)
         return
       }
