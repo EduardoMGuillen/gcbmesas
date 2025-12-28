@@ -1,29 +1,27 @@
+import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getToken } from 'next-auth/jwt'
 
-export async function middleware(req: NextRequest) {
-  const path = req.nextUrl.pathname
+export default withAuth(
+  function middleware(req: NextRequest & { nextauth: { token: any } }) {
+    const path = req.nextUrl.pathname
 
-  // Rutas /mesa - redirigir directamente a /clientes sin intentar autenticar
-  // Esto evita que NextAuth falle con errores de configuración
-  if (path.startsWith('/mesa/')) {
-    const mesaMatch = path.match(/^\/mesa\/([^/?]+)/)
-    const mesaId = mesaMatch ? mesaMatch[1] : null
-    if (mesaId) {
-      return NextResponse.redirect(new URL(`/clientes?tableId=${mesaId}`, req.url))
+    // Rutas /mesa - redirigir directamente a /clientes sin intentar autenticar
+    if (path.startsWith('/mesa/')) {
+      const mesaMatch = path.match(/^\/mesa\/([^/?]+)/)
+      const mesaId = mesaMatch ? mesaMatch[1] : null
+      if (mesaId) {
+        return NextResponse.redirect(new URL(`/clientes?tableId=${mesaId}`, req.url))
+      }
+      return NextResponse.redirect(new URL('/clientes', req.url))
     }
-    return NextResponse.redirect(new URL('/clientes', req.url))
-  }
 
-  // Rutas públicas - permitir acceso sin autenticación
-  if (path.startsWith('/clientes') || path === '/login' || path === '/auth-callback') {
-    return NextResponse.next()
-  }
+    // Rutas públicas - permitir acceso sin autenticación
+    if (path.startsWith('/clientes') || path === '/login' || path === '/auth-callback') {
+      return NextResponse.next()
+    }
 
-  // Para rutas protegidas, verificar token manualmente
-  try {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+    const token = req.nextauth.token
     const fromCallback = req.nextUrl.searchParams.get('from') === 'callback'
 
     // Admin routes - only allow ADMIN role
@@ -60,14 +58,24 @@ export async function middleware(req: NextRequest) {
     }
 
     return NextResponse.next()
-  } catch (error) {
-    // Si hay error obteniendo el token, redirigir a login para rutas protegidas
-    if (path.startsWith('/admin') || path.startsWith('/cajero') || path.startsWith('/mesero')) {
-      return NextResponse.redirect(new URL('/login', req.url))
-    }
-    return NextResponse.next()
+  },
+  {
+    callbacks: {
+      authorized: ({ token, req }) => {
+        const path = req.nextUrl.pathname
+        
+        // For /mesa, /clientes, login and auth-callback pages, always allow (don't check token)
+        // This prevents NextAuth from failing on these routes
+        if (path.startsWith('/mesa') || path.startsWith('/clientes') || path === '/login' || path === '/auth-callback') {
+          return true
+        }
+        
+        // For protected routes, require token
+        return !!token
+      },
+    },
   }
-}
+)
 
 export const config = {
   // Incluir todas las rutas excepto estáticas y API
