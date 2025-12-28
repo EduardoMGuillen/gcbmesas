@@ -54,11 +54,9 @@ export default async function AuthCallbackPage() {
     // This helps the middleware know the session is valid
     redirect(`${redirectUrl}?from=callback`)
   } else {
-    console.warn('[AuthCallback] No session found after server attempts, using client-side fallback (iOS may need more time)')
-    // If no session found, use client-side component for polling
-    // This is especially important for iOS where cookies can take longer to propagate
-    const { default: AuthCallbackClient } = await import('./AuthCallbackClient')
-    return <AuthCallbackClient initialRedirectUrl={null} />
+    console.warn('[AuthCallback] No session found after server attempts, redirecting to login')
+    // If no session found after all attempts, redirect to login with error
+    redirect('/login?error=SessionNotFound')
   }
 }
 
