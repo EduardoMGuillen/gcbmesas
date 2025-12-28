@@ -1,38 +1,13 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { getTableById, getProducts } from '@/lib/actions'
-import { Navbar } from '@/components/Navbar'
-import { TableView } from '@/components/TableView'
 
 export default async function MesaPage({
   params,
 }: {
   params: { id: string }
 }) {
-  // Intentar obtener sesión, pero si hay error de configuración, tratar como sin sesión
-  let session = null
-  try {
-    session = await getServerSession(authOptions)
-  } catch (error: any) {
-    // Si hay error de configuración de NextAuth (como NEXTAUTH_URL no coincide),
-    // tratar como usuario no autenticado y redirigir a clientes
-    console.warn('[MesaPage] Error checking session, redirecting to clientes:', error?.message)
-    redirect(`/clientes?tableId=${params.id}`)
-  }
-
-  // Si no hay sesión, redirigir a página de clientes
-  if (!session) {
-    redirect(`/clientes?tableId=${params.id}`)
-  }
-
-  // Si hay sesión pero no es MESERO o ADMIN, redirigir a login
-  if (!['MESERO', 'ADMIN'].includes(session.user.role)) {
-    redirect('/login')
-  }
-
-  const table = await getTableById(params.id)
-  const products = await getProducts(true)
+  // Esta ruta siempre redirige a /clientes
+  // El middleware debería manejar esto, pero por si acaso también lo hacemos aquí
+  redirect(`/clientes?tableId=${params.id}`)
 
   if (!table) {
     return (
