@@ -12,7 +12,9 @@ export async function GET(request: NextRequest) {
   // redirigir a /clientes para que el usuario pueda usar la aplicación
   if (error === 'Configuration' || error === 'NO_SECRET') {
     console.log('[Auth Error Handler] Configuration/NO_SECRET error detected, redirecting to /clientes')
-    return NextResponse.redirect(new URL('/clientes', request.url))
+    // Construir la URL base correctamente usando el origin de la request
+    const clientesUrl = new URL('/clientes', request.nextUrl.origin)
+    return NextResponse.redirect(clientesUrl)
   }
   
   // Para otros casos, redirigir a la página de error de login
