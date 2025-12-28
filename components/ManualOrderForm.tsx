@@ -16,18 +16,20 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
   const [selectedProductId, setSelectedProductId] = useState('')
   const [quantityInput, setQuantityInput] = useState('1')
   const [initialBalance, setInitialBalance] = useState('')
-  
-  const selectedTable = tables.find((t) => t.id === selectedTableId)
-  const hasOpenAccount = selectedTable?.accounts?.length > 0
-  // Si se pasa un initialTableId y no tiene cuenta, mostrar el formulario de crear cuenta
-  const [showCreateAccount, setShowCreateAccount] = useState(initialTableId !== '' && selectedTable && !hasOpenAccount)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const router = useRouter()
 
+  const selectedTable = tables.find((t) => t.id === selectedTableId)
+  const hasOpenAccount = selectedTable?.accounts?.length > 0
   const account = selectedTable?.accounts?.[0]
+  
+  // Si se pasa un initialTableId y no tiene cuenta, mostrar el formulario de crear cuenta automáticamente
+  const [showCreateAccount, setShowCreateAccount] = useState(
+    initialTableId !== '' && selectedTable && !hasOpenAccount
+  )
 
   // Filtrar productos por término de búsqueda
   const filteredProducts = products.filter((product) =>
