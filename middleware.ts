@@ -78,8 +78,9 @@ export default withAuth(
 )
 
 export const config = {
-  // Incluir todas las rutas excepto estáticas y API
+  // Incluir todas las rutas excepto estáticas, API y /mesa (que se maneja en el middleware antes de withAuth)
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|mesa|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/mesa/:path*', // Incluir /mesa explícitamente para que el middleware lo maneje
   ],
 }
