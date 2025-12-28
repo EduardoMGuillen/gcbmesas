@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createOrder, createAccount } from '@/lib/actions'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
@@ -26,10 +26,14 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
   const hasOpenAccount = selectedTable?.accounts?.length > 0
   const account = selectedTable?.accounts?.[0]
   
+  const [showCreateAccount, setShowCreateAccount] = useState(false)
+  
   // Si se pasa un initialTableId y no tiene cuenta, mostrar el formulario de crear cuenta automáticamente
-  const [showCreateAccount, setShowCreateAccount] = useState(
-    initialTableId !== '' && selectedTable && !hasOpenAccount
-  )
+  useEffect(() => {
+    if (initialTableId && selectedTableId === initialTableId && !hasOpenAccount) {
+      setShowCreateAccount(true)
+    }
+  }, [initialTableId, selectedTableId, hasOpenAccount])
 
   // Filtrar productos por término de búsqueda
   const filteredProducts = products.filter((product) =>
