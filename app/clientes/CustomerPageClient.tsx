@@ -146,11 +146,6 @@ export function CustomerPageClient() {
       return
     }
 
-    if (!scannerContainerRef.current) {
-      setScannerError('Error: El contenedor del escáner no está disponible.')
-      return
-    }
-
     try {
       const permissionStatus = await navigator.mediaDevices.getUserMedia({ video: true })
       permissionStatus.getTracks().forEach((track) => track.stop())
@@ -162,15 +157,18 @@ export function CustomerPageClient() {
       return
     }
 
+    // Establecer isScanning primero para que React renderice el contenedor
     setIsScanning(true)
 
-    // Esperar a que React renderice el contenedor
-    await new Promise(resolve => setTimeout(resolve, 50))
+    // Esperar a que React renderice el contenedor después de establecer isScanning
+    await new Promise(resolve => setTimeout(resolve, 150))
 
     try {
       const { Html5Qrcode } = await import('html5-qrcode')
       
+      // Verificar nuevamente después de que React haya renderizado
       if (!scannerContainerRef.current) {
+        console.error('[QR Scanner] Container not available after render')
         setScannerError('Error: El contenedor del escáner no está disponible.')
         setIsScanning(false)
         return
