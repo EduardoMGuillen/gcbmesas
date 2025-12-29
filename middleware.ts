@@ -9,6 +9,14 @@ export default withAuth(
   function middleware(req: NextRequest & { nextauth: { token: any } }) {
     const path = req.nextUrl.pathname
 
+    // Intercept auth error route early to avoid NextAuth secret validation
+    if (path === '/api/auth/error') {
+      const target = new URL('/clientes', req.url)
+      const tableId = req.nextUrl.searchParams.get('tableId')
+      if (tableId) target.searchParams.set('tableId', tableId)
+      return NextResponse.redirect(target, { status: 307 })
+    }
+
     // Rutas públicas - permitir acceso sin autenticación
     if (path.startsWith('/clientes') || path === '/login' || path === '/auth-callback') {
       return NextResponse.next()
@@ -72,9 +80,9 @@ export default withAuth(
 )
 
 export const config = {
-  // EXCLUIR /mesa completamente del matcher
-  // La página del servidor manejará la redirección para /mesa
+  // Incluir api/auth/error explícitamente y excluir /mesa del resto
   matcher: [
+    '/api/auth/error',
     '/((?!api|_next/static|_next/image|favicon.ico|mesa|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
