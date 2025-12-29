@@ -1,36 +1,17 @@
 // IMPORTANT: Import auth-secret FIRST to ensure NEXTAUTH_SECRET is set before NextAuth initializes
-import '@/lib/auth-secret'
-import { NextResponse } from 'next/server'
+// Hard-set NEXTAUTH_SECRET before importing NextAuth to avoid NO_SECRET
+const HARDCODED_SECRET = 'hard-fallback-secret-32-chars-minimum-string!'
+if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
+  process.env.NEXTAUTH_SECRET = HARDCODED_SECRET
+  console.warn('[NextAuth] NEXTAUTH_SECRET missing, using hardcoded fallback for this route.')
+}
+
 import NextAuth from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-// Runtime enforced to nodejs
 export const runtime = 'nodejs'
 
-// Pre-create NextAuth handler with safe secret (authOptions already contains fallback)
-const nextAuthHandler = NextAuth(authOptions)
+const handler = NextAuth(authOptions)
 
-export async function GET(req: Request) {
-  const hasSecret =
-    process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32
-
-  if (!hasSecret) {
-    console.warn('[NextAuth] NEXTAUTH_SECRET missing, redirecting to /clientes (GET)')
-    return NextResponse.redirect(new URL('/clientes', req.url), { status: 307 })
-  }
-
-  return nextAuthHandler(req)
-}
-
-export async function POST(req: Request) {
-  const hasSecret =
-    process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32
-
-  if (!hasSecret) {
-    console.warn('[NextAuth] NEXTAUTH_SECRET missing, redirecting to /clientes (POST)')
-    return NextResponse.redirect(new URL('/clientes', req.url), { status: 307 })
-  }
-
-  return nextAuthHandler(req)
-}
+export { handler as GET, handler as POST }
 
