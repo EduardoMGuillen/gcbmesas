@@ -1,10 +1,9 @@
-// IMPORTANT: Import auth-secret FIRST to ensure NEXTAUTH_SECRET is set before withAuth initializes
-import '@/lib/auth-secret'
-import { NEXTAUTH_SECRET } from '@/lib/auth-secret'
-
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+
+// Importing node's crypto in middleware (Edge runtime) can fail, so read the secret directly
+const MIDDLEWARE_SECRET = process.env.NEXTAUTH_SECRET
 
 export default withAuth(
   function middleware(req: NextRequest & { nextauth: { token: any } }) {
@@ -50,7 +49,8 @@ export default withAuth(
     return NextResponse.next()
   },
   {
-    secret: NEXTAUTH_SECRET,
+    // Use the env-provided secret (middleware runs on Edge, avoid crypto here)
+    secret: MIDDLEWARE_SECRET,
     callbacks: {
       authorized: ({ token, req }: { token: any; req: NextRequest }) => {
         const path = req.nextUrl.pathname
