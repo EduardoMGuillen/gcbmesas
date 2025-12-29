@@ -1,6 +1,6 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import type { NextRequest, NextFetchEvent } from 'next/server'
 
 // Importing node's crypto in middleware (Edge runtime) can fail, so read the secret directly
 const MIDDLEWARE_SECRET =
@@ -9,17 +9,10 @@ const MIDDLEWARE_SECRET =
     : process.env.NEXT_PUBLIC_FALLBACK_SECRET) ||
   'hard-fallback-secret-32-chars-minimum-string!'
 
-export default withAuth(
+// Base auth middleware for protected routes
+const authMiddleware = withAuth(
   function middleware(req: NextRequest & { nextauth: { token: any } }) {
     const path = req.nextUrl.pathname
-
-    // Intercept auth error route early to avoid NextAuth secret validation
-    if (path === '/api/auth/error') {
-      const target = new URL('/clientes', req.url)
-      const tableId = req.nextUrl.searchParams.get('tableId')
-      if (tableId) target.searchParams.set('tableId', tableId)
-      return NextResponse.redirect(target, { status: 307 })
-    }
 
     // Rutas públicas - permitir acceso sin autenticación
     if (path.startsWith('/clientes') || path === '/login' || path === '/auth-callback') {
@@ -83,10 +76,28 @@ export default withAuth(
   }
 )
 
+// Wrapper middleware to bypass auth for specific routes before withAuth runs
+export default function middleware(req: NextRequest, evt: NextFetchEvent) {
+  const path = req.nextUrl.pathname
+
+  // Intercept auth error route early to avoid NextAuth secret validation
+  if (path === '/api/auth/error') {
+    const target = new URL('/clientes', req.url)
+    const tableId = req.nextUrl.searchParams.get('tableId')
+    if (tableId) target.searchParams.set('tableId', tableId)
+    return NextResponse.redirect(target, { status: 307 })
+  }
+
+  // Let /mesa/* bypass auth entirely (handled by page redirect)
+  if (path.startsWith('/mesa')) {
+    return NextResponse.next()
+  }
+
+  // For everything else, run the auth middleware
+  return (authMiddleware as any)(req, evt)
+}
+
 export const config = {
-  // Incluir api/auth/error explícitamente y excluir /mesa del resto
-  matcher: [
-    '/api/auth/error',
-    '/((?!api|_next/static|_next/image|favicon.ico|mesa|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  // Match everything except static assets; we bypass /mesa explicitly above
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
