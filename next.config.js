@@ -2,12 +2,17 @@
 const nextConfig = {
   // Disable strict mode to avoid double rendering issues
   reactStrictMode: false,
-  async redirects() {
+  async rewrites() {
     return [
+      // Bypass NextAuth completely for error path
       {
         source: '/api/auth/error',
         destination: '/clientes',
-        permanent: false,
+      },
+      // Send any /mesa/:id directly to clientes with tableId param
+      {
+        source: '/mesa/:id*',
+        destination: '/clientes?tableId=:id*',
       },
     ]
   },
