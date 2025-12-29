@@ -4,9 +4,10 @@ import type { NextRequest } from 'next/server'
 
 // Importing node's crypto in middleware (Edge runtime) can fail, so read the secret directly
 const MIDDLEWARE_SECRET =
-  process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32
+  (process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32
     ? process.env.NEXTAUTH_SECRET
-    : 'preview-fallback-secret-32-chars-minimum!!!'
+    : process.env.NEXT_PUBLIC_FALLBACK_SECRET) ||
+  'hard-fallback-secret-32-chars-minimum-string!'
 
 export default withAuth(
   function middleware(req: NextRequest & { nextauth: { token: any } }) {

@@ -8,10 +8,12 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 
-const FALLBACK_SECRET =
-  process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32
+// Guarantee a valid secret even if env is missing (preview safety)
+const HARD_FALLBACK_SECRET = 'hard-fallback-secret-32-chars-minimum-string!'
+const EFFECTIVE_SECRET =
+  (process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32
     ? process.env.NEXTAUTH_SECRET
-    : 'preview-fallback-secret-32-chars-minimum!!!'
+    : NEXTAUTH_SECRET) || HARD_FALLBACK_SECRET
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -130,7 +132,8 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/login',
-    error: '/login/error', // Custom error page
+    // Si NextAuth lanza error de config, redirigir a clientes
+    error: '/clientes',
   },
   session: {
     strategy: 'jwt',
@@ -170,8 +173,8 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  // Use the secret that we've ensured is valid (either from env or generated)
-  secret: NEXTAUTH_SECRET ?? FALLBACK_SECRET,
+  // Use the secret that we've ensured is valid (env, generated, or hard fallback)
+  secret: EFFECTIVE_SECRET,
   debug: process.env.NODE_ENV === 'development',
   // Explicitly set NEXTAUTH_URL if provided (helps with cookie domain/secure settings)
   ...(process.env.NEXTAUTH_URL && { url: process.env.NEXTAUTH_URL }),
