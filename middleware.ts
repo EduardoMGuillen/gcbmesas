@@ -80,12 +80,10 @@ const authMiddleware = withAuth(
 export default function middleware(req: NextRequest, evt: NextFetchEvent) {
   const path = req.nextUrl.pathname
 
-  // Intercept auth error route early to avoid NextAuth secret validation
-  if (path === '/api/auth/error') {
-    const target = new URL('/clientes', req.url)
-    const tableId = req.nextUrl.searchParams.get('tableId')
-    if (tableId) target.searchParams.set('tableId', tableId)
-    return NextResponse.redirect(target, { status: 307 })
+  // Exclude public redirects and API auth routes from NextAuth/middleware
+  // /api/auth/error must never reach NextAuth to avoid NO_SECRET
+  if (path === '/api/auth/error' || path.startsWith('/api/auth')) {
+    return NextResponse.next()
   }
 
   // Let /mesa/* bypass auth entirely (handled by page redirect)
@@ -98,6 +96,6 @@ export default function middleware(req: NextRequest, evt: NextFetchEvent) {
 }
 
 export const config = {
-  // Match everything except static assets; we bypass /mesa explicitly above
+  // Match everything except static assets; we bypass /mesa and /api/auth in code above
   matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
