@@ -83,6 +83,10 @@ export function CustomerOrderView({
       if (tables) {
         const newTable = tables.find(t => t.id === initialTableId)
         if (newTable) {
+          // Actualizar zona seleccionada
+          if (newTable.zone) {
+            setSelectedZone(newTable.zone)
+          }
           setTable({
             id: newTable.id,
             name: newTable.name,
@@ -115,6 +119,14 @@ export function CustomerOrderView({
       // Actualizar table y account con los props actuales
       setTable(initialTable)
       setAccount(initialAccount)
+      // Actualizar zona si la mesa tiene zona
+      if (initialTable.zone) {
+        setSelectedZone(initialTable.zone)
+      }
+    } else if (!initialTableId) {
+      // Si no hay mesa seleccionada, resetear zona
+      setSelectedZone('')
+      setSelectedTableId('')
     }
   }, [initialTableId, initialTable, initialAccount, tables, isMesero, selectedTableId])
 
@@ -258,11 +270,12 @@ export function CustomerOrderView({
                   setError('')
                   if (newTableId) {
                     router.push(`${backUrl}?tableId=${newTableId}`)
-                    router.refresh()
                   } else {
+                    setSelectedZone('')
                     router.push(backUrl)
-                    router.refresh()
                   }
+                  // Forzar refresh para obtener nuevos datos del servidor
+                  setTimeout(() => router.refresh(), 100)
                 }}
                 className="w-full px-4 py-3 bg-dark-100 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
