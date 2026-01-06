@@ -251,7 +251,7 @@ export function CustomerOrderView({
               className="w-full px-4 py-3 bg-dark-100 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="">Selecciona una zona</option>
-              {Array.from(new Set(tables.map(t => t.zone).filter(Boolean))).sort().map((zone) => (
+              {Array.from(new Set(tables.map(t => t.zone).filter((zone): zone is string => Boolean(zone)))).sort().map((zone) => (
                 <option key={zone} value={zone}>
                   {zone}
                 </option>
