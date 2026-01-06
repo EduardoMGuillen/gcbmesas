@@ -232,6 +232,11 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
                 <h3 className="text-xl font-semibold text-white mb-1">
                   Mesa: {account.table.name}
                 </h3>
+                {account.table.zone && (
+                  <p className="text-sm text-white/80 mb-1">
+                    Zona: {account.table.zone}
+                  </p>
+                )}
                 <p className="text-sm text-dark-400">
                   Creada: {formatDate(account.createdAt)}
                 </p>
