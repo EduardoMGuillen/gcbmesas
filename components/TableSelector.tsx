@@ -16,7 +16,7 @@ export function TableSelector({ tables }: TableSelectorProps) {
   const [selectedZone, setSelectedZone] = useState<string>('')
 
   // Obtener zonas únicas
-  const zones = Array.from(new Set(tables.map(t => t.zone).filter(Boolean))).sort()
+  const zones = Array.from(new Set(tables.map(t => t.zone).filter((zone): zone is string => Boolean(zone)))).sort()
 
   // Filtrar mesas por zona seleccionada
   const filteredTables = selectedZone
