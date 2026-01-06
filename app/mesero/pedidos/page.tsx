@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { getTables, getProducts, getTableById, createAccount } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
 import { CustomerOrderView } from '@/components/CustomerOrderView'
+import { TableSelector } from '@/components/TableSelector'
 
 interface PedidosPageProps {
   searchParams: { tableId?: string }
@@ -104,27 +105,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
             backUrl="/mesero/pedidos"
           />
         ) : (
-          <div className="bg-dark-100 border border-dark-200 rounded-xl p-8">
-            <label className="block text-sm font-medium text-dark-300 mb-2">
-              Seleccionar Mesa
-            </label>
-            <select
-              defaultValue=""
-              onChange={(e) => {
-                if (e.target.value) {
-                  window.location.href = `/mesero/pedidos?tableId=${e.target.value}`
-                }
-              }}
-              className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">Selecciona una mesa</option>
-              {tablesForView.map((table) => (
-                <option key={table.id} value={table.id}>
-                  {table.name} {table.zone ? `- ${table.zone}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+          <TableSelector tables={tablesForView} />
         )}
       </main>
     </div>
