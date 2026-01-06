@@ -89,8 +89,8 @@ export function TablesList({ initialTables }: TablesListProps) {
     }
   }
 
-  // Helper function to load image as base64
-  const loadImageAsBase64 = (imagePath: string): Promise<string> => {
+  // Helper function to load image as base64 with dimensions
+  const loadImageAsBase64 = (imagePath: string): Promise<{ dataURL: string; width: number; height: number }> => {
     return new Promise((resolve, reject) => {
       const img = new Image()
       img.crossOrigin = 'anonymous'
@@ -101,7 +101,11 @@ export function TablesList({ initialTables }: TablesListProps) {
         const ctx = canvas.getContext('2d')
         if (ctx) {
           ctx.drawImage(img, 0, 0)
-          resolve(canvas.toDataURL('image/png'))
+          resolve({
+            dataURL: canvas.toDataURL('image/png'),
+            width: img.width,
+            height: img.height,
+          })
         } else {
           reject(new Error('Failed to get canvas context'))
         }
@@ -143,15 +147,26 @@ export function TablesList({ initialTables }: TablesListProps) {
           }
         }
 
-        // Load logo based on zone
+        // Load logo based on zone with dimensions
         let logoDataURL = ''
+        let logoWidth = 0
+        let logoHeight = 0
         try {
           if (table.zone === 'Astronomical') {
-            logoDataURL = await loadImageAsBase64('/LogoAstronomical.png')
+            const logoData = await loadImageAsBase64('/LogoAstronomical.png')
+            logoDataURL = logoData.dataURL
+            logoWidth = logoData.width
+            logoHeight = logoData.height
           } else if (table.zone === 'Studio54') {
-            logoDataURL = await loadImageAsBase64('/LogoStudio54.png')
+            const logoData = await loadImageAsBase64('/LogoStudio54.png')
+            logoDataURL = logoData.dataURL
+            logoWidth = logoData.width
+            logoHeight = logoData.height
           } else if (table.zone === 'Beer Garden') {
-            logoDataURL = await loadImageAsBase64('/LogoCasaBlanca.png')
+            const logoData = await loadImageAsBase64('/LogoCasaBlanca.png')
+            logoDataURL = logoData.dataURL
+            logoWidth = logoData.width
+            logoHeight = logoData.height
           }
         } catch (err) {
           console.error(`Error loading logo for zone ${table.zone}:`, err)
@@ -164,9 +179,18 @@ export function TablesList({ initialTables }: TablesListProps) {
 
         // Layout optimized for 4x2.5" card: QR left, text and logo right
         const qrSize = 45 // QR size in mm (smaller to fit card)
-        const logoSize = 18 // Logo size in mm
+        const logoMaxWidth = 18 // Max logo width in mm (maintain aspect ratio)
         const margin = 5 // Edge margin
         const spacingQRText = 4 // Space between QR and text
+        
+        // Calculate logo dimensions maintaining aspect ratio
+        let logoWidthMM = logoMaxWidth
+        let logoHeightMM = logoMaxWidth
+        if (logoWidth > 0 && logoHeight > 0) {
+          const aspectRatio = logoWidth / logoHeight
+          logoWidthMM = logoMaxWidth
+          logoHeightMM = logoMaxWidth / aspectRatio
+        }
         
         // Calculate QR position (left side, vertically centered)
         const qrX = margin + 5
@@ -195,11 +219,11 @@ export function TablesList({ initialTables }: TablesListProps) {
           pdf.text(`Código: ${table.shortCode}`, textX, textStartY + 7)
         }
 
-        // Logo - below code text
+        // Logo - below code text (maintain aspect ratio)
         if (logoDataURL) {
           const logoX = textX
           const logoY = textStartY + 10
-          pdf.addImage(logoDataURL, 'PNG', logoX, logoY, logoSize, logoSize)
+          pdf.addImage(logoDataURL, 'PNG', logoX, logoY, logoWidthMM, logoHeightMM)
         }
       }
 
