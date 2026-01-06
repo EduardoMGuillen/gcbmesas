@@ -16,6 +16,7 @@ interface CustomerOrderViewProps {
     id: string
     initialBalance: string | number
     currentBalance: string | number
+    status?: 'OPEN' | 'CLOSED'
     orders: Array<{
       id: string
       product: { name: string; price: string | number }
@@ -231,7 +232,7 @@ export function CustomerOrderView({
     try {
       await closeAccount(account.id)
       router.refresh()
-      setAccount({ ...account, status: 'CLOSED' })
+      setAccount({ ...account, status: 'CLOSED' as const })
     } catch (err: any) {
       setError(err.message || 'Error al cerrar cuenta')
     } finally {
@@ -419,7 +420,7 @@ export function CustomerOrderView({
                     >
                       Agregar Pedido
                     </button>
-                    {isMesero && account.status === 'OPEN' && (
+                    {isMesero && (account.status === 'OPEN' || !account.status) && (
                       <button
                         onClick={handleCloseAccount}
                         disabled={loading}
