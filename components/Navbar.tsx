@@ -21,6 +21,7 @@ export function Navbar() {
     { href: '/admin/inventario', label: 'Inventario', match: pathname?.startsWith('/admin/inventario') },
     { href: '/admin/usuarios', label: 'Usuarios', match: pathname?.startsWith('/admin/usuarios') },
     { href: '/admin/logs', label: 'Logs', match: pathname?.startsWith('/admin/logs') },
+    { href: '/mesero', label: 'Mesero', match: pathname?.startsWith('/mesero') },
     { href: '/cajero', label: 'Cajero', match: pathname?.startsWith('/cajero') },
   ]
 
