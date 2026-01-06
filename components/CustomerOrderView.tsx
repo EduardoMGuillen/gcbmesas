@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createCustomerOrder, createOrder } from '@/lib/actions'
+import { createCustomerOrder, createOrder, closeAccount } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
@@ -222,6 +222,23 @@ export function CustomerOrderView({
     }
   }
 
+  const handleCloseAccount = async () => {
+    if (!confirm('¿Estás seguro de cerrar esta cuenta?')) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      await closeAccount(account.id)
+      router.refresh()
+      setAccount({ ...account, status: 'CLOSED' })
+    } catch (err: any) {
+      setError(err.message || 'Error al cerrar cuenta')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(productSearchTerm.toLowerCase())
     const matchesCategory = !selectedCategory || product.category === selectedCategory
@@ -395,12 +412,23 @@ export function CustomerOrderView({
               <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-semibold text-white">Pedidos</h2>
-                  <button
-                    onClick={() => setShowAddProduct(true)}
-                    className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
-                  >
-                    Agregar Pedido
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowAddProduct(true)}
+                      className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                    >
+                      Agregar Pedido
+                    </button>
+                    {isMesero && account.status === 'OPEN' && (
+                      <button
+                        onClick={handleCloseAccount}
+                        disabled={loading}
+                        className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
+                      >
+                        Cerrar Cuenta
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {account.orders.length === 0 ? (
