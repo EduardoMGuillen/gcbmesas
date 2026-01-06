@@ -70,12 +70,53 @@ export function CustomerOrderView({
   const [error, setError] = useState('')
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
+  const [selectedZone, setSelectedZone] = useState<string>('')
   const [showCreateAccount, setShowCreateAccount] = useState(false)
   const [initialBalance, setInitialBalance] = useState('')
   const router = useRouter()
 
-  // No necesitamos actualizar table/account localmente cuando cambia selectedTableId
-  // El cambio de mesa se maneja redirigiendo a la página con el nuevo tableId
+  // Actualizar estado cuando cambia initialTableId (refrescar al cambiar mesa)
+  useEffect(() => {
+    if (initialTableId && initialTableId !== selectedTableId) {
+      setSelectedTableId(initialTableId)
+      // Si hay una nueva mesa, actualizar table y account
+      if (tables) {
+        const newTable = tables.find(t => t.id === initialTableId)
+        if (newTable) {
+          setTable({
+            id: newTable.id,
+            name: newTable.name,
+            shortCode: newTable.name,
+            zone: newTable.zone || null,
+          })
+          const newAccount = newTable.accounts?.[0]
+          if (newAccount) {
+            setAccount({
+              id: newAccount.id,
+              initialBalance: newAccount.initialBalance,
+              currentBalance: newAccount.currentBalance,
+              orders: [],
+            })
+            setShowCreateAccount(false)
+          } else {
+            setAccount({
+              id: '',
+              initialBalance: 0,
+              currentBalance: 0,
+              orders: [],
+            })
+            if (isMesero) {
+              setShowCreateAccount(true)
+            }
+          }
+        }
+      }
+    } else if (initialTableId === selectedTableId) {
+      // Actualizar table y account con los props actuales
+      setTable(initialTable)
+      setAccount(initialAccount)
+    }
+  }, [initialTableId, initialTable, initialAccount, tables, isMesero, selectedTableId])
 
   // Si se pasa un initialTableId y no tiene cuenta, mostrar el formulario de crear cuenta automáticamente
   useEffect(() => {
@@ -184,30 +225,56 @@ export function CustomerOrderView({
     <div>
       {/* Selector de mesa para meseros */}
       {isMesero && tables && (
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-dark-300 mb-2">
-            Seleccionar Mesa
-          </label>
-          <select
-            value={selectedTableId}
-            onChange={(e) => {
-              const newTableId = e.target.value
-              setError('')
-              if (newTableId) {
-                router.push(`${backUrl}?tableId=${newTableId}`)
-              } else {
-                router.push(backUrl)
-              }
-            }}
-            className="w-full px-4 py-3 bg-dark-100 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="">Selecciona una mesa</option>
-            {tables.map((table) => (
-              <option key={table.id} value={table.id}>
-                {table.name} {table.zone ? `- ${table.zone}` : ''}
-              </option>
-            ))}
-          </select>
+        <div className="mb-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-white mb-2">
+              Seleccionar Zona
+            </label>
+            <select
+              value={selectedZone || ''}
+              onChange={(e) => {
+                setSelectedZone(e.target.value)
+                setSelectedTableId('')
+              }}
+              className="w-full px-4 py-3 bg-dark-100 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Selecciona una zona</option>
+              {Array.from(new Set(tables.map(t => t.zone).filter(Boolean))).sort().map((zone) => (
+                <option key={zone} value={zone}>
+                  {zone}
+                </option>
+              ))}
+            </select>
+          </div>
+          {selectedZone && (
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">
+                Seleccionar Mesa
+              </label>
+              <select
+                value={selectedTableId}
+                onChange={(e) => {
+                  const newTableId = e.target.value
+                  setError('')
+                  if (newTableId) {
+                    router.push(`${backUrl}?tableId=${newTableId}`)
+                    router.refresh()
+                  } else {
+                    router.push(backUrl)
+                    router.refresh()
+                  }
+                }}
+                className="w-full px-4 py-3 bg-dark-100 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Selecciona una mesa</option>
+                {tables.filter(t => t.zone === selectedZone).map((table) => (
+                  <option key={table.id} value={table.id}>
+                    {table.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
@@ -219,7 +286,7 @@ export function CustomerOrderView({
           </p>
           <form onSubmit={handleCreateAccount} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-dark-300 mb-2">
+              <label className="block text-sm font-medium text-white mb-2">
                 Saldo Inicial
               </label>
               <input
@@ -262,10 +329,10 @@ export function CustomerOrderView({
           <div className="mb-6 flex justify-between items-start">
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">Mesa: {table.name}</h1>
-              <p className="text-dark-100">
+              <p className="text-white">
                 Código: <span className="font-semibold">{table.shortCode || table.id.slice(0, 8)}</span>
               </p>
-              {table.zone && <p className="text-dark-400">Zona: {table.zone}</p>}
+              {table.zone && <p className="text-white">Zona: {table.zone}</p>}
             </div>
             {!isMesero && (
               <button
@@ -279,7 +346,7 @@ export function CustomerOrderView({
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
-              <h3 className="text-sm font-medium text-dark-400 mb-2">Saldo Disponible</h3>
+              <h3 className="text-sm font-medium text-white mb-2">Saldo Disponible</h3>
               <p
                 className={`text-2xl font-bold ${
                   Number(account.currentBalance) < 0
@@ -291,13 +358,13 @@ export function CustomerOrderView({
               </p>
             </div>
             <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
-              <h3 className="text-sm font-medium text-dark-400 mb-2">Total Consumido</h3>
+              <h3 className="text-sm font-medium text-white mb-2">Total Consumido</h3>
               <p className="text-2xl font-bold text-primary-400">
                 {formatCurrency(totalConsumed)}
               </p>
             </div>
             <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
-              <h3 className="text-sm font-medium text-dark-400 mb-2">Pedidos Pendientes</h3>
+              <h3 className="text-sm font-medium text-white mb-2">Pedidos Pendientes</h3>
               <p className="text-2xl font-bold text-white">
                 {account.orders.filter((o) => !o.served).length}
               </p>
@@ -324,7 +391,7 @@ export function CustomerOrderView({
                 </div>
 
                 {account.orders.length === 0 ? (
-                  <p className="text-dark-400 text-center py-8">
+                  <p className="text-white text-center py-8">
                     No hay pedidos registrados
                   </p>
                 ) : (
@@ -339,10 +406,10 @@ export function CustomerOrderView({
                             <p className="font-semibold text-white">
                               {order.product.name}
                             </p>
-                            <p className="text-sm text-dark-400">
+                            <p className="text-sm text-white">
                               {order.quantity}x {formatCurrency(order.product.price)}
                             </p>
-                            <p className="text-xs text-dark-500 mt-1">
+                            <p className="text-xs text-white/70 mt-1">
                               {formatDate(order.createdAt)}
                             </p>
                           </div>
@@ -396,7 +463,7 @@ export function CustomerOrderView({
             <h2 className="text-2xl font-semibold text-white mb-4">Agregar Pedido</h2>
             <form onSubmit={handleAddOrder} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-dark-300 mb-2">
+                <label className="block text-sm font-medium text-white mb-2">
                   Buscar Producto
                 </label>
                 <input
@@ -410,7 +477,7 @@ export function CustomerOrderView({
 
               {categories.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-dark-300 mb-2">
+                  <label className="block text-sm font-medium text-white mb-2">
                     Categoría
                   </label>
                   <select
@@ -429,7 +496,7 @@ export function CustomerOrderView({
               )}
 
               <div>
-                <label className="block text-sm font-medium text-dark-300 mb-2">
+                <label className="block text-sm font-medium text-white mb-2">
                   Producto
                 </label>
                 <select
@@ -448,7 +515,7 @@ export function CustomerOrderView({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-dark-300 mb-2">
+                <label className="block text-sm font-medium text-white mb-2">
                   Cantidad
                 </label>
                 <input
