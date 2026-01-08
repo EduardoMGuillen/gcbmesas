@@ -37,10 +37,16 @@ export function LogsList({ initialLogs }: LogsListProps) {
   const [logs] = useState(initialLogs)
   const [filter, setFilter] = useState({
     action: '',
+    userSearch: '',
   })
 
   const filteredLogs = logs.filter((log) => {
     if (filter.action && log.action !== filter.action) return false
+    if (filter.userSearch) {
+      const username = log.user?.username || ''
+      const searchLower = filter.userSearch.toLowerCase()
+      if (!username.toLowerCase().includes(searchLower)) return false
+    }
     return true
   })
 
@@ -102,7 +108,32 @@ export function LogsList({ initialLogs }: LogsListProps) {
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">
+              Buscar por Usuario
+            </label>
+            <input
+              type="text"
+              value={filter.userSearch}
+              onChange={(e) => setFilter({ ...filter, userSearch: e.target.value })}
+              placeholder="Escribe el nombre de usuario..."
+              className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
         </div>
+        {(filter.action || filter.userSearch) && (
+          <div className="mt-4 flex items-center justify-between">
+            <span className="text-sm text-dark-400">
+              {filteredLogs.length} log{filteredLogs.length !== 1 ? 's' : ''} encontrado{filteredLogs.length !== 1 ? 's' : ''}
+            </span>
+            <button
+              onClick={() => setFilter({ action: '', userSearch: '' })}
+              className="text-sm text-primary-400 hover:text-primary-300 font-medium"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden">
