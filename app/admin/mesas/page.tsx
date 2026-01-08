@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getTables } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
+import { Footer } from '@/components/Footer'
 import { TablesList } from '@/components/TablesList'
 
 export default async function MesasPage() {
@@ -23,11 +24,12 @@ export default async function MesasPage() {
   const tables = await getTables()
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
         <TablesList initialTables={tables} />
       </main>
+      <Footer />
     </div>
   )
 }

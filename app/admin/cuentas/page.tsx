@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { Navbar } from '@/components/Navbar'
+import { Footer } from '@/components/Footer'
 import { AccountsList } from '@/components/AccountsList'
 
 export default async function CuentasPage() {
@@ -37,19 +38,20 @@ export default async function CuentasPage() {
     })
 
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
           <AccountsList initialAccounts={accounts} />
         </main>
+        <Footer />
       </div>
     )
   } catch (error: any) {
     console.error('Error loading accounts:', error)
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
           <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-6 py-4 rounded-lg">
             <p className="font-semibold mb-2">Error al cargar cuentas</p>
             <p className="text-sm">
@@ -60,6 +62,7 @@ export default async function CuentasPage() {
             </p>
           </div>
         </main>
+        <Footer />
       </div>
     )
   }

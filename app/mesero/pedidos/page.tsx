@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getTables, getProducts, getTableById, createAccount } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
+import { Footer } from '@/components/Footer'
 import { CustomerOrderView } from '@/components/CustomerOrderView'
 import { TableSelector } from '@/components/TableSelector'
 
@@ -77,9 +78,9 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
   }))
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
             Agregar Pedido
@@ -108,6 +109,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
           <TableSelector tables={tablesForView} />
         )}
       </main>
+      <Footer />
     </div>
   )
 }
