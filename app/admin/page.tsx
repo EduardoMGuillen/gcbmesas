@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getDashboardStats } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
+import { Footer } from '@/components/Footer'
 import { CleanUrlParams } from '@/components/CleanUrlParams'
 import { Suspense } from 'react'
 import { formatCurrency } from '@/lib/utils'
@@ -30,12 +31,12 @@ export default async function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col">
       <Suspense fallback={null}>
         <CleanUrlParams />
       </Suspense>
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 flex-1">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">Dashboard</h1>
           <p className="text-sm sm:text-base text-dark-400">Resumen general del sistema</p>
@@ -100,6 +101,7 @@ export default async function AdminDashboard() {
           )}
         </div>
       </main>
+      <Footer />
     </div>
   )
 }

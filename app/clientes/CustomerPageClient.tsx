@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { Footer } from '@/components/Footer'
 
 export function CustomerPageClient() {
   const [manualCode, setManualCode] = useState('')
@@ -349,11 +350,7 @@ export function CustomerPageClient() {
           </form>
         </div>
       </main>
-      <footer className="w-full py-4 text-center">
-        <p className="text-white/60 text-sm">
-          Powered by Nexus Global Suministros
-        </p>
-      </footer>
+      <Footer />
     </div>
   )
 }
