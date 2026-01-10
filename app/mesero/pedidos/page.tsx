@@ -55,6 +55,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
               price: Number(order.price),
               createdAt: order.createdAt,
               served: order.served,
+              rejected: order.rejected || false,
             })),
           }
         : null

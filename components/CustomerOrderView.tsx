@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createCustomerOrder, createOrder, closeAccount } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 
 interface CustomerOrderViewProps {
   table: {
@@ -24,6 +25,7 @@ interface CustomerOrderViewProps {
       price: string | number
       createdAt: string | Date
       served: boolean
+      rejected?: boolean
     }>
   }
   products: Array<{
@@ -75,6 +77,9 @@ export function CustomerOrderView({
   const [showCreateAccount, setShowCreateAccount] = useState(false)
   const [initialBalance, setInitialBalance] = useState('')
   const router = useRouter()
+  
+  // Auto-refresh cada 30 segundos para ver actualizaciones en tiempo real
+  useAutoRefresh({ interval: 30000, enabled: hasOpenAccount })
 
   // Actualizar estado cuando cambia initialTableId (refrescar al cambiar mesa)
   useEffect(() => {
