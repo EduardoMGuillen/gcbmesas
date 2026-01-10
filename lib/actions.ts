@@ -1165,6 +1165,8 @@ export async function createCustomerOrder(data: {
   })
 
   revalidatePath(`/clientes`)
+  revalidatePath(`/clientes?tableId=${account.tableId}`)
+  revalidatePath(`/mesa/${account.tableId}`)
   return result
 }
 
