@@ -225,10 +225,13 @@ export function CustomerOrderView({
       setError('')
       
       // Refresh inmediato para obtener los datos actualizados del pedido
-      // Usar setTimeout para asegurar que el estado se actualice primero
+      // Forzar refresh usando startTransition para mejor sincronización
+      router.refresh()
+      
+      // Refresh adicional después de un pequeño delay para asegurar actualización
       setTimeout(() => {
         router.refresh()
-      }, 100)
+      }, 500)
     } catch (err: any) {
       setError(err.message || 'Error al agregar pedido')
     } finally {

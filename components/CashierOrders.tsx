@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { setOrderServed, rejectOrder } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -38,9 +38,29 @@ export function CashierOrders({
 }: CashierOrdersProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [selectedZone, setSelectedZone] = useState<string>('')
   
   // Auto-refresh cada 15 segundos para ver nuevos pedidos pendientes
   useAutoRefresh({ interval: 15000 })
+
+  // Filtrar pedidos por zona
+  const filteredPendingOrders = pendingOrders.filter((order) => {
+    if (!selectedZone) return true
+    return order.account.table.zone === selectedZone
+  })
+
+  const filteredRecentServed = recentServed.filter((order) => {
+    if (!selectedZone) return true
+    return order.account.table.zone === selectedZone
+  })
+
+  // Obtener zonas únicas de ambos listados
+  const zones = Array.from(
+    new Set([
+      ...pendingOrders.map((o) => o.account.table.zone).filter(Boolean),
+      ...recentServed.map((o) => o.account.table.zone).filter(Boolean),
+    ])
+  ).filter((zone): zone is string => Boolean(zone)).sort()
 
   const handleMarkServed = (orderId: string) => {
     startTransition(async () => {
@@ -64,27 +84,47 @@ export function CashierOrders({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-2xl font-semibold text-white">
-              Pedidos pendientes
-            </h2>
-            <p className="text-sm text-white/80">
-              Marca como realizado cuando el pedido esté listo.
-            </p>
-          </div>
-          <span className="text-sm text-white/80">
-            Total: {pendingOrders.length}
-          </span>
-        </div>
+    <div className="space-y-6">
+      {/* Filtro de zona */}
+      <div className="bg-dark-100 border border-dark-200 rounded-xl p-4">
+        <label className="block text-sm font-medium text-white mb-2">
+          Filtrar por Zona
+        </label>
+        <select
+          value={selectedZone}
+          onChange={(e) => setSelectedZone(e.target.value)}
+          className="w-full sm:w-auto px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          <option value="">Todas las zonas</option>
+          {zones.map((zone) => (
+            <option key={zone} value={zone}>
+              {zone}
+            </option>
+          ))}
+        </select>
+      </div>
 
-        {pendingOrders.length === 0 ? (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-2xl font-semibold text-white">
+                Pedidos pendientes
+              </h2>
+              <p className="text-sm text-white/80">
+                Marca como realizado cuando el pedido esté listo.
+              </p>
+            </div>
+            <span className="text-sm text-white/80">
+              Total: {filteredPendingOrders.length}
+            </span>
+          </div>
+
+          {filteredPendingOrders.length === 0 ? (
           <p className="text-white/80">No hay pedidos pendientes.</p>
         ) : (
           <div className="space-y-4">
-            {pendingOrders.map((order) => (
+            {filteredPendingOrders.map((order) => (
               <div
                 key={order.id}
                 className="border border-dark-200 rounded-lg p-4 bg-dark-50"
@@ -156,11 +196,11 @@ export function CashierOrders({
           </div>
         </div>
 
-        {recentServed.length === 0 ? (
-          <p className="text-white/80">Aún no hay pedidos completados.</p>
+        {filteredRecentServed.length === 0 ? (
+          <p className="text-white/80">Aún no hay pedidos completados{selectedZone ? ` en ${selectedZone}` : ''}.</p>
         ) : (
           <div className="space-y-3">
-            {recentServed.map((order) => (
+            {filteredRecentServed.map((order) => (
               <div
                 key={order.id}
                 className="flex items-center justify-between border-b border-dark-200 pb-3 last:border-b-0"

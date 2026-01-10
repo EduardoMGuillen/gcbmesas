@@ -494,6 +494,37 @@ export async function closeAccount(accountId: string) {
     throw new Error('La cuenta ya está cerrada')
   }
 
+  // Aceptar automáticamente todos los pedidos pendientes (no aceptados ni rechazados)
+  const pendingOrders = account.orders.filter(
+    (order) => !order.served && !order.rejected
+  )
+
+  if (pendingOrders.length > 0) {
+    await prisma.order.updateMany({
+      where: {
+        id: { in: pendingOrders.map((o) => o.id) },
+        accountId: accountId,
+        served: false,
+        rejected: false,
+      },
+      data: {
+        served: true,
+      },
+    })
+
+    // Crear log para indicar que los pedidos fueron aceptados automáticamente
+    await createLog(
+      LogAction.ACCOUNT_CLOSED,
+      currentUser.id,
+      account.tableId,
+      {
+        accountId: accountId,
+        autoAcceptedOrdersCount: pendingOrders.length,
+        autoAcceptedOrderIds: pendingOrders.map((o) => o.id),
+      }
+    )
+  }
+
   const totalConsumed =
     Number(account.initialBalance) - Number(account.currentBalance)
 
@@ -505,13 +536,27 @@ export async function closeAccount(accountId: string) {
     },
   })
 
-  await createLog(LogAction.ACCOUNT_CLOSED, currentUser.id, account.tableId, {
-    accountId,
-    initialBalance: account.initialBalance,
-    totalConsumed,
-    finalBalance: account.currentBalance,
-    ordersCount: account.orders.length,
-  })
+  // El log ya fue creado arriba si hubo pedidos aceptados automáticamente
+  // Si no hubo pedidos pendientes, crear el log aquí
+  if (pendingOrders.length === 0) {
+    await createLog(LogAction.ACCOUNT_CLOSED, currentUser.id, account.tableId, {
+      accountId,
+      initialBalance: account.initialBalance,
+      totalConsumed,
+      finalBalance: account.currentBalance,
+      ordersCount: account.orders.length,
+    })
+  } else {
+    // Actualizar el log existente con información adicional
+    await createLog(LogAction.ACCOUNT_CLOSED, currentUser.id, account.tableId, {
+      accountId,
+      initialBalance: account.initialBalance,
+      totalConsumed,
+      finalBalance: account.currentBalance,
+      ordersCount: account.orders.length,
+      autoAcceptedOrdersCount: pendingOrders.length,
+    })
+  }
 
   revalidatePath(`/mesa/${account.tableId}`)
   revalidatePath('/admin/cuentas')
