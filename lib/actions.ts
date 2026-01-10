@@ -323,7 +323,7 @@ export async function getCashierDashboardData() {
     prisma.order.findMany({
       where: { served: true },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 50, // Aumentado de 20 a 50 para mostrar más pedidos recientes
       include: {
         product: { select: { name: true, price: true } },
         account: {
