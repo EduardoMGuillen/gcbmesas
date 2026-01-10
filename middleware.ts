@@ -22,32 +22,32 @@ const authMiddleware = withAuth(
     const token = req.nextauth.token
     const fromCallback = req.nextUrl.searchParams.get('from') === 'callback'
 
-    // If coming from auth-callback, allow access (session was just verified server-side)
-    if (fromCallback) {
-      return NextResponse.next()
-    }
-
+      // If coming from auth-callback, allow access (session was just verified server-side)
+      if (fromCallback) {
+        return NextResponse.next()
+      }
+      
     // Only verify roles if token is available
     if (token) {
       // Admin routes - only allow ADMIN role
       if (path.startsWith('/admin')) {
         if (token.role !== 'ADMIN') {
-          return NextResponse.redirect(new URL('/login', req.url))
-        }
+        return NextResponse.redirect(new URL('/login', req.url))
       }
+    }
 
-      // Cajero routes - allow CAJERO and ADMIN roles
-      if (path.startsWith('/cajero')) {
+    // Cajero routes - allow CAJERO and ADMIN roles
+    if (path.startsWith('/cajero')) {
         if (!['CAJERO', 'ADMIN'].includes(token.role as string)) {
-          return NextResponse.redirect(new URL('/login', req.url))
-        }
+        return NextResponse.redirect(new URL('/login', req.url))
       }
+    }
 
-      // Mesero routes - allow MESERO and ADMIN roles
-      if (path.startsWith('/mesero')) {
+    // Mesero routes - allow MESERO and ADMIN roles
+    if (path.startsWith('/mesero')) {
         if (!['MESERO', 'ADMIN'].includes(token.role as string)) {
-          return NextResponse.redirect(new URL('/login', req.url))
-        }
+        return NextResponse.redirect(new URL('/login', req.url))
+      }
       }
     }
 

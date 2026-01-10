@@ -18,5 +18,5 @@ export default async function MesaPage({
     redirect(`/clientes?tableId=${tableId}`)
   } else {
     redirect('/clientes')
-  }
+}
 }

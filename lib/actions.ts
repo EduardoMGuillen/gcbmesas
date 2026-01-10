@@ -563,6 +563,56 @@ export async function closeAccount(accountId: string) {
   return closedAccount
 }
 
+export async function addBalanceToAccount(accountId: string, amount: number) {
+  const currentUser = await getCurrentUser()
+
+  // Verificar que el usuario tenga permisos (MESERO o ADMIN)
+  if (!['MESERO', 'ADMIN'].includes(currentUser.role)) {
+    throw new Error('No tienes permisos para agregar saldo a la cuenta')
+  }
+
+  if (amount <= 0) {
+    throw new Error('El monto debe ser mayor a 0')
+  }
+
+  const account = await prisma.account.findUnique({
+    where: { id: accountId },
+    include: {
+      table: true,
+    },
+  })
+
+  if (!account) {
+    throw new Error('Cuenta no encontrada')
+  }
+
+  if (account.status === 'CLOSED') {
+    throw new Error('No se puede agregar saldo a una cuenta cerrada')
+  }
+
+  const newBalance = Number(account.currentBalance) + amount
+
+  const updatedAccount = await prisma.account.update({
+    where: { id: accountId },
+    data: {
+      currentBalance: newBalance,
+    },
+  })
+
+  await createLog(LogAction.ACCOUNT_OPENED, currentUser.id, account.tableId, {
+    accountId: account.id,
+    action: 'BALANCE_ADDED',
+    amountAdded: amount,
+    previousBalance: Number(account.currentBalance),
+    newBalance: newBalance,
+  })
+
+  revalidatePath(`/mesa/${account.tableId}`)
+  revalidatePath(`/clientes?tableId=${account.tableId}`)
+  revalidatePath('/admin/cuentas')
+  return updatedAccount
+}
+
 export async function exportAccountToExcel(accountId: string) {
   const currentUser = await getCurrentUser()
   
