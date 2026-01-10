@@ -127,12 +127,12 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
       </div>
 
       {/* Filtros */}
-      <div className="mb-6 bg-dark-100 border border-dark-200 rounded-xl p-6">
+      <div className="mb-6 bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-white mb-4">Filtros</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Filtro por zona */}
-          <div>
+          <div className="min-w-0">
             <label className="block text-sm font-medium text-dark-300 mb-2">
               Zona
             </label>
@@ -149,7 +149,7 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
           </div>
 
           {/* Filtro por estado */}
-          <div>
+          <div className="min-w-0">
             <label className="block text-sm font-medium text-dark-300 mb-2">
               Estado
             </label>
@@ -165,7 +165,7 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
           </div>
 
           {/* Filtro fecha desde */}
-          <div>
+          <div className="min-w-0">
             <label className="block text-sm font-medium text-dark-300 mb-2">
               Desde
             </label>
@@ -173,12 +173,12 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 sm:px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-0 text-sm"
             />
           </div>
 
           {/* Filtro fecha hasta */}
-          <div>
+          <div className="min-w-0">
             <label className="block text-sm font-medium text-dark-300 mb-2">
               Hasta
             </label>
@@ -186,7 +186,7 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 sm:px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-0 text-sm"
             />
           </div>
         </div>

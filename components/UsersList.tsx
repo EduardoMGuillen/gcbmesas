@@ -128,7 +128,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
       )}
 
       <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px]">
           <thead className="bg-dark-50 border-b border-dark-200">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
@@ -194,6 +195,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showCreateModal && (
