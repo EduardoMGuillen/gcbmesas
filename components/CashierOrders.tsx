@@ -230,6 +230,7 @@ export function CashierOrders({
           </div>
         )}
       </div>
+      </div>
     </div>
   )
 }
