@@ -906,10 +906,16 @@ export async function createOrder(data: {
   })
 
   // Revalidar rutas para que tanto clientes como meseros vean los cambios
+  // Revalidar sin query params primero (más efectivo)
   revalidatePath(`/clientes`, 'page')
+  // Revalidar la ruta dinámica de mesa (funciona mejor que query params)
   revalidatePath(`/mesa/${account.tableId}`, 'page')
+  // Revalidar otras rutas relacionadas
   revalidatePath('/admin/cuentas', 'page')
   revalidatePath('/mesero/pedidos', 'page')
+  revalidatePath('/cajero', 'page')
+  // También revalidar el layout para limpiar cache
+  revalidatePath('/', 'layout')
   return result
 }
 
