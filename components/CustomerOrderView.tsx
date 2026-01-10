@@ -81,8 +81,9 @@ export function CustomerOrderView({
   // Verificar si hay cuenta abierta (convertir a booleano explícitamente)
   const hasOpenAccount = !!(account && account.id)
   
-  // Auto-refresh cada 30 segundos para ver actualizaciones en tiempo real
-  useAutoRefresh({ interval: 30000, enabled: hasOpenAccount })
+  // Auto-refresh cada 20 segundos para clientes y meseros (más frecuente para ver cambios rápidamente)
+  // Solo activo cuando hay cuenta abierta
+  useAutoRefresh({ interval: 20000, enabled: hasOpenAccount })
 
   // Actualizar estado cuando cambia initialTableId (refrescar al cambiar mesa)
   useEffect(() => {
@@ -217,13 +218,17 @@ export function CustomerOrderView({
         })
       }
 
-      // Refresh page to get updated data
-      router.refresh()
-      
+      // Cerrar el formulario primero
       setShowAddProduct(false)
       setSelectedProduct('')
       setQuantity('1')
       setError('')
+      
+      // Refresh inmediato para obtener los datos actualizados del pedido
+      // Usar setTimeout para asegurar que el estado se actualice primero
+      setTimeout(() => {
+        router.refresh()
+      }, 100)
     } catch (err: any) {
       setError(err.message || 'Error al agregar pedido')
     } finally {
