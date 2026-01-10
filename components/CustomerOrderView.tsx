@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
-import { createCustomerOrder, createOrder, closeAccount } from '@/lib/actions'
+import { createCustomerOrder, createOrder, closeAccount, addBalanceToAccount } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
@@ -76,6 +76,10 @@ export function CustomerOrderView({
   const [selectedZone, setSelectedZone] = useState<string>('')
   const [showCreateAccount, setShowCreateAccount] = useState(false)
   const [initialBalance, setInitialBalance] = useState('')
+  const [showAddBalance, setShowAddBalance] = useState(false)
+  const [balanceAmount, setBalanceAmount] = useState('')
+  const [showConfirmAddBalance, setShowConfirmAddBalance] = useState(false)
+  const [pendingBalanceAmount, setPendingBalanceAmount] = useState(0)
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   
@@ -292,6 +296,45 @@ export function CustomerOrderView({
     }
   }
 
+  const handleOpenAddBalanceModal = () => {
+    setShowAddBalance(true)
+    setBalanceAmount('')
+    setError('')
+  }
+
+  const handleConfirmAddBalance = () => {
+    const amount = parseFloat(balanceAmount)
+    if (isNaN(amount) || amount <= 0) {
+      setError('El monto debe ser mayor a 0')
+      return
+    }
+    setPendingBalanceAmount(amount)
+    setShowAddBalance(false)
+    setShowConfirmAddBalance(true)
+  }
+
+  const handleAddBalance = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      await addBalanceToAccount(account.id, pendingBalanceAmount)
+      setAccount({
+        ...account,
+        currentBalance: Number(account.currentBalance) + pendingBalanceAmount,
+      })
+      setShowConfirmAddBalance(false)
+      setPendingBalanceAmount(0)
+      setBalanceAmount('')
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || 'Error al agregar saldo')
+      setShowConfirmAddBalance(false)
+      setShowAddBalance(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(productSearchTerm.toLowerCase())
     const matchesCategory = !selectedCategory || product.category === selectedCategory
@@ -471,7 +514,7 @@ export function CustomerOrderView({
               <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-semibold text-white">Pedidos</h2>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={() => setShowAddProduct(true)}
                       className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
@@ -479,13 +522,22 @@ export function CustomerOrderView({
                       Agregar Pedido
                     </button>
                     {isMesero && (account.status === 'OPEN' || !account.status) && (
-                      <button
-                        onClick={handleCloseAccount}
-                        disabled={loading}
-                        className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
-                      >
-                        Cerrar Cuenta
-                      </button>
+                      <>
+                        <button
+                          onClick={handleOpenAddBalanceModal}
+                          disabled={loading}
+                          className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
+                        >
+                          Agregar saldo a la cuenta
+                        </button>
+                        <button
+                          onClick={handleCloseAccount}
+                          disabled={loading}
+                          className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
+                        >
+                          Cerrar Cuenta
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -654,6 +706,118 @@ export function CustomerOrderView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para agregar saldo */}
+      {showAddBalance && hasOpenAccount && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overscroll-contain">
+          <div className="bg-dark-100 border-t sm:border border-dark-200 rounded-t-2xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full">
+            <h2 className="text-xl sm:text-2xl font-semibold text-white mb-4">
+              Agregar saldo a la cuenta
+            </h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleConfirmAddBalance()
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">
+                  Monto a agregar
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={balanceAmount}
+                  onChange={(e) => setBalanceAmount(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+                  placeholder="0.00"
+                  autoFocus
+                />
+              </div>
+              {error && (
+                <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddBalance(false)
+                    setBalanceAmount('')
+                    setError('')
+                  }}
+                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-3 px-4 rounded-lg transition-colors text-base touch-manipulation"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || !balanceAmount || parseFloat(balanceAmount) <= 0}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 text-base touch-manipulation"
+                >
+                  Continuar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación para agregar saldo */}
+      {showConfirmAddBalance && hasOpenAccount && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overscroll-contain">
+          <div className="bg-dark-100 border-t sm:border border-dark-200 rounded-t-2xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full">
+            <h2 className="text-xl sm:text-2xl font-semibold text-white mb-4">
+              Confirmar agregar saldo
+            </h2>
+            <div className="space-y-4">
+              <div className="bg-dark-50 border border-dark-200 rounded-lg p-4">
+                <p className="text-sm text-dark-300 mb-2">¿Seguro que quieres agregar saldo a la cuenta?</p>
+                <p className="text-lg font-semibold text-white">
+                  Monto: {formatCurrency(pendingBalanceAmount)}
+                </p>
+                <p className="text-sm text-dark-400 mt-2">
+                  Saldo actual: {formatCurrency(account.currentBalance)}
+                </p>
+                <p className="text-sm text-green-400 mt-1 font-semibold">
+                  Nuevo saldo: {formatCurrency(Number(account.currentBalance) + pendingBalanceAmount)}
+                </p>
+              </div>
+              {error && (
+                <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfirmAddBalance(false)
+                    setPendingBalanceAmount(0)
+                    setShowAddBalance(true)
+                    setError('')
+                  }}
+                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-3 px-4 rounded-lg transition-colors text-base touch-manipulation"
+                >
+                  No
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddBalance}
+                  disabled={loading}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 text-base touch-manipulation"
+                >
+                  {loading ? 'Agregando...' : 'Sí, agregar'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -239,14 +239,14 @@ export default function ScanPage() {
           qrbox: window.innerWidth < 640 ? { width: 220, height: 220 } : { width: 300, height: 300 },
           aspectRatio: 1.0,
         },
-        (decodedText: string) => {
+                (decodedText: string) => {
           if (!isMountedRef.current) return
           
-          const parsedId = parseTableId(decodedText)
-          setManualCode(parsedId)
-          stopScanner()
+                  const parsedId = parseTableId(decodedText)
+                  setManualCode(parsedId)
+                  stopScanner()
           router.push(`/mesero/pedidos?tableId=${parsedId}`)
-        },
+                },
         (errorMessage: string) => {
           // Solo loggear errores de escaneo, no son críticos
           console.debug('[QR Scanner] Scanning:', errorMessage)
@@ -260,7 +260,7 @@ export default function ScanPage() {
       await stopScanner()
       
       if (isMountedRef.current) {
-        setIsScanning(false)
+      setIsScanning(false)
       }
     }
   }

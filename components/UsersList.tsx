@@ -127,44 +127,31 @@ export function UsersList({ initialUsers }: UsersListProps) {
         </div>
       )}
 
-      <div className="relative -mx-4 sm:mx-0">
-        <div className="overflow-x-auto overscroll-x-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <div className="inline-block min-w-full sm:min-w-0 sm:w-full px-4 sm:px-0">
-            <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden">
-              <table className="w-full min-w-[640px] table-auto">
-          <thead className="bg-dark-50 border-b border-dark-200">
-            <tr>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
-                Usuario
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
-                Nombre
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
-                Rol
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider hidden sm:table-cell whitespace-nowrap">
-                Creado
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-dark-200">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-dark-50">
-                <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-white">
-                    {user.username}
+      {/* Vista móvil - Cards */}
+      <div className="block md:hidden space-y-3">
+        {users.length === 0 ? (
+          <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center text-dark-400">
+            No hay usuarios registrados
+          </div>
+        ) : (
+          users.map((user) => (
+          <div
+            key={user.id}
+            className="bg-dark-100 border border-dark-200 rounded-xl p-4 space-y-3"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="text-base font-semibold text-white mb-1 truncate">
+                  {user.username}
+                </div>
+                {user.name && (
+                  <div className="text-sm text-dark-300 mb-2 truncate">
+                    {user.name}
                   </div>
-                </td>
-                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-dark-300">
-                  {user.name || '—'}
-                </td>
-                <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                )}
+                <div className="flex items-center gap-2 flex-wrap">
                   <span
-                    className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                       user.role === 'ADMIN'
                         ? 'bg-purple-500/20 text-purple-400'
                         : user.role === 'MESERO'
@@ -174,27 +161,109 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   >
                     {user.role}
                   </span>
-                </td>
-                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-dark-400 hidden sm:table-cell">
-                  {formatDate(user.createdAt)}
-                </td>
-                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2 sm:space-x-3">
-                  <button
-                    onClick={() => openEditModal(user)}
-                    className="text-primary-400 hover:text-primary-300"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(user)}
-                    disabled={deleteLoadingId === user.id}
-                    className="text-red-400 hover:text-red-300 disabled:opacity-50"
-                  >
-                    {deleteLoadingId === user.id ? 'Eliminando...' : 'Eliminar'}
-                  </button>
+                  <span className="text-xs text-dark-400">
+                    {formatDate(user.createdAt)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2 border-t border-dark-200">
+              <button
+                onClick={() => openEditModal(user)}
+                className="flex-1 bg-primary-600/20 hover:bg-primary-600/30 text-primary-400 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => handleDeleteUser(user)}
+                disabled={deleteLoadingId === user.id}
+                className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-medium py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
+              >
+                {deleteLoadingId === user.id ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+          ))
+        )}
+      </div>
+
+      {/* Vista desktop - Tabla */}
+      <div className="hidden md:block relative -mx-4 sm:mx-0">
+        <div className="overflow-x-auto overscroll-x-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="inline-block min-w-full sm:min-w-0 sm:w-full px-4 sm:px-0">
+            <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden">
+              <table className="w-full table-auto">
+          <thead className="bg-dark-50 border-b border-dark-200">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
+                Usuario
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
+                Nombre
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
+                Rol
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
+                Creado
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-dark-200">
+            {users.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center text-dark-400">
+                  No hay usuarios registrados
                 </td>
               </tr>
-            ))}
+            ) : (
+              users.map((user) => (
+                <tr key={user.id} className="hover:bg-dark-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-white">
+                      {user.username}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-300">
+                    {user.name || '—'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                        user.role === 'ADMIN'
+                          ? 'bg-purple-500/20 text-purple-400'
+                          : user.role === 'MESERO'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-green-500/20 text-green-400'
+                      }`}
+                    >
+                      {user.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-400">
+                    {formatDate(user.createdAt)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                    <button
+                      onClick={() => openEditModal(user)}
+                      className="text-primary-400 hover:text-primary-300"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUser(user)}
+                      disabled={deleteLoadingId === user.id}
+                      className="text-red-400 hover:text-red-300 disabled:opacity-50"
+                    >
+                      {deleteLoadingId === user.id ? 'Eliminando...' : 'Eliminar'}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
               </table>
             </div>
@@ -203,12 +272,14 @@ export function UsersList({ initialUsers }: UsersListProps) {
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-dark-100 border border-dark-200 rounded-xl p-6 max-w-md w-full">
-            <h2 className="text-2xl font-semibold text-white mb-4">
-              Crear Usuario
-            </h2>
-            <form onSubmit={handleCreateUser} className="space-y-4">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overscroll-contain">
+          <div className="bg-dark-100 border-t sm:border border-dark-200 rounded-t-2xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] sm:max-h-[85vh] overflow-y-auto overscroll-contain">
+            <div className="sticky top-0 bg-dark-100 pb-4 mb-4 border-b border-dark-200 sm:border-0 sm:pb-0 sm:mb-0">
+              <h2 className="text-xl sm:text-2xl font-semibold text-white">
+                Crear Usuario
+              </h2>
+            </div>
+            <form onSubmit={handleCreateUser} className="space-y-4 pb-4">
               <div>
                 <label className="block text-sm font-medium text-dark-300 mb-2">
                   Usuario
@@ -220,7 +291,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
                     setFormData({ ...formData, username: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+                  autoComplete="username"
                 />
               </div>
               <div>
@@ -233,8 +305,9 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
                   placeholder="Nombre completo"
+                  autoComplete="name"
                 />
               </div>
               <div>
@@ -248,7 +321,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
                     setFormData({ ...formData, password: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+                  autoComplete="new-password"
                 />
               </div>
               <div>
@@ -263,14 +337,14 @@ export function UsersList({ initialUsers }: UsersListProps) {
                       role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO',
                     })
                   }
-                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
                 >
                   <option value="MESERO">Mesero</option>
                   <option value="ADMIN">Administrador</option>
                   <option value="CAJERO">Cajero</option>
                 </select>
               </div>
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -283,14 +357,14 @@ export function UsersList({ initialUsers }: UsersListProps) {
                       name: '',
                     })
                   }}
-                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-3 px-4 rounded-lg transition-colors text-base touch-manipulation"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 text-base touch-manipulation"
                 >
                   {loading ? 'Creando...' : 'Crear'}
                 </button>
@@ -301,12 +375,14 @@ export function UsersList({ initialUsers }: UsersListProps) {
       )}
 
       {editingUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-dark-100 border border-dark-200 rounded-xl p-6 max-w-md w-full">
-            <h2 className="text-2xl font-semibold text-white mb-4">
-              Editar Usuario
-            </h2>
-            <form onSubmit={handleUpdateUser} className="space-y-4">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overscroll-contain">
+          <div className="bg-dark-100 border-t sm:border border-dark-200 rounded-t-2xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] sm:max-h-[85vh] overflow-y-auto overscroll-contain">
+            <div className="sticky top-0 bg-dark-100 pb-4 mb-4 border-b border-dark-200 sm:border-0 sm:pb-0 sm:mb-0">
+              <h2 className="text-xl sm:text-2xl font-semibold text-white">
+                Editar Usuario
+              </h2>
+            </div>
+            <form onSubmit={handleUpdateUser} className="space-y-4 pb-4">
               <div>
                 <label className="block text-sm font-medium text-dark-300 mb-2">
                   Usuario
@@ -318,7 +394,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
                     setFormData({ ...formData, username: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+                  autoComplete="username"
                 />
               </div>
               <div>
@@ -331,7 +408,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+                  autoComplete="name"
                 />
               </div>
               <div>
@@ -344,7 +422,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
                   }
-                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+                  autoComplete="new-password"
                 />
               </div>
               <div>
@@ -359,14 +438,14 @@ export function UsersList({ initialUsers }: UsersListProps) {
                       role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO',
                     })
                   }
-                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
                 >
                   <option value="MESERO">Mesero</option>
                   <option value="ADMIN">Administrador</option>
                   <option value="CAJERO">Cajero</option>
                 </select>
               </div>
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -379,14 +458,14 @@ export function UsersList({ initialUsers }: UsersListProps) {
                       name: '',
                     })
                   }}
-                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-3 px-4 rounded-lg transition-colors text-base touch-manipulation"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 text-base touch-manipulation"
                 >
                   {loading ? 'Guardando...' : 'Guardar'}
                 </button>

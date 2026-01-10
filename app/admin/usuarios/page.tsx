@@ -18,10 +18,8 @@ export default async function UsuariosPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-8 flex-1">
-        <div className="px-4 sm:px-0">
-          <UsersList initialUsers={users} />
-        </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 flex-1 w-full">
+        <UsersList initialUsers={users} />
       </main>
       <Footer />
     </div>
