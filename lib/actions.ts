@@ -905,8 +905,11 @@ export async function createOrder(data: {
     quantity,
   })
 
-  revalidatePath(`/mesa/${account.tableId}`)
-  revalidatePath('/admin/cuentas')
+  // Revalidar rutas para que tanto clientes como meseros vean los cambios
+  revalidatePath(`/clientes`, 'page')
+  revalidatePath(`/mesa/${account.tableId}`, 'page')
+  revalidatePath('/admin/cuentas', 'page')
+  revalidatePath('/mesero/pedidos', 'page')
   return result
 }
 
