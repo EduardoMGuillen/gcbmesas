@@ -87,7 +87,7 @@ export function CustomerOrderView({
   // Esto asegura que cuando un mesero agrega un pedido, el cliente lo vea automáticamente
   // Nota: Usar polling con API para verificar cambios antes de recargar
   // Pausar el autorefresh cuando el usuario está agregando un pedido para no interrumpir su proceso
-  const latestOrderId = account.orders[0]?.id || null
+  const latestOrderId = account.orders[0]?.id || undefined
   const orderCount = account.orders.length
   
   useAutoRefresh({ 
@@ -96,7 +96,7 @@ export function CustomerOrderView({
     forceReload: !isMesero, // Solo forzar recarga para clientes (no meseros)
     pauseWhen: () => loading || showAddProduct, // Pausar si está cargando o mostrando el formulario
     accountId: account.id, // ID de cuenta para verificar nuevos pedidos
-    lastOrderId: latestOrderId, // Último ID conocido
+    lastOrderId: latestOrderId, // Último ID conocido (convertir null a undefined)
     lastOrderCount: orderCount // Último conteo conocido
   })
 
