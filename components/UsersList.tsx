@@ -105,17 +105,17 @@ export function UsersList({ initialUsers }: UsersListProps) {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
+    <div className="w-full">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Usuarios</h1>
-          <p className="text-dark-400">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Usuarios</h1>
+          <p className="text-sm sm:text-base text-dark-400">
             Gestiona los usuarios del sistema
           </p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+          className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm sm:text-base"
         >
           Crear Usuario
         </button>
@@ -127,24 +127,24 @@ export function UsersList({ initialUsers }: UsersListProps) {
         </div>
       )}
 
-      <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden">
+      <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden -mx-4 sm:mx-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[640px] table-auto">
           <thead className="bg-dark-50 border-b border-dark-200">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
                 Usuario
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
                 Nombre
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
                 Rol
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider hidden sm:table-cell">
                 Creado
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-dark-300 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-dark-300 uppercase tracking-wider">
                 Acciones
               </th>
             </tr>
@@ -152,17 +152,17 @@ export function UsersList({ initialUsers }: UsersListProps) {
           <tbody className="divide-y divide-dark-200">
             {users.map((user) => (
               <tr key={user.id} className="hover:bg-dark-50">
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-white">
                     {user.username}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-300">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-dark-300">
                   {user.name || '—'}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
                       user.role === 'ADMIN'
                         ? 'bg-purple-500/20 text-purple-400'
                         : user.role === 'MESERO'
@@ -173,10 +173,10 @@ export function UsersList({ initialUsers }: UsersListProps) {
                     {user.role}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-400">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-dark-400 hidden sm:table-cell">
                   {formatDate(user.createdAt)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2 sm:space-x-3">
                   <button
                     onClick={() => openEditModal(user)}
                     className="text-primary-400 hover:text-primary-300"

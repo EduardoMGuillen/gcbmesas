@@ -131,19 +131,19 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
       </div>
 
       {/* Filtros */}
-      <div className="mb-6 bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Filtros</h2>
+      <div className="mb-6 bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 -mx-4 sm:mx-0">
+        <h2 className="text-base sm:text-lg font-semibold text-white mb-4">Filtros</h2>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Filtro por zona */}
-          <div className="min-w-0">
-            <label className="block text-sm font-medium text-dark-300 mb-2">
+          <div className="min-w-0 w-full">
+            <label className="block text-xs sm:text-sm font-medium text-dark-300 mb-2">
               Zona
             </label>
             <select
               value={selectedZone}
               onChange={(e) => setSelectedZone(e.target.value)}
-              className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 sm:px-4 py-2 text-sm bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="">Todas las zonas</option>
               <option value="Astronomical">Astronomical</option>
@@ -153,14 +153,14 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
           </div>
 
           {/* Filtro por estado */}
-          <div className="min-w-0">
-            <label className="block text-sm font-medium text-dark-300 mb-2">
+          <div className="min-w-0 w-full">
+            <label className="block text-xs sm:text-sm font-medium text-dark-300 mb-2">
               Estado
             </label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 sm:px-4 py-2 text-sm bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="">Todas</option>
               <option value="OPEN">Abiertas</option>
@@ -169,28 +169,30 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
           </div>
 
           {/* Filtro fecha desde */}
-          <div className="min-w-0">
-            <label className="block text-sm font-medium text-dark-300 mb-2">
+          <div className="min-w-0 w-full overflow-hidden">
+            <label className="block text-xs sm:text-sm font-medium text-dark-300 mb-2">
               Desde
             </label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 sm:px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-0 text-sm"
+              className="w-full px-3 py-2 text-sm bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
             />
           </div>
 
           {/* Filtro fecha hasta */}
-          <div className="min-w-0">
-            <label className="block text-sm font-medium text-dark-300 mb-2">
+          <div className="min-w-0 w-full overflow-hidden">
+            <label className="block text-xs sm:text-sm font-medium text-dark-300 mb-2">
               Hasta
             </label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 sm:px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-0 text-sm"
+              className="w-full px-3 py-2 text-sm bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
             />
           </div>
         </div>
