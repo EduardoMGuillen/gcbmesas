@@ -512,34 +512,42 @@ export function CustomerOrderView({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-white">Pedidos</h2>
-                  <div className="flex gap-2 flex-wrap">
-                    <button
-                      onClick={() => setShowAddProduct(true)}
-                      className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
-                    >
-                      Agregar Pedido
-                    </button>
-                    {isMesero && (account.status === 'OPEN' || !account.status) && (
-                      <>
-                        <button
-                          onClick={handleOpenAddBalanceModal}
-                          disabled={loading}
-                          className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
-                        >
-                          Agregar saldo a la cuenta
-                        </button>
-                        <button
-                          onClick={handleCloseAccount}
-                          disabled={loading}
-                          className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
-                        >
-                          Cerrar Cuenta
-                        </button>
-                      </>
+                <div className="mb-6">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
+                    <h2 className="text-xl font-semibold text-white">Pedidos</h2>
+                    {!isMesero && (
+                      <button
+                        onClick={() => setShowAddProduct(true)}
+                        className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm w-full sm:w-auto sm:flex-shrink-0"
+                      >
+                        Agregar Pedido
+                      </button>
                     )}
                   </div>
+                  {isMesero && (account.status === 'OPEN' || !account.status) && (
+                    <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                      <button
+                        onClick={() => setShowAddProduct(true)}
+                        className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm w-full sm:w-auto"
+                      >
+                        Agregar Pedido
+                      </button>
+                      <button
+                        onClick={handleOpenAddBalanceModal}
+                        disabled={loading}
+                        className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm w-full sm:w-auto"
+                      >
+                        Agregar saldo a la cuenta
+                      </button>
+                      <button
+                        onClick={handleCloseAccount}
+                        disabled={loading}
+                        className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm w-full sm:w-auto"
+                      >
+                        Cerrar Cuenta
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {account.orders.length === 0 ? (
