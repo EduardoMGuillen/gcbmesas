@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { createCustomerOrder, createOrder, closeAccount } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
@@ -77,6 +77,7 @@ export function CustomerOrderView({
   const [showCreateAccount, setShowCreateAccount] = useState(false)
   const [initialBalance, setInitialBalance] = useState('')
   const router = useRouter()
+  const [isPending, startTransition] = useTransition()
   
   // Verificar si hay cuenta abierta (convertir a booleano explícitamente)
   const hasOpenAccount = !!(account && account.id)
@@ -225,13 +226,15 @@ export function CustomerOrderView({
       setError('')
       
       // Refresh inmediato para obtener los datos actualizados del pedido
-      // Forzar refresh usando startTransition para mejor sincronización
-      router.refresh()
+      // Usar startTransition para mejor sincronización con React
+      startTransition(() => {
+        router.refresh()
+      })
       
-      // Refresh adicional después de un pequeño delay para asegurar actualización
+      // Refresh adicional después de un delay para asegurar actualización completa
       setTimeout(() => {
         router.refresh()
-      }, 500)
+      }, 800)
     } catch (err: any) {
       setError(err.message || 'Error al agregar pedido')
     } finally {
@@ -274,14 +277,22 @@ export function CustomerOrderView({
             <label className="block text-sm font-medium text-white mb-2">
               Seleccionar Zona
             </label>
-            <select
-              value={selectedZone || ''}
-              onChange={(e) => {
-                setSelectedZone(e.target.value)
-                setSelectedTableId('')
-              }}
-              className="w-full px-4 py-3 bg-dark-100 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
+              <select
+                value={selectedZone || ''}
+                onChange={(e) => {
+                  const newZone = e.target.value
+                  setSelectedZone(newZone)
+                  setSelectedTableId('')
+                  // Si había una mesa seleccionada, limpiar la URL y refrescar
+                  if (selectedTableId) {
+                    router.push(backUrl)
+                    setTimeout(() => {
+                      router.refresh()
+                    }, 100)
+                  }
+                }}
+                className="w-full px-4 py-3 bg-dark-100 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
               <option value="">Selecciona una zona</option>
               {Array.from(new Set(tables.map(t => t.zone).filter((zone): zone is string => Boolean(zone)))).sort().map((zone) => (
                 <option key={zone} value={zone}>
