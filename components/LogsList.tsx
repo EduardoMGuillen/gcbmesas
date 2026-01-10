@@ -74,16 +74,16 @@ export function LogsList({ initialLogs }: LogsListProps) {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Logs</h1>
-          <p className="text-dark-400">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Logs</h1>
+          <p className="text-sm sm:text-base text-dark-400">
             Registro de todas las actividades del sistema
           </p>
         </div>
         <button
           onClick={exportToCSV}
-          className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+          className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm sm:text-base"
         >
           Exportar CSV
         </button>
@@ -136,8 +136,8 @@ export function LogsList({ initialLogs }: LogsListProps) {
         )}
       </div>
 
-      <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden -mx-4 sm:mx-0">
-        <div className="overflow-x-auto">
+      <div className="w-full overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden min-w-full sm:min-w-0">
           <table className="w-full min-w-[800px] table-auto">
             <thead className="bg-dark-50 border-b border-dark-200">
               <tr>

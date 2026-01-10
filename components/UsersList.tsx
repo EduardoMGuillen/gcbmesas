@@ -127,8 +127,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
         </div>
       )}
 
-      <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden -mx-4 sm:mx-0">
-        <div className="overflow-x-auto">
+      <div className="w-full overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden min-w-full sm:min-w-0">
           <table className="w-full min-w-[640px] table-auto">
           <thead className="bg-dark-50 border-b border-dark-200">
             <tr>
@@ -194,7 +194,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
         </div>
       </div>
 
