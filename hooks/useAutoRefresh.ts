@@ -14,7 +14,7 @@ interface UseAutoRefreshOptions {
 export function useAutoRefresh(options: UseAutoRefreshOptions = {}) {
   const { interval = 30000, enabled = true } = options
   const router = useRouter()
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     if (!enabled) {
