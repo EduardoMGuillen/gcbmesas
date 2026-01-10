@@ -5,6 +5,7 @@ interface UseAutoRefreshOptions {
   interval?: number // Intervalo en milisegundos (default: 30000 = 30 segundos)
   enabled?: boolean // Si está habilitado o no (default: true)
   forceReload?: boolean // Si debe forzar recarga completa en lugar de solo refresh (default: false)
+  pauseWhen?: () => boolean // Función que retorna true si debe pausar el autorefresh (default: undefined)
 }
 
 /**
@@ -13,7 +14,7 @@ interface UseAutoRefreshOptions {
  * @returns Función para refrescar manualmente si es necesario
  */
 export function useAutoRefresh(options: UseAutoRefreshOptions = {}) {
-  const { interval = 30000, enabled = true, forceReload = false } = options
+  const { interval = 30000, enabled = true, forceReload = false, pauseWhen } = options
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -31,6 +32,11 @@ export function useAutoRefresh(options: UseAutoRefreshOptions = {}) {
 
     // Configurar nuevo intervalo
     intervalRef.current = setInterval(() => {
+      // Pausar si la función pauseWhen retorna true (por ejemplo, cuando hay una acción en curso)
+      if (pauseWhen && pauseWhen()) {
+        return
+      }
+
       if (forceReload) {
         // Para páginas con query params (como /clientes?tableId=...), forzar recarga completa
         // porque revalidatePath no funciona bien con query params en Next.js
@@ -47,7 +53,7 @@ export function useAutoRefresh(options: UseAutoRefreshOptions = {}) {
         clearInterval(intervalRef.current)
       }
     }
-  }, [router, interval, enabled, forceReload, pathname, searchParams])
+  }, [router, interval, enabled, forceReload, pathname, searchParams, pauseWhen])
 
   // Función para refrescar manualmente
   const refresh = () => {

@@ -86,11 +86,12 @@ export function CustomerOrderView({
   // Solo activo cuando hay cuenta abierta
   // Esto asegura que cuando un mesero agrega un pedido, el cliente lo vea automáticamente
   // Nota: Usar forceReload=true porque revalidatePath no funciona bien con query params en Next.js
-  // y necesitamos forzar recarga completa para obtener datos frescos
+  // Pausar el autorefresh cuando el usuario está agregando un pedido para no interrumpir su proceso
   useAutoRefresh({ 
     interval: 5000, 
     enabled: hasOpenAccount,
-    forceReload: !isMesero // Solo forzar recarga para clientes (no meseros)
+    forceReload: !isMesero, // Solo forzar recarga para clientes (no meseros)
+    pauseWhen: () => loading || showAddProduct // Pausar si está cargando o mostrando el formulario
   })
 
   // Actualizar estado cuando cambia initialTableId (refrescar al cambiar mesa)
