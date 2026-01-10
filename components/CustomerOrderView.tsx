@@ -211,30 +211,49 @@ export function CustomerOrderView({
           productId: selectedProduct,
           quantity: quantityNum,
         })
+        
+        // Cerrar el formulario primero
+        setShowAddProduct(false)
+        setSelectedProduct('')
+        setQuantity('1')
+        setError('')
+        
+        // Refresh inmediato para obtener los datos actualizados del pedido
+        startTransition(() => {
+          router.refresh()
+        })
+        
+        // Refresh adicional después de un delay para asegurar actualización completa
+        setTimeout(() => {
+          router.refresh()
+        }, 800)
       } else {
+        // Para clientes, asegurar que la acción se complete antes de refrescar
         await createCustomerOrder({
           accountId: account.id,
           productId: selectedProduct,
           quantity: quantityNum,
         })
+        
+        // Cerrar el formulario primero
+        setShowAddProduct(false)
+        setSelectedProduct('')
+        setQuantity('1')
+        setError('')
+        
+        // Para clientes, hacer refresh más agresivo porque revalidatePath puede no funcionar bien con query params
+        // Forzar refresh inmediato
+        router.refresh()
+        
+        // Refresh adicional después de delays más largos para asegurar que el servidor procese todo
+        setTimeout(() => {
+          router.refresh()
+        }, 500)
+        
+        setTimeout(() => {
+          router.refresh()
+        }, 1200)
       }
-
-      // Cerrar el formulario primero
-      setShowAddProduct(false)
-      setSelectedProduct('')
-      setQuantity('1')
-      setError('')
-      
-      // Refresh inmediato para obtener los datos actualizados del pedido
-      // Usar startTransition para mejor sincronización con React
-      startTransition(() => {
-        router.refresh()
-      })
-      
-      // Refresh adicional después de un delay para asegurar actualización completa
-      setTimeout(() => {
-        router.refresh()
-      }, 800)
     } catch (err: any) {
       setError(err.message || 'Error al agregar pedido')
     } finally {
