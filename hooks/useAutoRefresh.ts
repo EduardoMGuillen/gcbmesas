@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 
 interface UseAutoRefreshOptions {
   interval?: number // Intervalo en milisegundos (default: 30000 = 30 segundos)
   enabled?: boolean // Si está habilitado o no (default: true)
+  forceReload?: boolean // Si debe forzar recarga completa en lugar de solo refresh (default: false)
 }
 
 /**
@@ -12,8 +13,10 @@ interface UseAutoRefreshOptions {
  * @returns Función para refrescar manualmente si es necesario
  */
 export function useAutoRefresh(options: UseAutoRefreshOptions = {}) {
-  const { interval = 30000, enabled = true } = options
+  const { interval = 30000, enabled = true, forceReload = false } = options
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -28,7 +31,14 @@ export function useAutoRefresh(options: UseAutoRefreshOptions = {}) {
 
     // Configurar nuevo intervalo
     intervalRef.current = setInterval(() => {
-      router.refresh()
+      if (forceReload) {
+        // Para páginas con query params (como /clientes?tableId=...), forzar recarga completa
+        // porque revalidatePath no funciona bien con query params en Next.js
+        const currentUrl = window.location.href
+        window.location.href = currentUrl
+      } else {
+        router.refresh()
+      }
     }, interval)
 
     // Limpiar al desmontar o cuando cambian las opciones
@@ -37,11 +47,16 @@ export function useAutoRefresh(options: UseAutoRefreshOptions = {}) {
         clearInterval(intervalRef.current)
       }
     }
-  }, [router, interval, enabled])
+  }, [router, interval, enabled, forceReload, pathname, searchParams])
 
   // Función para refrescar manualmente
   const refresh = () => {
-    router.refresh()
+    if (forceReload) {
+      const currentUrl = window.location.href
+      window.location.href = currentUrl
+    } else {
+      router.refresh()
+    }
   }
 
   return { refresh }
