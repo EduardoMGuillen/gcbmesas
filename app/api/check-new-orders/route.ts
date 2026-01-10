@@ -41,8 +41,10 @@ export async function GET(request: NextRequest) {
     const latestOrderId = account.orders[0]?.id || null
 
     // Verificar si hay cambios
+    // Comparar IDs (manejar null/undefined correctamente)
+    const lastId = lastOrderId || null
     const hasNewOrders =
-      lastOrderId !== latestOrderId ||
+      lastId !== latestOrderId ||
       (lastOrderCount !== null &&
         parseInt(lastOrderCount) !== currentOrderCount)
 
