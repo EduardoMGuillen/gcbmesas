@@ -590,12 +590,14 @@ export async function addBalanceToAccount(accountId: string, amount: number) {
     throw new Error('No se puede agregar saldo a una cuenta cerrada')
   }
 
-  const newBalance = Number(account.currentBalance) + amount
+  const newCurrentBalance = Number(account.currentBalance) + amount
+  const newInitialBalance = Number(account.initialBalance) + amount
 
   const updatedAccount = await prisma.account.update({
     where: { id: accountId },
     data: {
-      currentBalance: newBalance,
+      initialBalance: newInitialBalance,
+      currentBalance: newCurrentBalance,
     },
   })
 
@@ -603,8 +605,10 @@ export async function addBalanceToAccount(accountId: string, amount: number) {
     accountId: account.id,
     action: 'BALANCE_ADDED',
     amountAdded: amount,
-    previousBalance: Number(account.currentBalance),
-    newBalance: newBalance,
+    previousInitialBalance: Number(account.initialBalance),
+    previousCurrentBalance: Number(account.currentBalance),
+    newInitialBalance: newInitialBalance,
+    newCurrentBalance: newCurrentBalance,
   })
 
   revalidatePath(`/mesa/${account.tableId}`)

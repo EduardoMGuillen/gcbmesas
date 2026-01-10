@@ -320,6 +320,7 @@ export function CustomerOrderView({
       await addBalanceToAccount(account.id, pendingBalanceAmount)
       setAccount({
         ...account,
+        initialBalance: Number(account.initialBalance) + pendingBalanceAmount,
         currentBalance: Number(account.currentBalance) + pendingBalanceAmount,
       })
       setShowConfirmAddBalance(false)
