@@ -82,16 +82,22 @@ export function CustomerOrderView({
   // Verificar si hay cuenta abierta (convertir a booleano explícitamente)
   const hasOpenAccount = !!(account && account.id)
   
-  // Auto-refresh cada 5 segundos para clientes (muy frecuente para ver cambios de meseros inmediatamente)
+  // Auto-refresh inteligente: solo recarga cuando hay nuevos pedidos
   // Solo activo cuando hay cuenta abierta
   // Esto asegura que cuando un mesero agrega un pedido, el cliente lo vea automáticamente
-  // Nota: Usar forceReload=true porque revalidatePath no funciona bien con query params en Next.js
+  // Nota: Usar polling con API para verificar cambios antes de recargar
   // Pausar el autorefresh cuando el usuario está agregando un pedido para no interrumpir su proceso
+  const latestOrderId = account.orders[0]?.id || null
+  const orderCount = account.orders.length
+  
   useAutoRefresh({ 
     interval: 5000, 
     enabled: hasOpenAccount,
     forceReload: !isMesero, // Solo forzar recarga para clientes (no meseros)
-    pauseWhen: () => loading || showAddProduct // Pausar si está cargando o mostrando el formulario
+    pauseWhen: () => loading || showAddProduct, // Pausar si está cargando o mostrando el formulario
+    accountId: account.id, // ID de cuenta para verificar nuevos pedidos
+    lastOrderId: latestOrderId, // Último ID conocido
+    lastOrderCount: orderCount // Último conteo conocido
   })
 
   // Actualizar estado cuando cambia initialTableId (refrescar al cambiar mesa)
