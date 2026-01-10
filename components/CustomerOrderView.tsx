@@ -78,8 +78,11 @@ export function CustomerOrderView({
   const [initialBalance, setInitialBalance] = useState('')
   const router = useRouter()
   
+  // Verificar si hay cuenta abierta
+  const hasOpenAccount = account && account.id
+  
   // Auto-refresh cada 30 segundos para ver actualizaciones en tiempo real
-  useAutoRefresh({ interval: 30000, enabled: hasOpenAccount })
+  useAutoRefresh({ interval: 30000, enabled: !!hasOpenAccount })
 
   // Actualizar estado cuando cambia initialTableId (refrescar al cambiar mesa)
   useEffect(() => {
@@ -253,8 +256,6 @@ export function CustomerOrderView({
 
   const totalConsumed =
     Number(account.initialBalance) - Number(account.currentBalance)
-
-  const hasOpenAccount = account && account.id
 
   return (
     <div>
