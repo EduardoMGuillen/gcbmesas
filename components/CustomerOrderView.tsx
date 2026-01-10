@@ -241,18 +241,18 @@ export function CustomerOrderView({
         setQuantity('1')
         setError('')
         
-        // Para clientes, hacer refresh más agresivo porque revalidatePath puede no funcionar bien con query params
-        // Forzar refresh inmediato
+        // Para clientes, usar una estrategia más agresiva porque revalidatePath no funciona bien con query params
+        // Opción 1: Refresh inmediato con router.refresh
         router.refresh()
         
-        // Refresh adicional después de delays más largos para asegurar que el servidor procese todo
+        // Opción 2: Refresh usando window.location para forzar recarga completa si router.refresh falla
+        // Usar un delay más largo para dar tiempo a que router.refresh funcione primero
         setTimeout(() => {
-          router.refresh()
-        }, 500)
-        
-        setTimeout(() => {
-          router.refresh()
-        }, 1200)
+          // Verificar si la página necesita recarga completa
+          // Si después de 1000ms no se ha actualizado, forzar recarga
+          const currentUrl = window.location.href
+          window.location.href = currentUrl // Forzar recarga completa de la página
+        }, 1000)
       }
     } catch (err: any) {
       setError(err.message || 'Error al agregar pedido')

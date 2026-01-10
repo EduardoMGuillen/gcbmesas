@@ -1165,10 +1165,11 @@ export async function createCustomerOrder(data: {
   })
 
   // Revalidar todas las posibles rutas que pueden mostrar esta mesa
+  // Nota: revalidatePath no funciona bien con query params, así que revalidamos sin ellos
   revalidatePath(`/clientes`, 'page')
-  revalidatePath(`/clientes?tableId=${account.tableId}`, 'page')
+  // También revalidar usando el patrón de ruta dinámica
   revalidatePath(`/mesa/${account.tableId}`, 'page')
-  // También revalidar la ruta base para asegurar que el cache se actualice
+  // Forzar revalidación del layout para limpiar cache
   revalidatePath('/', 'layout')
   return result
 }
