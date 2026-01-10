@@ -4,6 +4,7 @@ import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { setOrderServed, rejectOrder } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 
 interface CashierOrdersProps {
   pendingOrders: Array<{
@@ -37,6 +38,9 @@ export function CashierOrders({
 }: CashierOrdersProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  
+  // Auto-refresh cada 15 segundos para ver nuevos pedidos pendientes
+  useAutoRefresh({ interval: 15000 })
 
   const handleMarkServed = (orderId: string) => {
     startTransition(async () => {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 
 interface CashierAccountsProps {
   accounts: Array<{
@@ -24,6 +25,9 @@ interface CashierAccountsProps {
 
 export function CashierAccounts({ accounts }: CashierAccountsProps) {
   const [selectedZone, setSelectedZone] = useState<string>('')
+  
+  // Auto-refresh cada 30 segundos para ver cambios en cuentas
+  useAutoRefresh({ interval: 30000 })
 
   // Filtrar cuentas por zona
   const filteredAccounts = accounts.filter((acc) => {

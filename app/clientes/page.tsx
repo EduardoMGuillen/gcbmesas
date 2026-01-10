@@ -62,6 +62,7 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
         price: Number(order.price),
         createdAt: order.createdAt,
         served: order.served,
+        rejected: order.rejected || false,
       })),
     }
 

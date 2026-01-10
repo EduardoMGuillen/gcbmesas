@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { closeAccount } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 
 interface AccountsListProps {
   initialAccounts: any[]
@@ -18,6 +19,9 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
   const [selectedAccount, setSelectedAccount] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  
+  // Auto-refresh cada 30 segundos para ver cambios en cuentas
+  useAutoRefresh({ interval: 30000 })
 
   // Función auxiliar para comparar solo fechas (sin hora)
   const isSameOrAfterDate = (date: Date, compareDate: Date) => {
