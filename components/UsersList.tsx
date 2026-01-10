@@ -127,24 +127,26 @@ export function UsersList({ initialUsers }: UsersListProps) {
         </div>
       )}
 
-      <div className="w-full overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-        <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden min-w-full sm:min-w-0">
-          <table className="w-full min-w-[640px] table-auto">
+      <div className="relative -mx-4 sm:mx-0">
+        <div className="overflow-x-auto overscroll-x-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="inline-block min-w-full sm:min-w-0 sm:w-full px-4 sm:px-0">
+            <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden">
+              <table className="w-full min-w-[640px] table-auto">
           <thead className="bg-dark-50 border-b border-dark-200">
             <tr>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
                 Usuario
               </th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
                 Nombre
               </th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
                 Rol
               </th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider hidden sm:table-cell">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider hidden sm:table-cell whitespace-nowrap">
                 Creado
               </th>
-              <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-dark-300 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
                 Acciones
               </th>
             </tr>
@@ -152,17 +154,17 @@ export function UsersList({ initialUsers }: UsersListProps) {
           <tbody className="divide-y divide-dark-200">
             {users.map((user) => (
               <tr key={user.id} className="hover:bg-dark-50">
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-white">
                     {user.username}
                   </div>
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-dark-300">
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-dark-300">
                   {user.name || '—'}
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                   <span
-                    className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
+                    className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                       user.role === 'ADMIN'
                         ? 'bg-purple-500/20 text-purple-400'
                         : user.role === 'MESERO'
@@ -173,10 +175,10 @@ export function UsersList({ initialUsers }: UsersListProps) {
                     {user.role}
                   </span>
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-dark-400 hidden sm:table-cell">
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-dark-400 hidden sm:table-cell">
                   {formatDate(user.createdAt)}
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2 sm:space-x-3">
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2 sm:space-x-3">
                   <button
                     onClick={() => openEditModal(user)}
                     className="text-primary-400 hover:text-primary-300"
@@ -194,7 +196,9 @@ export function UsersList({ initialUsers }: UsersListProps) {
               </tr>
             ))}
           </tbody>
-          </table>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 

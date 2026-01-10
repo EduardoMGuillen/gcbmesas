@@ -136,24 +136,26 @@ export function LogsList({ initialLogs }: LogsListProps) {
         )}
       </div>
 
-      <div className="w-full overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-        <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden min-w-full sm:min-w-0">
-          <table className="w-full min-w-[800px] table-auto">
+      <div className="relative -mx-4 sm:mx-0">
+        <div className="overflow-x-auto overscroll-x-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="inline-block min-w-full sm:min-w-0 sm:w-full px-4 sm:px-0">
+            <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden">
+              <table className="w-full min-w-[800px] table-auto">
             <thead className="bg-dark-50 border-b border-dark-200">
               <tr>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
                   Fecha
                 </th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
                   Acción
                 </th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
                   Usuario
                 </th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider hidden sm:table-cell">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider hidden sm:table-cell whitespace-nowrap">
                   Mesa
                 </th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider whitespace-nowrap">
                   Detalles
                 </th>
               </tr>
@@ -168,21 +170,21 @@ export function LogsList({ initialLogs }: LogsListProps) {
               ) : (
                 filteredLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-dark-50">
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-dark-400">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-dark-400">
                       {formatDate(log.createdAt)}
                     </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 sm:px-3 py-1 rounded-full text-xs font-semibold bg-primary-500/20 text-primary-400">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 sm:px-3 py-1 rounded-full text-xs font-semibold bg-primary-500/20 text-primary-400 whitespace-nowrap">
                         {getActionLabel(log.action)}
                       </span>
                     </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-white">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-white">
                       {log.user?.username || 'N/A'}
                     </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-white hidden sm:table-cell">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-white hidden sm:table-cell">
                       {log.table?.name || 'N/A'}
                     </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-dark-400">
+                    <td className="px-3 sm:px-6 py-4 text-sm text-dark-400">
                       <details className="cursor-pointer">
                         <summary className="text-primary-400 hover:text-primary-300">
                           Ver detalles
@@ -196,7 +198,9 @@ export function LogsList({ initialLogs }: LogsListProps) {
                 ))
               )}
             </tbody>
-          </table>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </div>
