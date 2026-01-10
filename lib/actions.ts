@@ -1164,9 +1164,12 @@ export async function createCustomerOrder(data: {
     isCustomerOrder: true,
   })
 
-  revalidatePath(`/clientes`)
-  revalidatePath(`/clientes?tableId=${account.tableId}`)
-  revalidatePath(`/mesa/${account.tableId}`)
+  // Revalidar todas las posibles rutas que pueden mostrar esta mesa
+  revalidatePath(`/clientes`, 'page')
+  revalidatePath(`/clientes?tableId=${account.tableId}`, 'page')
+  revalidatePath(`/mesa/${account.tableId}`, 'page')
+  // También revalidar la ruta base para asegurar que el cache se actualice
+  revalidatePath('/', 'layout')
   return result
 }
 
