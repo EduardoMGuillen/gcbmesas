@@ -138,7 +138,7 @@ export function LogsList({ initialLogs }: LogsListProps) {
 
       <div className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead className="bg-dark-50 border-b border-dark-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">

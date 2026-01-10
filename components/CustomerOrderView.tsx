@@ -461,12 +461,14 @@ export function CustomerOrderView({
                             </p>
                             <span
                               className={`text-xs px-2 py-1 rounded-full ${
-                                order.served
+                                order.rejected === true
+                                  ? 'bg-red-500/20 text-red-400'
+                                  : order.served
                                   ? 'bg-green-500/20 text-green-400'
                                   : 'bg-amber-500/20 text-amber-200'
                               }`}
                             >
-                              {order.served ? 'Listo' : 'Pendiente'}
+                              {order.rejected === true ? 'Rechazado' : order.served ? 'Listo' : 'Pendiente'}
                             </span>
                           </div>
                         </div>
