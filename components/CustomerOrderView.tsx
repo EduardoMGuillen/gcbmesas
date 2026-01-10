@@ -82,10 +82,10 @@ export function CustomerOrderView({
   // Verificar si hay cuenta abierta (convertir a booleano explícitamente)
   const hasOpenAccount = !!(account && account.id)
   
-  // Auto-refresh cada 15 segundos para clientes y meseros (más frecuente para ver cambios rápidamente)
+  // Auto-refresh cada 10 segundos para clientes y meseros (muy frecuente para ver cambios de meseros rápidamente)
   // Solo activo cuando hay cuenta abierta
   // Esto asegura que cuando un mesero agrega un pedido, el cliente lo vea automáticamente
-  useAutoRefresh({ interval: 15000, enabled: hasOpenAccount })
+  useAutoRefresh({ interval: 10000, enabled: hasOpenAccount })
 
   // Actualizar estado cuando cambia initialTableId (refrescar al cambiar mesa)
   useEffect(() => {
