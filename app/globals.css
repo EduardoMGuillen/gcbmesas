@@ -93,6 +93,31 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Category bar scrollbar - always visible */
+.category-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1e293b;
+}
+
+.category-scrollbar::-webkit-scrollbar {
+  height: 8px;
+  display: block !important;
+}
+
+.category-scrollbar::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+.category-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.category-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 /* Prevent layout shift when keyboard appears on mobile */
 @media (max-width: 640px) {
   /* Ensure inputs don't cause layout shift */
