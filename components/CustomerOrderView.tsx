@@ -179,6 +179,23 @@ export function CustomerOrderView({
     )
   ).sort()
 
+  // Establecer BOTELLAS como categoría por defecto cuando se abre el modal
+  useEffect(() => {
+    if (showAddProduct && categories.length > 0) {
+      if (!selectedCategory) {
+        const botellasCategory = categories.find(cat => 
+          cat.toUpperCase().includes('BOTELLA') || cat.toUpperCase() === 'BOTELLAS'
+        )
+        if (botellasCategory) {
+          setSelectedCategory(botellasCategory)
+        } else if (categories.length > 0) {
+          // Si no hay BOTELLAS, usar la primera categoría
+          setSelectedCategory(categories[0])
+        }
+      }
+    }
+  }, [showAddProduct, categories, selectedCategory])
+
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -339,7 +356,8 @@ export function CustomerOrderView({
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(productSearchTerm.toLowerCase())
-    const matchesCategory = !selectedCategory || product.category === selectedCategory
+    // Siempre filtrar por categoría seleccionada (nunca mostrar todas)
+    const matchesCategory = selectedCategory ? product.category === selectedCategory : false
     return matchesSearch && matchesCategory
   })
 
@@ -627,6 +645,7 @@ export function CustomerOrderView({
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-semibold text-white">Agregar Pedido</h2>
               <button
+                type="button"
                 onClick={() => {
                   setShowAddProduct(false)
                   setSelectedProduct('')
@@ -649,11 +668,14 @@ export function CustomerOrderView({
                 {categories.map((category) => (
                   <button
                     key={category}
-                    onClick={() => setSelectedCategory(selectedCategory === category ? '' : category)}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory(category)
+                    }}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
                       selectedCategory === category
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-dark-50 border border-dark-200 text-white hover:bg-dark-200'
+                        ? 'bg-primary-500 text-white shadow-lg'
+                        : 'bg-dark-50 border border-dark-200 text-white hover:bg-dark-200 hover:border-dark-300'
                     }`}
                   >
                     {category}
@@ -671,14 +693,14 @@ export function CustomerOrderView({
               ) : (
                 <div className="grid grid-cols-2 gap-4">
                   {filteredProducts.map((product) => (
-                    <div
+                    <button
                       key={product.id}
+                      type="button"
                       onClick={() => {
                         setSelectedProduct(product.id)
-                        // Abrir modal de cantidad
                         setQuantity('1')
                       }}
-                      className="bg-dark-50 border border-dark-200 rounded-lg p-4 cursor-pointer hover:border-primary-500 transition-colors"
+                      className="bg-dark-50 border border-dark-200 rounded-lg p-4 cursor-pointer hover:border-primary-500 transition-colors text-left w-full"
                     >
                       {/* Emoji */}
                       {product.emoji && (
@@ -703,7 +725,7 @@ export function CustomerOrderView({
                       <p className="text-primary-400 font-bold text-center">
                         {formatCurrency(product.price)}
                       </p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
