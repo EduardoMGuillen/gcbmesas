@@ -33,6 +33,7 @@ interface CustomerOrderViewProps {
     name: string
     price: string | number
     category?: string | null
+    emoji?: string | null
   }>
   // Props opcionales para modo mesero
   tables?: Array<{
@@ -622,99 +623,144 @@ export function CustomerOrderView({
 
       {showAddProduct && hasOpenAccount && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-dark-100 border border-dark-200 rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-semibold text-white mb-4">Agregar Pedido</h2>
-            <form onSubmit={handleAddOrder} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  Buscar Producto
-                </label>
-                <input
-                  type="text"
-                  value={productSearchTerm}
-                  onChange={(e) => setProductSearchTerm(e.target.value)}
-                  placeholder="Buscar..."
-                  className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
+          <div className="bg-dark-100 border border-dark-200 rounded-xl p-6 w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-semibold text-white">Agregar Pedido</h2>
+              <button
+                onClick={() => {
+                  setShowAddProduct(false)
+                  setSelectedProduct('')
+                  setQuantity('1')
+                  setProductSearchTerm('')
+                  setSelectedCategory('')
+                  setError('')
+                }}
+                className="text-white hover:text-red-400 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-              {categories.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Categoría
-                  </label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            {/* Barra de categorías */}
+            {categories.length > 0 && (
+              <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-dark-300 scrollbar-track-dark-100">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setSelectedCategory(selectedCategory === category ? '' : category)}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
+                      selectedCategory === category
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-dark-50 border border-dark-200 text-white hover:bg-dark-200'
+                    }`}
                   >
-                    <option value="">Todas las categorías</option>
-                    {categories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
+                    {category}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Grid de productos */}
+            <div className="flex-1 overflow-y-auto pr-2">
+              {filteredProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-white text-lg">No se encontraron productos</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  {filteredProducts.map((product) => (
+                    <div
+                      key={product.id}
+                      onClick={() => {
+                        setSelectedProduct(product.id)
+                        // Abrir modal de cantidad
+                        setQuantity('1')
+                      }}
+                      className="bg-dark-50 border border-dark-200 rounded-lg p-4 cursor-pointer hover:border-primary-500 transition-colors"
+                    >
+                      {/* Emoji */}
+                      {product.emoji && (
+                        <div className="text-4xl mb-3 text-center">{product.emoji}</div>
+                      )}
+                      
+                      {/* Nombre del producto */}
+                      <h3 className="font-semibold text-white mb-2 text-center text-sm">
+                        {product.name}
+                      </h3>
+                      
+                      {/* Categoría tag */}
+                      {product.category && (
+                        <div className="flex justify-center mb-2">
+                          <span className="bg-primary-600/20 text-primary-400 px-2 py-1 rounded text-xs font-medium">
+                            {product.category}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Precio */}
+                      <p className="text-primary-400 font-bold text-center">
+                        {formatCurrency(product.price)}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  Producto
-                </label>
-                <select
-                  value={selectedProduct}
-                  onChange={(e) => setSelectedProduct(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="">Selecciona un producto</option>
-                  {filteredProducts.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} - {formatCurrency(product.price)}
-                    </option>
-                  ))}
-                </select>
+            {/* Modal de cantidad (se muestra cuando se selecciona un producto) */}
+            {selectedProduct && (
+              <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[60]">
+                <div className="bg-dark-100 border border-dark-200 rounded-xl p-6 max-w-md w-full">
+                  <h3 className="text-xl font-semibold text-white mb-4">Cantidad</h3>
+                  <form
+                    onSubmit={handleAddOrder}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-2">
+                        Cantidad
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        required
+                        autoFocus
+                        className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    {error && (
+                      <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
+                        {error}
+                      </div>
+                    )}
+                    <div className="flex space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedProduct('')
+                          setQuantity('1')
+                          setError('')
+                        }}
+                        className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {loading ? 'Agregando...' : 'Agregar'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  Cantidad
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-
-              <div className="flex space-x-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddProduct(false)
-                    setSelectedProduct('')
-                    setQuantity('1')
-                    setProductSearchTerm('')
-                    setSelectedCategory('')
-                    setError('')
-                  }}
-                  className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {loading ? 'Agregando...' : 'Agregar'}
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}
