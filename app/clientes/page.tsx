@@ -45,7 +45,10 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
       )
     }
 
-    const products = await getProductsPublic()
+    const products = await getProductsPublic().catch((error) => {
+      console.error('Error fetching products:', error)
+      return []
+    })
 
     // Convertir Decimal a number para el componente
     const accountForView = {
@@ -70,8 +73,8 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
       id: p.id,
       name: p.name,
       price: Number(p.price),
-      category: p.category,
-      emoji: p.emoji,
+      category: p.category || null,
+      emoji: p.emoji || null,
     }))
 
     return (
