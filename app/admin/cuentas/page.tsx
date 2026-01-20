@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { AccountsList } from '@/components/AccountsList'
+import { closeOldAccounts } from '@/lib/actions'
 
 export default async function CuentasPage() {
   let session = null
@@ -19,6 +20,17 @@ export default async function CuentasPage() {
   if (!session || (session.user.role !== 'ADMIN' && session.user.role !== 'MESERO')) {
     redirect('/login')
     return
+  }
+
+  // Cerrar automáticamente cuentas abiertas por más de 12 horas
+  try {
+    const closeResults = await closeOldAccounts()
+    if (closeResults.closed > 0) {
+      console.log(`[CuentasPage] Se cerraron automáticamente ${closeResults.closed} cuenta(s) antigua(s)`)
+    }
+  } catch (error: any) {
+    // No fallar la página si hay error al cerrar cuentas antiguas
+    console.error('[CuentasPage] Error al cerrar cuentas antiguas:', error)
   }
 
   try {
