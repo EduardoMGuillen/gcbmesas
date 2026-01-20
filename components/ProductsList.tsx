@@ -26,6 +26,7 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
     name: '',
     price: '',
     category: '',
+    emoji: '',
   })
   const router = useRouter()
 
@@ -60,11 +61,12 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
         name: formData.name,
         price,
         category: formData.category || undefined,
+        emoji: formData.emoji.trim() === '' ? undefined : formData.emoji.trim(),
       })
       setProducts([...products, newProduct])
       // Si el nuevo producto tiene categoría y estamos filtrando por esa categoría, se mostrará automáticamente
       setShowCreateModal(false)
-      setFormData({ name: '', price: '', category: '' })
+      setFormData({ name: '', price: '', category: '', emoji: '' })
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Error al crear producto')
@@ -91,6 +93,10 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
         updateData.price = price
       }
       if (formData.category !== undefined) updateData.category = formData.category
+      if (formData.emoji !== undefined) {
+        // Si el campo está vacío, establecer como null
+        updateData.emoji = formData.emoji.trim() === '' ? null : formData.emoji.trim()
+      }
 
       const updatedProduct = await updateProduct(editingProduct.id, updateData)
       setProducts(
@@ -98,7 +104,7 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
       )
       // Si cambió la categoría y estamos filtrando, ajustar el filtro si es necesario
       setEditingProduct(null)
-      setFormData({ name: '', price: '', category: '' })
+      setFormData({ name: '', price: '', category: '', emoji: '' })
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Error al actualizar producto')
@@ -159,6 +165,7 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
       name: product.name,
       price: product.price.toString(),
       category: product.category || '',
+      emoji: product.emoji || '',
     })
   }
 
@@ -341,13 +348,38 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
                   placeholder="Bebidas, Comida, etc."
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Emoji (opcional)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.emoji}
+                    onChange={(e) =>
+                      setFormData({ ...formData, emoji: e.target.value })
+                    }
+                    placeholder="🍺 📦 🍕 etc."
+                    maxLength={2}
+                    className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white text-2xl text-center focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  {formData.emoji && (
+                    <div className="flex items-center justify-center w-16 bg-dark-50 border border-dark-200 rounded-lg text-3xl">
+                      {formData.emoji}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-dark-400 mt-1">
+                  Ingresa un emoji para mostrar en el grid de productos (máx. 2 caracteres)
+                </p>
+              </div>
               <div className="flex space-x-3">
                 <button
                   type="button"
                   onClick={() => {
                     setShowCreateModal(false)
                     setError('')
-                    setFormData({ name: '', price: '', category: '' })
+                    setFormData({ name: '', price: '', category: '', emoji: '' })
                   }}
                   className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                 >
@@ -416,13 +448,38 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Emoji (opcional)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.emoji}
+                    onChange={(e) =>
+                      setFormData({ ...formData, emoji: e.target.value })
+                    }
+                    placeholder="🍺 📦 🍕 etc."
+                    maxLength={2}
+                    className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white text-2xl text-center focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  {formData.emoji && (
+                    <div className="flex items-center justify-center w-16 bg-dark-50 border border-dark-200 rounded-lg text-3xl">
+                      {formData.emoji}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-dark-400 mt-1">
+                  Ingresa un emoji para mostrar en el grid de productos (máx. 2 caracteres)
+                </p>
+              </div>
               <div className="flex space-x-3">
                 <button
                   type="button"
                   onClick={() => {
                     setEditingProduct(null)
                     setError('')
-                    setFormData({ name: '', price: '', category: '' })
+                    setFormData({ name: '', price: '', category: '', emoji: '' })
                   }}
                   className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                 >

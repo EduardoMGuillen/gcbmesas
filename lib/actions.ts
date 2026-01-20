@@ -835,6 +835,7 @@ export async function createProduct(data: {
   name: string
   price: number
   category?: string
+  emoji?: string
 }) {
   const currentUser = await getCurrentUser()
   if (currentUser.role !== 'ADMIN') {
@@ -846,6 +847,7 @@ export async function createProduct(data: {
       name: data.name,
       price: data.price,
       category: data.category,
+      emoji: data.emoji || null,
       isActive: true,
     },
   })
@@ -866,6 +868,7 @@ export async function updateProduct(
     name?: string
     price?: number
     category?: string
+    emoji?: string | null
     isActive?: boolean
   }
 ) {
