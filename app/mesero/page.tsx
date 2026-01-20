@@ -6,12 +6,24 @@ import { Footer } from '@/components/Footer'
 import { CleanUrlParams } from '@/components/CleanUrlParams'
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { closeOldAccounts } from '@/lib/actions'
 
 export default async function MeseroPage() {
   const session = await getServerSession(authOptions)
 
   if (!session || !['MESERO', 'ADMIN'].includes(session.user.role)) {
     redirect('/login')
+  }
+
+  // Cerrar automáticamente cuentas abiertas por más de 12 horas
+  try {
+    const closeResults = await closeOldAccounts()
+    if (closeResults.closed > 0) {
+      console.log(`[MeseroPage] Se cerraron automáticamente ${closeResults.closed} cuenta(s) antigua(s)`)
+    }
+  } catch (error: any) {
+    // No fallar la página si hay error al cerrar cuentas antiguas
+    console.error('[MeseroPage] Error al cerrar cuentas antiguas:', error)
   }
 
   return (
