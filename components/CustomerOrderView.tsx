@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
-import { createCustomerOrder, createOrder, closeAccount, addBalanceToAccount } from '@/lib/actions'
+import { createCustomerOrder, createOrder, closeAccount, addBalanceToAccount, cancelOrderByCustomer, cancelOrderByMesero } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
+import Image from 'next/image'
 
 interface CustomerOrderViewProps {
   table: {
@@ -354,6 +355,48 @@ export function CustomerOrderView({
     }
   }
 
+  const handleCancelOrder = async (orderId: string) => {
+    if (!confirm('¿Estás seguro de cancelar este pedido? El saldo se revertirá en la cuenta.')) {
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      if (isMesero) {
+        await cancelOrderByMesero(orderId)
+      } else {
+        await cancelOrderByCustomer(orderId)
+      }
+      
+      // Actualizar el estado local
+      const updatedOrders = account.orders.map((o: any) => {
+        if (o.id === orderId) {
+          return { ...o, rejected: true }
+        }
+        return o
+      })
+      
+      // Recalcular el balance (sumar el precio del pedido cancelado)
+      const cancelledOrder = account.orders.find((o: any) => o.id === orderId)
+      const newBalance = cancelledOrder 
+        ? Number(account.currentBalance) + Number(cancelledOrder.price)
+        : account.currentBalance
+
+      setAccount({
+        ...account,
+        orders: updatedOrders,
+        currentBalance: newBalance,
+      })
+
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || 'Error al cancelar pedido')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(productSearchTerm.toLowerCase())
     // Siempre filtrar por categoría seleccionada (nunca mostrar todas)
@@ -478,6 +521,28 @@ export function CustomerOrderView({
       {/* Mostrar contenido principal solo si hay cuenta abierta */}
       {hasOpenAccount && (
         <>
+          {/* Logo Casa Blanca */}
+          <div className="mb-6 text-center">
+            <div className="mb-4 flex justify-center">
+              <Image
+                src="/LogoCasaBlanca.png"
+                alt="Casa Blanca Logo"
+                width={200}
+                height={200}
+                className="object-contain"
+                priority
+              />
+            </div>
+            <a
+              href="https://www.lagrancasablanca.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary-400 hover:text-primary-300 font-medium text-lg transition-colors inline-block"
+            >
+              Ver eventos
+            </a>
+          </div>
+
           <div className="mb-6 flex justify-between items-start">
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">Mesa: {table.name}</h1>
@@ -579,9 +644,22 @@ export function CustomerOrderView({
                     {account.orders.map((order: any) => (
                       <div
                         key={order.id}
-                        className="bg-dark-50 border border-dark-200 rounded-lg p-4"
+                        className="bg-dark-50 border border-dark-200 rounded-lg p-4 relative"
                       >
-                        <div className="flex justify-between items-start">
+                        {/* Botón X para cancelar pedidos pendientes */}
+                        {!order.served && !order.rejected && (account.status === 'OPEN' || !account.status) && (
+                          <button
+                            onClick={() => handleCancelOrder(order.id)}
+                            disabled={loading}
+                            className="absolute top-3 right-3 text-white/60 hover:text-red-400 transition-colors disabled:opacity-50"
+                            title="Cancelar pedido"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                        <div className="flex justify-between items-start pr-8">
                           <div>
                             <p className="font-semibold text-white">
                               {order.product.name}

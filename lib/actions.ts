@@ -448,6 +448,174 @@ export async function rejectOrder(orderId: string) {
   return result
 }
 
+// Cancelar pedido (cliente o mesero)
+export async function cancelOrderByCustomer(orderId: string) {
+  const customerUser = await getOrCreateCustomerUser()
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      account: {
+        select: {
+          id: true,
+          tableId: true,
+          currentBalance: true,
+          status: true,
+        },
+      },
+      product: { select: { name: true, price: true } },
+    },
+  })
+
+  if (!order) {
+    throw new Error('Pedido no encontrado')
+  }
+
+  if (order.rejected === true) {
+    throw new Error('Este pedido ya fue cancelado')
+  }
+
+  if (order.served === true) {
+    throw new Error('No se puede cancelar un pedido que ya fue servido')
+  }
+
+  if (order.account.status === 'CLOSED') {
+    throw new Error('No se puede cancelar un pedido de una cuenta cerrada')
+  }
+
+  // Los clientes pueden cancelar cualquier pedido pendiente de su mesa
+  // (no hay restricción de usuario ya que todos usan el mismo usuario CLIENTE)
+
+  const result = await prisma.$transaction(async (tx) => {
+    const lockedAccount = await tx.account.findUnique({
+      where: { id: order.account.id },
+    })
+
+    if (!lockedAccount) {
+      throw new Error('Cuenta no encontrada')
+    }
+
+    const rejectedOrder = await tx.order.update({
+      where: { id: orderId },
+      data: { rejected: true },
+    })
+
+    const newBalance = Number(lockedAccount.currentBalance) + Number(order.price)
+
+    await tx.account.update({
+      where: { id: order.account.id },
+      data: { currentBalance: newBalance },
+    })
+
+    await tx.log.create({
+      data: {
+        userId: customerUser.id,
+        tableId: order.account.tableId,
+        action: 'ORDER_REJECTED',
+        details: {
+          orderId: order.id,
+          productName: order.product.name,
+          price: order.price.toString(),
+          quantity: order.quantity,
+          reason: 'Cancelado por cliente',
+          cancelledBy: 'CLIENTE',
+        },
+      },
+    })
+
+    return rejectedOrder
+  })
+
+  revalidatePath('/clientes')
+  revalidatePath(`/mesa/${order.account.tableId}`)
+  return result
+}
+
+export async function cancelOrderByMesero(orderId: string) {
+  const currentUser = await getCurrentUser()
+
+  if (!['MESERO', 'ADMIN'].includes(currentUser.role)) {
+    throw new Error('Solo meseros o administradores pueden cancelar pedidos')
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      account: {
+        select: {
+          id: true,
+          tableId: true,
+          currentBalance: true,
+          status: true,
+        },
+      },
+      product: { select: { name: true, price: true } },
+    },
+  })
+
+  if (!order) {
+    throw new Error('Pedido no encontrado')
+  }
+
+  if (order.rejected === true) {
+    throw new Error('Este pedido ya fue cancelado')
+  }
+
+  if (order.served === true) {
+    throw new Error('No se puede cancelar un pedido que ya fue servido')
+  }
+
+  if (order.account.status === 'CLOSED') {
+    throw new Error('No se puede cancelar un pedido de una cuenta cerrada')
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const lockedAccount = await tx.account.findUnique({
+      where: { id: order.account.id },
+    })
+
+    if (!lockedAccount) {
+      throw new Error('Cuenta no encontrada')
+    }
+
+    const rejectedOrder = await tx.order.update({
+      where: { id: orderId },
+      data: { rejected: true },
+    })
+
+    const newBalance = Number(lockedAccount.currentBalance) + Number(order.price)
+
+    await tx.account.update({
+      where: { id: order.account.id },
+      data: { currentBalance: newBalance },
+    })
+
+    await tx.log.create({
+      data: {
+        userId: currentUser.id,
+        tableId: order.account.tableId,
+        action: 'ORDER_REJECTED',
+        details: {
+          orderId: order.id,
+          productName: order.product.name,
+          price: order.price.toString(),
+          quantity: order.quantity,
+          reason: 'Cancelado por mesero',
+          cancelledBy: 'MESERO',
+          cancelledByUser: currentUser.username,
+        },
+      },
+    })
+
+    return rejectedOrder
+  })
+
+  revalidatePath('/mesero')
+  revalidatePath('/mesero/pedidos')
+  revalidatePath(`/mesa/${order.account.tableId}`)
+  return result
+}
+
 // ========== ACCOUNT ACTIONS ==========
 
 export async function createAccount(data: {
