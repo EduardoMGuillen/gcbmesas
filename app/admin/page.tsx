@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { getDashboardStats } from '@/lib/actions'
+import { getDashboardStats, closeOldAccounts } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { CleanUrlParams } from '@/components/CleanUrlParams'
@@ -14,6 +14,17 @@ export default async function AdminDashboard() {
   if (!session || session.user.role !== 'ADMIN') {
     redirect('/login')
     return
+  }
+
+  // Cerrar automáticamente cuentas abiertas por más de 12 horas
+  try {
+    const closeResults = await closeOldAccounts()
+    if (closeResults.closed > 0) {
+      console.log(`[AdminDashboard] Se cerraron automáticamente ${closeResults.closed} cuenta(s) antigua(s)`)
+    }
+  } catch (error: any) {
+    // No fallar la página si hay error al cerrar cuentas antiguas
+    console.error('[AdminDashboard] Error al cerrar cuentas antiguas:', error)
   }
 
   let stats
