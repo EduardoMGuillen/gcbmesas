@@ -71,6 +71,7 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
       name: p.name,
       price: Number(p.price),
       category: p.category,
+      emoji: p.emoji,
     }))
 
     return (

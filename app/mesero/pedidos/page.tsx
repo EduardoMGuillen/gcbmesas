@@ -68,6 +68,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
     name: p.name,
     price: Number(p.price),
     category: p.category,
+    emoji: p.emoji,
   }))
 
   // Preparar tables para la vista
