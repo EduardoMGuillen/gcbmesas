@@ -646,20 +646,7 @@ export function CustomerOrderView({
                         key={order.id}
                         className="bg-dark-50 border border-dark-200 rounded-lg p-4 relative"
                       >
-                        {/* Botón X para cancelar pedidos pendientes */}
-                        {!order.served && !order.rejected && (account.status === 'OPEN' || !account.status) && (
-                          <button
-                            onClick={() => handleCancelOrder(order.id)}
-                            disabled={loading}
-                            className="absolute top-3 right-3 text-white/60 hover:text-red-400 transition-colors disabled:opacity-50"
-                            title="Cancelar pedido"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                        <div className="flex justify-between items-start pr-8">
+                        <div className="flex justify-between items-start">
                           <div>
                             <p className="font-semibold text-white">
                               {order.product.name}
@@ -671,21 +658,36 @@ export function CustomerOrderView({
                               {formatDate(order.createdAt)}
                             </p>
                           </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-white">
-                              {formatCurrency(order.price)}
-                            </p>
-                            <span
-                              className={`text-xs px-2 py-1 rounded-full ${
-                                order.rejected === true
-                                  ? 'bg-red-500/20 text-red-400'
-                                  : order.served
-                                  ? 'bg-green-500/20 text-green-400'
-                                  : 'bg-amber-500/20 text-amber-200'
-                              }`}
-                            >
-                              {order.rejected === true ? 'Rechazado' : order.served ? 'Listo' : 'Pendiente'}
-                            </span>
+                          <div className="flex items-start gap-3">
+                            <div className="text-right">
+                              <p className="font-semibold text-white">
+                                {formatCurrency(order.price)}
+                              </p>
+                              <span
+                                className={`text-xs px-2 py-1 rounded-full ${
+                                  order.rejected === true
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : order.served
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : 'bg-amber-500/20 text-amber-200'
+                                }`}
+                              >
+                                {order.rejected === true ? 'Rechazado' : order.served ? 'Listo' : 'Pendiente'}
+                              </span>
+                            </div>
+                            {/* Botón X para cancelar pedidos pendientes */}
+                            {!order.served && !order.rejected && (account.status === 'OPEN' || !account.status) && (
+                              <button
+                                onClick={() => handleCancelOrder(order.id)}
+                                disabled={loading}
+                                className="text-white/60 hover:text-red-400 transition-colors disabled:opacity-50 flex-shrink-0 mt-0.5"
+                                title="Cancelar pedido"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
