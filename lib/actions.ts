@@ -563,6 +563,97 @@ export async function closeAccount(accountId: string) {
   return closedAccount
 }
 
+// Cerrar automáticamente cuentas abiertas por más de 12 horas
+export async function closeOldAccounts() {
+  const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000)
+
+  // Buscar todas las cuentas abiertas creadas hace más de 12 horas
+  const oldAccounts = await prisma.account.findMany({
+    where: {
+      status: 'OPEN',
+      createdAt: {
+        lt: twelveHoursAgo,
+      },
+    },
+    include: {
+      orders: true,
+      table: true,
+    },
+  })
+
+  const results = {
+    closed: 0,
+    errors: 0,
+    accountIds: [] as string[],
+  }
+
+  // Cerrar cada cuenta encontrada
+  for (const account of oldAccounts) {
+    try {
+      // Aceptar automáticamente todos los pedidos pendientes
+      const pendingOrders = account.orders.filter(
+        (order) => !order.served && !order.rejected
+      )
+
+      if (pendingOrders.length > 0) {
+        await prisma.order.updateMany({
+          where: {
+            id: { in: pendingOrders.map((o) => o.id) },
+            accountId: account.id,
+            served: false,
+            rejected: false,
+          },
+          data: {
+            served: true,
+          },
+        })
+      }
+
+      const totalConsumed =
+        Number(account.initialBalance) - Number(account.currentBalance)
+
+      // Cerrar la cuenta
+      await prisma.account.update({
+        where: { id: account.id },
+        data: {
+          status: 'CLOSED',
+          closedAt: new Date(),
+        },
+      })
+
+      // Crear log indicando cierre automático
+      await createLog(
+        LogAction.ACCOUNT_CLOSED,
+        undefined, // Sin usuario (cierre automático del sistema)
+        account.tableId,
+        {
+          accountId: account.id,
+          autoClosed: true,
+          hoursOpen: Math.round(
+            (Date.now() - account.createdAt.getTime()) / (1000 * 60 * 60)
+          ),
+          initialBalance: account.initialBalance,
+          totalConsumed,
+          finalBalance: account.currentBalance,
+          ordersCount: account.orders.length,
+          autoAcceptedOrdersCount: pendingOrders.length,
+        }
+      )
+
+      revalidatePath(`/mesa/${account.tableId}`)
+      revalidatePath('/admin/cuentas')
+
+      results.closed++
+      results.accountIds.push(account.id)
+    } catch (error: any) {
+      console.error(`Error al cerrar cuenta ${account.id}:`, error)
+      results.errors++
+    }
+  }
+
+  return results
+}
+
 export async function addBalanceToAccount(accountId: string, amount: number) {
   const currentUser = await getCurrentUser()
 

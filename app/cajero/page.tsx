@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { getCashierDashboardData } from '@/lib/actions'
+import { getCashierDashboardData, closeOldAccounts } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { CashierAccounts } from '@/components/CashierAccounts'
@@ -14,6 +14,17 @@ export default async function CajeroPage() {
 
   if (!session || !['CAJERO', 'ADMIN'].includes(session.user.role)) {
     redirect('/login')
+  }
+
+  // Cerrar automáticamente cuentas abiertas por más de 12 horas
+  try {
+    const closeResults = await closeOldAccounts()
+    if (closeResults.closed > 0) {
+      console.log(`[CajeroPage] Se cerraron automáticamente ${closeResults.closed} cuenta(s) antigua(s)`)
+    }
+  } catch (error: any) {
+    // No fallar la página si hay error al cerrar cuentas antiguas
+    console.error('[CajeroPage] Error al cerrar cuentas antiguas:', error)
   }
 
   const { accounts, pendingOrders, recentServed } =

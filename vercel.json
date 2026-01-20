@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/close-old-accounts",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}
