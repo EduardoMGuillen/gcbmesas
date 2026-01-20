@@ -664,7 +664,7 @@ export function CustomerOrderView({
 
             {/* Barra de categorías */}
             {categories.length > 0 && (
-              <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-dark-300 scrollbar-track-dark-100">
+              <div className="flex gap-2 mb-6 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-dark-300 scrollbar-track-dark-100">
                 {categories.map((category) => (
                   <button
                     key={category}
@@ -672,7 +672,7 @@ export function CustomerOrderView({
                     onClick={() => {
                       setSelectedCategory(category)
                     }}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                    className={`px-5 py-3 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
                       selectedCategory === category
                         ? 'bg-primary-500 text-white shadow-lg'
                         : 'bg-dark-50 border border-dark-200 text-white hover:bg-dark-200 hover:border-dark-300'
