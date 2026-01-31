@@ -1,8 +1,12 @@
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AccountsList } from '@/components/AccountsList'
 import { closeOldAccounts } from '@/lib/actions'
 
 export default async function CuentasPage() {
+  const session = await getServerSession(authOptions)
+  const userRole = session?.user?.role as string | undefined
   // Cerrar cuentas antiguas en background (no bloquea la carga)
   closeOldAccounts().catch((err) => {
     console.error('[CuentasPage] Error al cerrar cuentas antiguas:', err)
@@ -38,7 +42,7 @@ export default async function CuentasPage() {
       take: 100,
     })
 
-    return <AccountsList initialAccounts={accounts} />
+    return <AccountsList initialAccounts={accounts} userRole={userRole} />
   } catch (error: any) {
     console.error('Error loading accounts:', error)
     return (
