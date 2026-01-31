@@ -28,7 +28,7 @@ export function usePushNotifications() {
         }
         const tokenPromise = new Promise<string>((resolve, reject) => {
           const timeout = setTimeout(
-            () => reject(new Error('Tiempo de espera agotado. Comprueba conexión a internet y Google Play Services.')),
+            () => reject(new Error('Tiempo de espera agotado. En emulador FCM suele fallar: prueba en un móvil real. Si es dispositivo real, revisa que Google Play Services esté actualizado.')),
             30000
           )
           PushNotifications.addListener(
