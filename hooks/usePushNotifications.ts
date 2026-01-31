@@ -8,7 +8,12 @@ export function usePushNotifications() {
 
   const subscribe = useCallback(async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      setMessage('Tu navegador no soporta notificaciones push')
+      const isWebView = typeof (window as any).Capacitor !== 'undefined' || /wv|WebView/i.test(navigator.userAgent)
+      if (isWebView) {
+        setMessage('Las notificaciones no están disponibles en la app instalada. Abre esta web en Chrome, añádela a pantalla de inicio y actívalas desde ahí.')
+      } else {
+        setMessage('Tu navegador no soporta notificaciones push. Usa Chrome en el móvil (y añade la web a pantalla de inicio) para recibirlas.')
+      }
       setStatus('error')
       return
     }
