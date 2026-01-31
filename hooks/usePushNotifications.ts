@@ -11,21 +11,32 @@ function isCapacitorAndroid(): boolean {
 export function usePushNotifications() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState<string>('')
+  const [logLines, setLogLines] = useState<string[]>([])
+
+  const log = useCallback((line: string) => {
+    setLogLines((prev) => [...prev, line])
+    if (typeof window !== 'undefined') console.log('[Push]', line)
+  }, [])
 
   const subscribe = useCallback(async () => {
     setStatus('loading')
     setMessage('')
+    setLogLines([])
 
     // Android APK: usar FCM con plugin Capacitor
     if (isCapacitorAndroid()) {
       try {
+        log('1. Cargando plugin Capacitor Push...')
         const { PushNotifications } = await import('@capacitor/push-notifications')
+        log('2. Solicitando permiso de notificaciones...')
         const perm = await PushNotifications.requestPermissions()
+        log(`3. Permiso: ${perm.receive}`)
         if (perm.receive !== 'granted') {
           setMessage('Permiso denegado. Activa las notificaciones en Ajustes del dispositivo.')
           setStatus('error')
           return
         }
+        log('4. Añadiendo listeners (registration, registrationError)...')
         const tokenPromise = new Promise<string>((resolve, reject) => {
           const timeout = setTimeout(
             () => reject(new Error('Tiempo de espera agotado. En emulador FCM suele fallar: prueba en un móvil real. Si es dispositivo real, revisa que Google Play Services esté actualizado.')),
@@ -36,6 +47,7 @@ export function usePushNotifications() {
             (ev: { value: string }) => {
               clearTimeout(timeout)
               PushNotifications.removeAllListeners().catch(() => {})
+              log('5. Token FCM recibido (primeros 20 chars: ' + (ev.value || '').slice(0, 20) + '...)')
               resolve(ev.value)
             }
           )
@@ -44,12 +56,15 @@ export function usePushNotifications() {
             (err: { error: string }) => {
               clearTimeout(timeout)
               PushNotifications.removeAllListeners().catch(() => {})
+              log('5. Error FCM: ' + (err?.error || 'desconocido'))
               reject(new Error(err?.error || 'Error al obtener el token de notificaciones'))
             }
           )
         })
+        log('5. Llamando register() y esperando token (máx 30s)...')
         await PushNotifications.register()
         const token = await tokenPromise
+        log('6. Enviando token al servidor...')
         const res = await fetch('/api/push-subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -59,10 +74,12 @@ export function usePushNotifications() {
           const err = await res.json().catch(() => ({}))
           throw new Error(err.error || 'Error al registrar')
         }
+        log('7. Servidor OK. Notificaciones activadas.')
         setMessage('Notificaciones activadas')
         setStatus('success')
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err)
+        log('ERROR: ' + errMsg)
         setMessage(errMsg)
         setStatus('error')
       }
@@ -178,7 +195,7 @@ export function usePushNotifications() {
     }
   }, [])
 
-  return { subscribe, status, message }
+  return { subscribe, status, message, logLines }
 }
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
