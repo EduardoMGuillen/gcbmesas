@@ -56,6 +56,7 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
       initialBalance: Number(account.initialBalance),
       currentBalance: Number(account.currentBalance),
       clientName: account.clientName || null,
+      openedBy: account.openedBy ? { name: account.openedBy.name, username: account.openedBy.username } : null,
       orders: account.orders.map((order: any) => ({
         id: order.id,
         product: {

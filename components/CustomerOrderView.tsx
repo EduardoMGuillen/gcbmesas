@@ -20,6 +20,7 @@ interface CustomerOrderViewProps {
     currentBalance: string | number
     status?: 'OPEN' | 'CLOSED'
     clientName?: string | null
+    openedBy?: { name: string | null; username: string } | null
     orders: Array<{
       id: string
       product: { name: string; price: string | number }
@@ -47,6 +48,7 @@ interface CustomerOrderViewProps {
       initialBalance: string | number
       currentBalance: string | number
       clientName?: string | null
+      openedBy?: { name: string | null; username: string } | null
     }>
   }>
   initialTableId?: string
@@ -135,6 +137,7 @@ export function CustomerOrderView({
               initialBalance: newAccount.initialBalance,
               currentBalance: newAccount.currentBalance,
               clientName: newAccount.clientName ?? null,
+              openedBy: newAccount.openedBy ?? null,
               orders: [],
             })
             setShowCreateAccount(false)
@@ -587,6 +590,9 @@ export function CustomerOrderView({
               {table.zone && <p className="text-white">Zona: {table.zone}</p>}
               {account.clientName && (
                 <p className="text-primary-400 font-medium">Cliente: {account.clientName}</p>
+              )}
+              {account.openedBy && (
+                <p className="text-white/90">Mesero: {account.openedBy.name || account.openedBy.username}</p>
               )}
             </div>
             {!isMesero && (
