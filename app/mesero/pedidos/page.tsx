@@ -11,9 +11,9 @@ interface PedidosPageProps {
   searchParams: { tableId?: string }
 }
 
-async function createAccountAction(tableId: string, initialBalance: number, clientName?: string | null) {
+async function createAccountAction(tableId: string, initialBalance: number) {
   'use server'
-  await createAccount({ tableId, initialBalance, clientName })
+  await createAccount({ tableId, initialBalance })
 }
 
 export default async function PedidosPage({ searchParams }: PedidosPageProps) {
@@ -45,7 +45,6 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
             id: tableData.accounts[0].id,
             initialBalance: Number(tableData.accounts[0].initialBalance),
             currentBalance: Number(tableData.accounts[0].currentBalance),
-            clientName: tableData.accounts[0].clientName || null,
             orders: tableData.accounts[0].orders.map((order: any) => ({
               id: order.id,
               product: {

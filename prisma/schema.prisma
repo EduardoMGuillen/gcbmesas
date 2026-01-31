@@ -82,7 +82,6 @@ model Account {
   createdAt       DateTime      @default(now())
   closedAt        DateTime?
   openedByUserId  String?
-  clientName      String?
 
   table      Table   @relation(fields: [tableId], references: [id], onDelete: Cascade)
   openedBy   User?   @relation(fields: [openedByUserId], references: [id], onDelete: SetNull)

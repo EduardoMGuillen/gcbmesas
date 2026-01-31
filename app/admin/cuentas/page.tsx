@@ -36,7 +36,6 @@ export default async function CuentasPage() {
         status: true,
         createdAt: true,
         closedAt: true,
-        clientName: true,
         table: { select: { id: true, name: true, zone: true, shortCode: true } },
         openedBy: { select: { name: true, username: true } },
         orders: {

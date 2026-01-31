@@ -19,7 +19,6 @@ interface CustomerOrderViewProps {
     initialBalance: string | number
     currentBalance: string | number
     status?: 'OPEN' | 'CLOSED'
-    clientName?: string | null
     orders: Array<{
       id: string
       product: { name: string; price: string | number }
@@ -50,7 +49,7 @@ interface CustomerOrderViewProps {
   }>
   initialTableId?: string
   isMesero?: boolean
-  onCreateAccount?: (tableId: string, initialBalance: number, clientName?: string | null) => Promise<void>
+  onCreateAccount?: (tableId: string, initialBalance: number) => Promise<void>
   onChangeTable?: (tableId: string) => void
   backUrl?: string
 }
@@ -79,7 +78,6 @@ export function CustomerOrderView({
   const [selectedZone, setSelectedZone] = useState<string>('')
   const [showCreateAccount, setShowCreateAccount] = useState(false)
   const [initialBalance, setInitialBalance] = useState('')
-  const [clientName, setClientName] = useState('')
   const [showAddBalance, setShowAddBalance] = useState(false)
   const [balanceAmount, setBalanceAmount] = useState('')
   const [showConfirmAddBalance, setShowConfirmAddBalance] = useState(false)
@@ -213,10 +211,9 @@ export function CustomerOrderView({
       }
 
       if (onCreateAccount) {
-        await onCreateAccount(selectedTableId, balance, clientName.trim() || null)
+        await onCreateAccount(selectedTableId, balance)
         setShowCreateAccount(false)
         setInitialBalance('')
-        setClientName('')
         router.refresh()
       }
     } catch (err: any) {
@@ -485,18 +482,6 @@ export function CustomerOrderView({
           <form onSubmit={handleCreateAccount} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-white mb-2">
-                Nombre del cliente (opcional)
-              </label>
-              <input
-                type="text"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="Ej: Juan Pérez"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">
                 Saldo Inicial
               </label>
               <input
@@ -516,7 +501,6 @@ export function CustomerOrderView({
                 onClick={() => {
                   setShowCreateAccount(false)
                   setInitialBalance('')
-                  setClientName('')
                 }}
                 className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
               >
@@ -566,9 +550,6 @@ export function CustomerOrderView({
                 Código: <span className="font-semibold">{table.shortCode || table.id.slice(0, 8)}</span>
               </p>
               {table.zone && <p className="text-white">Zona: {table.zone}</p>}
-              {account.clientName && (
-                <p className="text-primary-400 font-medium">Cliente: {account.clientName}</p>
-              )}
             </div>
             {!isMesero && (
               <button

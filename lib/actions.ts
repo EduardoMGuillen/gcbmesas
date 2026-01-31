@@ -626,7 +626,6 @@ export async function cancelOrderByMesero(orderId: string) {
 export async function createAccount(data: {
   tableId: string
   initialBalance: number
-  clientName?: string | null
 }) {
   const currentUser = await getCurrentUser()
 
@@ -637,7 +636,6 @@ export async function createAccount(data: {
       currentBalance: data.initialBalance,
       status: 'OPEN',
       openedByUserId: currentUser.id,
-      clientName: data.clientName?.trim() || null,
     },
   })
 

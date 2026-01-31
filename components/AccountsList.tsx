@@ -248,9 +248,6 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
                     Mesero: {account.openedBy.name || account.openedBy.username}
                   </p>
                 )}
-                {account.clientName && (
-                  <p className="text-sm text-white/90 mb-1">Cliente: {account.clientName}</p>
-                )}
                 <p className="text-sm text-dark-400">
                   Creada: {formatDate(account.createdAt)}
                 </p>
