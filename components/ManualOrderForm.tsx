@@ -16,6 +16,7 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
   const [selectedProductId, setSelectedProductId] = useState('')
   const [quantityInput, setQuantityInput] = useState('1')
   const [initialBalance, setInitialBalance] = useState('')
+  const [clientName, setClientName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -56,10 +57,12 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
       await createAccount({
         tableId: selectedTableId,
         initialBalance: balance,
+        clientName: clientName.trim() || null,
       })
 
       setShowCreateAccount(false)
       setInitialBalance('')
+      setClientName('')
       setSuccess('Cuenta creada exitosamente')
       router.refresh()
     } catch (err: any) {
@@ -153,6 +156,18 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
               <form onSubmit={handleCreateAccount} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-dark-300 mb-2">
+                    Nombre del cliente (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Ej: Juan Pérez"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-2">
                     Saldo Inicial
                   </label>
                   <input
@@ -172,6 +187,7 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
                     onClick={() => {
                       setShowCreateAccount(false)
                       setInitialBalance('')
+                      setClientName('')
                     }}
                     className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                   >

@@ -293,6 +293,9 @@ export async function getCashierDashboardData() {
         table: {
           select: { id: true, name: true, zone: true, shortCode: true },
         },
+        openedBy: {
+          select: { name: true, username: true },
+        },
         orders: {
           orderBy: { createdAt: 'desc' },
           include: {
@@ -621,6 +624,7 @@ export async function cancelOrderByMesero(orderId: string) {
 export async function createAccount(data: {
   tableId: string
   initialBalance: number
+  clientName?: string | null
 }) {
   const currentUser = await getCurrentUser()
 
@@ -630,6 +634,8 @@ export async function createAccount(data: {
       initialBalance: data.initialBalance,
       currentBalance: data.initialBalance,
       status: 'OPEN',
+      openedByUserId: currentUser.id,
+      clientName: data.clientName?.trim() || null,
     },
   })
 
