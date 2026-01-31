@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { PushNotifyButton } from './PushNotifyButton'
 
@@ -51,8 +52,8 @@ export function Navbar() {
         <div className="flex justify-between items-center h-14 sm:h-16">
           {/* Logo and Desktop Menu */}
           <div className="flex items-center">
-            <Link href="/" className="text-lg sm:text-xl font-bold text-white">
-              La Gran Casa Blanca
+            <Link href="/" className="flex items-center">
+              <Image src="/LogoCasaBlanca.png" alt="Casa Blanca" width={36} height={36} className="h-8 w-auto object-contain" />
             </Link>
             {/* Desktop Menu - Hidden on mobile */}
             <div className="hidden md:flex items-center ml-6 lg:ml-8 space-x-2 lg:space-x-4">
