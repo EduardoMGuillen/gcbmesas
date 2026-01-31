@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Casa Blanca</string>
-    <string name="title_activity_main">Casa Blanca</string>
+    <string name="app_name">GranCasaBlanca Mesas</string>
+    <string name="title_activity_main">GranCasaBlanca Mesas</string>
     <string name="package_name">com.casablanca.gcbmesas</string>
     <string name="custom_url_scheme">com.casablanca.gcbmesas</string>
 </resources>
