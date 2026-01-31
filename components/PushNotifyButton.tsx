@@ -1,11 +1,32 @@
 'use client'
 
+import { useState } from 'react'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { useSession } from 'next-auth/react'
 
 export function PushNotifyButton() {
   const { data: session } = useSession()
   const { subscribe, status, message } = usePushNotifications()
+  const [testLoading, setTestLoading] = useState(false)
+  const [testMsg, setTestMsg] = useState('')
+
+  const handleTest = async () => {
+    setTestMsg('')
+    setTestLoading(true)
+    try {
+      const res = await fetch('/api/push-test', { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setTestMsg('Enviada. Si no la ves: minimiza Chrome o cambia de pestaña.')
+      } else {
+        setTestMsg(json.error || 'Error al enviar')
+      }
+    } catch {
+      setTestMsg('Error de conexión')
+    } finally {
+      setTestLoading(false)
+    }
+  }
 
   // Solo mostrar a meseros y admins
   if (!session || !['MESERO', 'ADMIN'].includes(session.user.role)) {
@@ -14,12 +35,23 @@ export function PushNotifyButton() {
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <button
-        onClick={subscribe}
-        disabled={status === 'loading'}
-        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white/80 hover:text-white hover:bg-dark-200 rounded-lg transition-colors disabled:opacity-50"
-        title="Recibir notificaciones cuando un cliente agregue pedidos a tus mesas"
-      >
+      <div className="flex items-center gap-2">
+        {status === 'success' && (
+          <button
+            onClick={handleTest}
+            disabled={testLoading}
+            className="px-3 py-2 text-sm font-medium text-primary-400 hover:text-primary-300 hover:bg-dark-200 rounded-lg transition-colors disabled:opacity-50"
+            title="Chrome no muestra notificaciones con la pestaña enfocada. Minimiza o cambia de pestaña."
+          >
+            {testLoading ? 'Enviando...' : 'Probar'}
+          </button>
+        )}
+        <button
+          onClick={subscribe}
+          disabled={status === 'loading'}
+          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white/80 hover:text-white hover:bg-dark-200 rounded-lg transition-colors disabled:opacity-50"
+          title="Recibir notificaciones cuando un cliente agregue pedidos a tus mesas"
+        >
         <svg
           className="w-5 h-5"
           fill="none"
@@ -35,13 +67,14 @@ export function PushNotifyButton() {
         </svg>
         {status === 'loading' ? 'Activando...' : 'Notificaciones'}
       </button>
-      {message && (
+      </div>
+      {(message || testMsg) && (
         <span
           className={`text-xs max-w-[240px] text-right break-words ${
-            status === 'success' ? 'text-green-400' : status === 'error' ? 'text-red-400' : 'text-white/70'
+            status === 'success' && !testMsg ? 'text-green-400' : status === 'error' ? 'text-red-400' : 'text-white/70'
           }`}
         >
-          {message}
+          {testMsg || message}
         </span>
       )}
     </div>
