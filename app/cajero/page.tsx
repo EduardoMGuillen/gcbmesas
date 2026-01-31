@@ -22,9 +22,11 @@ export default async function CajeroPage() {
   const { accounts, pendingOrders, recentServed } =
     await getCashierDashboardData()
 
+  const isAdmin = session.user.role === 'ADMIN'
+
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
+      {!isAdmin && <Navbar />}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 flex-1">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Panel de Cajero</h1>
@@ -48,7 +50,7 @@ export default async function CajeroPage() {
           <CashierAccounts accounts={accounts} />
         </section>
       </main>
-      <Footer />
+      {!isAdmin && <Footer />}
     </div>
   )
 }
