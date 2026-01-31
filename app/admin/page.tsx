@@ -16,16 +16,8 @@ export default async function AdminDashboard() {
     return
   }
 
-  // Cerrar automáticamente cuentas abiertas por más de 12 horas
-  try {
-    const closeResults = await closeOldAccounts()
-    if (closeResults.closed > 0) {
-      console.log(`[AdminDashboard] Se cerraron automáticamente ${closeResults.closed} cuenta(s) antigua(s)`)
-    }
-  } catch (error: any) {
-    // No fallar la página si hay error al cerrar cuentas antiguas
-    console.error('[AdminDashboard] Error al cerrar cuentas antiguas:', error)
-  }
+  // Cerrar cuentas antiguas en background (no bloquea)
+  closeOldAccounts().catch((err) => console.error('[AdminDashboard] Error al cerrar cuentas antiguas:', err))
 
   let stats
   try {
