@@ -178,6 +178,9 @@ export default function LoginPage() {
               </div>
             )}
 
+            <p className="text-xs text-dark-400 text-center">
+              Tu sesión se mantendrá activa al cerrar la app
+            </p>
             <button
               type="submit"
               disabled={loading}
