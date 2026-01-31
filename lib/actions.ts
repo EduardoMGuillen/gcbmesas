@@ -1162,6 +1162,7 @@ export async function createOrder(data: {
     include: {
       table: true,
       orders: true,
+      openedBy: { select: { id: true } },
     },
   })
 
@@ -1235,12 +1236,20 @@ export async function createOrder(data: {
     quantity,
   })
 
+  // Notificar al mesero que abrió la cuenta si quien agrega no es él
+  if (account.openedByUserId && account.openedByUserId !== currentUser.id) {
+    const { sendPushToAccountOpener } = await import('@/lib/push')
+    sendPushToAccountOpener(
+      account.openedByUserId,
+      account.table.name,
+      product.name,
+      quantity
+    ).catch((e) => console.error('[Push] Error:', e))
+  }
+
   // Revalidar rutas para que tanto clientes como meseros vean los cambios
-  // Revalidar sin query params primero (más efectivo)
   revalidatePath(`/clientes`, 'page')
-  // Revalidar la ruta dinámica de mesa (funciona mejor que query params)
   revalidatePath(`/mesa/${account.tableId}`, 'page')
-  // Revalidar otras rutas relacionadas
   revalidatePath('/admin/cuentas', 'page')
   revalidatePath('/mesero/pedidos', 'page')
   revalidatePath('/cajero', 'page')
@@ -1466,6 +1475,7 @@ export async function createCustomerOrder(data: {
     include: {
       table: true,
       orders: true,
+      openedBy: { select: { id: true } },
     },
   })
 
@@ -1538,6 +1548,17 @@ export async function createCustomerOrder(data: {
     quantity,
     isCustomerOrder: true,
   })
+
+  // Notificar al mesero que abrió la cuenta (cliente agregó pedido)
+  if (account.openedByUserId) {
+    const { sendPushToAccountOpener } = await import('@/lib/push')
+    sendPushToAccountOpener(
+      account.openedByUserId,
+      account.table.name,
+      product.name,
+      quantity
+    ).catch((e) => console.error('[Push] Error:', e))
+  }
 
   // Revalidar todas las posibles rutas que pueden mostrar esta mesa
   // Nota: revalidatePath no funciona bien con query params, así que revalidamos sin ellos

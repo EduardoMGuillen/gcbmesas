@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { PushNotifyButton } from './PushNotifyButton'
 
 export function Navbar() {
   const { data: session } = useSession()
@@ -72,6 +73,7 @@ export function Navbar() {
 
           {/* User Info and Mobile Menu Button */}
           <div className="flex items-center space-x-2 sm:space-x-4">
+            <PushNotifyButton />
             {/* User info - Hidden on small mobile */}
             <span className="hidden sm:inline-block text-xs sm:text-sm text-white/80 truncate max-w-[150px] lg:max-w-none">
               {session?.user.name || session?.user.username} ({session?.user.role})
@@ -126,6 +128,9 @@ export function Navbar() {
               <div className="text-xs">{session?.user.role}</div>
             </div>
             
+            <div className="px-4 py-2">
+              <PushNotifyButton />
+            </div>
             {/* Mobile Links */}
             {links.map((link) => (
               <Link
