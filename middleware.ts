@@ -29,25 +29,26 @@ const authMiddleware = withAuth(
       
     // Only verify roles if token is available
     if (token) {
-      // Admin routes - only allow ADMIN role
+      // Admin routes - ADMIN always, MESERO only for /admin/cuentas
       if (path.startsWith('/admin')) {
-        if (token.role !== 'ADMIN') {
-        return NextResponse.redirect(new URL('/login', req.url))
+        const allowed = token.role === 'ADMIN' || (token.role === 'MESERO' && path.startsWith('/admin/cuentas'))
+        if (!allowed) {
+          return NextResponse.redirect(new URL('/login', req.url))
+        }
       }
-    }
 
-    // Cajero routes - allow CAJERO and ADMIN roles
-    if (path.startsWith('/cajero')) {
+      // Cajero routes - allow CAJERO and ADMIN roles
+      if (path.startsWith('/cajero')) {
         if (!['CAJERO', 'ADMIN'].includes(token.role as string)) {
-        return NextResponse.redirect(new URL('/login', req.url))
+          return NextResponse.redirect(new URL('/login', req.url))
+        }
       }
-    }
 
-    // Mesero routes - allow MESERO and ADMIN roles
-    if (path.startsWith('/mesero')) {
+      // Mesero routes - allow MESERO and ADMIN roles
+      if (path.startsWith('/mesero')) {
         if (!['MESERO', 'ADMIN'].includes(token.role as string)) {
-        return NextResponse.redirect(new URL('/login', req.url))
-      }
+          return NextResponse.redirect(new URL('/login', req.url))
+        }
       }
     }
 
