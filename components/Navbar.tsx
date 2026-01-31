@@ -21,12 +21,14 @@ export function Navbar() {
     { href: '/admin/inventario', label: 'Inventario', match: pathname?.startsWith('/admin/inventario') },
     { href: '/admin/usuarios', label: 'Usuarios', match: pathname?.startsWith('/admin/usuarios') },
     { href: '/admin/logs', label: 'Logs', match: pathname?.startsWith('/admin/logs') },
-    { href: '/mesero', label: 'Mesero', match: pathname?.startsWith('/mesero') },
+    { href: '/mesero', label: 'Mesero', match: pathname === '/mesero' },
+    { href: '/mesero/mesas-activas', label: 'Mesas Activas', match: pathname?.startsWith('/mesero/mesas-activas') },
     { href: '/cajero', label: 'Cajero', match: pathname?.startsWith('/cajero') },
   ]
 
   const meseroLinks = [
     { href: '/mesero', label: 'Panel', match: pathname === '/mesero' },
+    { href: '/mesero/mesas-activas', label: 'Mesas Activas', match: pathname?.startsWith('/mesero/mesas-activas') },
     { href: '/admin/cuentas', label: 'Cuentas', match: pathname?.startsWith('/admin/cuentas') },
   ]
 

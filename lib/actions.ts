@@ -1295,6 +1295,37 @@ export async function cancelOrder(orderId: string) {
 
 // ========== DATA FETCHING ==========
 
+export async function getMeseroActiveTables() {
+  const currentUser = await getCurrentUser()
+  if (!['MESERO', 'ADMIN'].includes(currentUser.role)) {
+    throw new Error('Solo meseros o administradores pueden acceder')
+  }
+
+  const accounts = await prisma.account.findMany({
+    where: {
+      status: 'OPEN',
+      openedByUserId: currentUser.id,
+    },
+    select: {
+      id: true,
+      initialBalance: true,
+      currentBalance: true,
+      createdAt: true,
+      table: {
+        select: {
+          id: true,
+          name: true,
+          shortCode: true,
+          zone: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  return accounts
+}
+
 export async function getTables() {
   await getCurrentUser()
   return prisma.table.findMany({
