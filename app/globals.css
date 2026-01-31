@@ -37,6 +37,18 @@ body {
   }
 }
 
+/* Safe area for PWA/webapp - notch, status bar (iOS/Android) */
+.pt-safe {
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Main content below sticky header (h-14 = 3.5rem) + safe area */
+.pt-header-safe {
+  padding-top: calc(constant(safe-area-inset-top) + 3.5rem);
+  padding-top: calc(env(safe-area-inset-top) + 3.5rem);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

@@ -119,7 +119,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 bg-dark-50 safe-area-inset py-8 sm:py-4">
+    <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 bg-dark-50 pt-safe safe-area-inset py-8 sm:py-4">
       <div className="w-full max-w-md mx-auto my-auto">
         <div className="bg-dark-100 rounded-xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 border border-dark-200">
           <div className="text-center mb-5 sm:mb-6 md:mb-8">

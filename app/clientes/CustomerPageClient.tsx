@@ -255,7 +255,7 @@ export function CustomerPageClient() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
+    <div className="min-h-screen flex flex-col pt-safe" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
       <main className="flex-1 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="mb-8 text-center">
           <div className="mb-6 flex justify-center">
