@@ -137,10 +137,11 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 365 * 24 * 60 * 60, // 365 días - persistir al cerrar/abrir webapp (evita bug iOS WebKit con cookies de sesión)
     updateAge: 24 * 60 * 60, // 24 hours
   },
   cookies: {
+    // Cookie persistente (con maxAge): evita logout al cerrar PWA. Cookies "session" (sin maxAge) se pierden en iOS.
     sessionToken: {
       name: `next-auth.session-token`,
       options: {
@@ -148,8 +149,7 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        // Don't set domain to allow cookies to work properly
-        maxAge: 30 * 24 * 60 * 60, // 30 days
+        maxAge: 365 * 24 * 60 * 60, // 365 días - explícito para persistencia en iOS/Android PWA
       },
     },
     callbackUrl: {
@@ -159,7 +159,7 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60, // 1 hour
+        maxAge: 24 * 60 * 60, // 24h - persistente para evitar pérdida en iOS
       },
     },
     csrfToken: {
@@ -169,7 +169,7 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60, // 1 hour
+        maxAge: 24 * 60 * 60, // 24h - persistente
       },
     },
   },
