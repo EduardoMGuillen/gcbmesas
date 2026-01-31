@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 
 export function PushNotifyButton() {
   const { data: session } = useSession()
-  const { subscribe, status, message, logLines } = usePushNotifications()
+  const { subscribe, status, message, logLines = [] } = usePushNotifications()
   const [testLoading, setTestLoading] = useState(false)
   const [testMsg, setTestMsg] = useState('')
 
@@ -77,10 +77,10 @@ export function PushNotifyButton() {
           {testMsg || message}
         </span>
       )}
-      {logLines.length > 0 && (
+      {(logLines?.length ?? 0) > 0 && (
         <div className="mt-2 w-full max-w-[280px] max-h-32 overflow-y-auto rounded bg-dark-200/80 px-2 py-1.5 text-left">
           <p className="text-[10px] text-white/60 mb-1 font-medium">Registro (para pruebas):</p>
-          {logLines.map((line, i) => (
+          {(logLines || []).map((line, i) => (
             <p key={i} className="text-[10px] text-white/80 font-mono leading-tight break-all">
               {line}
             </p>
