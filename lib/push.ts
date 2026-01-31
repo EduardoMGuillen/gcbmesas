@@ -1,17 +1,39 @@
 import webpush from 'web-push'
+import admin from 'firebase-admin'
 import { prisma } from './prisma'
 
 function getVapidKeys() {
   const publicKey = process.env.VAPID_PUBLIC_KEY
   const privateKey = process.env.VAPID_PRIVATE_KEY
-  if (!publicKey || !privateKey) {
-    return null
-  }
+  if (!publicKey || !privateKey) return null
   return { publicKey, privateKey }
 }
 
+function isFirebaseConfigured(): boolean {
+  return !!(process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
+}
+
+let firebaseInitialized = false
+function getFirebaseAdmin() {
+  if (firebaseInitialized) return admin.app()
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
+  const credJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
+  if (credPath) {
+    admin.initializeApp({ credential: admin.credential.applicationDefault() })
+  } else if (credJson) {
+    try {
+      const cred = JSON.parse(credJson)
+      admin.initializeApp({ credential: admin.credential.cert(cred) })
+    } catch {
+      return null
+    }
+  } else return null
+  firebaseInitialized = true
+  return admin.app()
+}
+
 export function isPushConfigured(): boolean {
-  return !!getVapidKeys()
+  return !!getVapidKeys() || isFirebaseConfigured()
 }
 
 export async function sendPushToUser(
@@ -20,53 +42,54 @@ export async function sendPushToUser(
   body: string,
   data?: Record<string, string>
 ) {
-  const keys = getVapidKeys()
-  if (!keys) return
-
-  webpush.setVapidDetails(
-    'mailto:support@lagrancasablanca.com',
-    keys.publicKey,
-    keys.privateKey
-  )
-
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId },
   })
+  const toRemove: string[] = []
 
-  const payload = JSON.stringify({
-    title,
-    body,
-    ...data,
-  })
+  for (const sub of subscriptions) {
+    if (sub.endpoint.startsWith('fcm:')) {
+      const token = sub.endpoint.slice(4)
+      const app = getFirebaseAdmin()
+      if (!app) continue
+      try {
+        await app.messaging().send({
+          token,
+          notification: { title, body },
+          data: data ? Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])) : undefined,
+          android: { priority: 'high' as const },
+        })
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (/invalid-registration-token|registration-token-not-registered|not-found/i.test(msg)) {
+          toRemove.push(sub.id)
+        } else {
+          console.error('[Push FCM] Error:', msg)
+        }
+      }
+      continue
+    }
 
-  const results = await Promise.allSettled(
-    subscriptions.map((sub) =>
-      webpush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth,
-          },
-        },
+    const keys = getVapidKeys()
+    if (!keys || !sub.p256dh || !sub.auth) continue
+    webpush.setVapidDetails(
+      'mailto:support@lagrancasablanca.com',
+      keys.publicKey,
+      keys.privateKey
+    )
+    const payload = JSON.stringify({ title, body, ...data })
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
         payload,
         { TTL: 60 }
       )
-    )
-  )
-
-  // Remove invalid/expired subscriptions (410 Gone, 404 Not Found)
-  const toRemove: string[] = []
-  results.forEach((result, i) => {
-    if (result.status === 'rejected') {
-      const err = result.reason
-      if (err?.statusCode === 410 || err?.statusCode === 404) {
-        toRemove.push(subscriptions[i].id)
-      } else {
-        console.error('[Push] Error sending to', subscriptions[i].endpoint.slice(0, 50), err?.message)
-      }
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number }
+      if (e?.statusCode === 410 || e?.statusCode === 404) toRemove.push(sub.id)
+      else console.error('[Push Web] Error:', sub.endpoint.slice(0, 50), err)
     }
-  })
+  }
 
   if (toRemove.length > 0) {
     await prisma.pushSubscription.deleteMany({ where: { id: { in: toRemove } } })
