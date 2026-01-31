@@ -1,25 +1,33 @@
 /* Service Worker - Push Notifications */
+// Chrome Android exige un fetch handler para que el SW controle la PWA (aunque sea vacío)
+self.addEventListener('fetch', function () {})
+
 self.addEventListener('push', (event) => {
-  if (!event.data) return
-  try {
-    const data = event.data.json()
-    const title = data.title || 'Casa Blanca'
-    const options = {
-      body: data.body || '',
-      icon: '/LogoCasaBlanca.png',
-      badge: '/LogoCasaBlanca.png',
-      tag: data.type || 'default',
-      renotify: true,
-      requireInteraction: false,
-      silent: false,
-      vibrate: [200, 100, 200],
-      data: data,
-      dir: 'auto',
+  let title = 'Casa Blanca'
+  let body = ''
+  let data = {}
+  if (event.data) {
+    try {
+      data = event.data.json()
+      title = data.title || title
+      body = data.body || ''
+    } catch (e) {
+      body = event.data.text() || ''
     }
-    event.waitUntil(self.registration.showNotification(title, options))
-  } catch (e) {
-    console.error('[SW] Push parse error:', e)
   }
+  const options = {
+    body: body,
+    icon: '/LogoCasaBlanca.png',
+    badge: '/LogoCasaBlanca.png',
+    tag: data.type || 'default',
+    renotify: true,
+    requireInteraction: false,
+    silent: false,
+    vibrate: [200, 100, 200],
+    data: data,
+    dir: 'auto',
+  }
+  event.waitUntil(self.registration.showNotification(title, options))
 })
 
 self.addEventListener('notificationclick', (event) => {
