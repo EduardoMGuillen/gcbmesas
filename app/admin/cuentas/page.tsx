@@ -37,6 +37,9 @@ export default async function CuentasPage() {
     const accounts = await prisma.account.findMany({
       include: {
         table: true,
+        openedBy: {
+          select: { name: true, username: true },
+        },
         orders: {
           include: {
             product: true,
