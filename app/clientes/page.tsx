@@ -19,7 +19,7 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
 
     if (!table) {
       return (
-        <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
+        <div className="min-h-screen flex flex-col pt-safe" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
             <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-6 py-4 rounded-lg">
               Mesa no encontrada
@@ -34,7 +34,7 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
 
     if (!account) {
       return (
-        <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
+        <div className="min-h-screen flex flex-col pt-safe" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
             <div className="bg-amber-500/20 border border-amber-500/50 text-amber-400 px-6 py-4 rounded-lg">
               Esta mesa no tiene una cuenta abierta. Por favor, solicita al personal que abra una cuenta.
@@ -80,7 +80,7 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
     }))
 
     return (
-      <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
+      <div className="min-h-screen flex flex-col pt-safe" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
           <CustomerOrderView table={table} account={accountForView} products={productsForView} />
         </main>

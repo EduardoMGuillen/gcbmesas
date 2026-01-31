@@ -48,7 +48,7 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
     return (
       <div className="min-h-screen flex flex-col">
         <CleanUrlParams />
-        <header className="bg-dark-100 border-b border-dark-200 sticky top-0 z-50">
+        <header className="bg-dark-100 border-b border-dark-200 sticky top-0 z-50 pt-safe">
           <div className="flex justify-between items-center h-14 px-4">
             <Link href="/mesero" className="text-lg font-bold text-white">
               La Gran Casa Blanca
@@ -92,7 +92,7 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
       <CleanUrlParams />
 
       {/* Top bar - always visible */}
-      <header className="bg-dark-100 border-b border-dark-200 sticky top-0 z-50 md:z-40 w-full md:absolute md:left-0 md:right-0">
+      <header className="bg-dark-100 border-b border-dark-200 sticky top-0 z-50 md:z-40 w-full md:absolute md:left-0 md:right-0 pt-safe">
         <div className="flex justify-between items-center h-14 sm:h-16 px-4 sm:px-6">
           <div className="flex items-center gap-3">
             {/* Sidebar toggle - desktop only */}
