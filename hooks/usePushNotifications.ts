@@ -17,6 +17,27 @@ export function usePushNotifications() {
     setMessage('')
 
     try {
+      // Register service worker FIRST (required on Android before permission)
+      const reg = await navigator.serviceWorker.register('/sw.js', {
+        scope: '/',
+        updateViaCache: 'none',
+      })
+      // Wait for active worker - critical for Android
+      const worker = reg.installing || reg.waiting || reg.active
+      if (worker) {
+        await new Promise<void>((resolve, reject) => {
+          if (worker.state === 'activated') {
+            resolve()
+            return
+          }
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'activated') resolve()
+          })
+          setTimeout(resolve, 3000) // Fallback timeout
+        })
+      }
+      await navigator.serviceWorker.ready
+
       // Get VAPID public key
       const vapidRes = await fetch('/api/push-vapid')
       if (!vapidRes.ok) {
@@ -24,22 +45,19 @@ export function usePushNotifications() {
       }
       const { publicKey } = await vapidRes.json()
 
-      // Register service worker
-      const reg = await navigator.serviceWorker.register('/sw.js')
-      await navigator.serviceWorker.ready
-
-      // Request permission
+      // Request permission (must be after SW registration on Android)
       const permission = await Notification.requestPermission()
       if (permission !== 'granted') {
-        setMessage('Permiso denegado')
+        setMessage(permission === 'denied' ? 'Permiso denegado. Revisa la configuración de notificaciones del navegador.' : 'Permiso denegado')
         setStatus('error')
         return
       }
 
       // Subscribe to push
+      const key = urlBase64ToUint8Array(publicKey)
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+        applicationServerKey: key as BufferSource,
       })
 
       const subscription = sub.toJSON()
@@ -63,7 +81,12 @@ export function usePushNotifications() {
       setMessage('Notificaciones activadas')
       setStatus('success')
     } catch (err: unknown) {
-      setMessage(err instanceof Error ? err.message : 'Error al activar notificaciones')
+      const errMsg = err instanceof Error ? err.message : String(err)
+      const isAndroid = /Android/i.test(navigator.userAgent)
+      const hint = isAndroid
+        ? ' En Android: agrega la app a pantalla de inicio y abre desde ahí. Revisa que las notificaciones estén permitidas en Chrome.'
+        : ''
+      setMessage(errMsg + hint)
       setStatus('error')
     }
   }, [])

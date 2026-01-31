@@ -37,7 +37,7 @@ export function PushNotifyButton() {
       </button>
       {message && (
         <span
-          className={`text-xs ${
+          className={`text-xs max-w-[240px] text-right break-words ${
             status === 'success' ? 'text-green-400' : status === 'error' ? 'text-red-400' : 'text-white/70'
           }`}
         >

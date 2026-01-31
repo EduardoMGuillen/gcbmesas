@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { PushNotifyButton } from './PushNotifyButton'
 import { Footer } from './Footer'
@@ -85,8 +86,8 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
                 )}
               </svg>
             </button>
-            <Link href="/admin" className="text-lg sm:text-xl font-bold text-white">
-              La Gran Casa Blanca
+            <Link href="/admin" className="flex items-center">
+              <Image src="/LogoCasaBlanca.png" alt="Casa Blanca" width={36} height={36} className="h-8 w-auto object-contain" />
             </Link>
             {/* Mobile menu button */}
             <button
