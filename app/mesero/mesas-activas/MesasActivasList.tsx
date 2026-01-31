@@ -4,6 +4,10 @@ import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount } from 
 import Link from 'next/link'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 
+function pendingCount(orders: { served: boolean; rejected?: boolean | null }[]) {
+  return orders.filter((o) => !o.served && o.rejected !== true).length
+}
+
 interface MesasActivasListProps {
   accounts: Array<{
     id: string
@@ -17,11 +21,14 @@ interface MesasActivasListProps {
       shortCode: string
       zone: string | null
     }
+    orders: Array<{ id: string; served: boolean; rejected?: boolean | null }>
   }>
 }
 
 export function MesasActivasList({ accounts }: MesasActivasListProps) {
   useAutoRefresh({ interval: 30000 })
+
+  const hasPending = accounts.some((acc) => pendingCount(acc.orders) > 0)
 
   if (accounts.length === 0) {
     return (
@@ -44,6 +51,25 @@ export function MesasActivasList({ accounts }: MesasActivasListProps) {
 
   return (
     <div className="space-y-4">
+      <div className="mb-6 flex items-center gap-2">
+        {hasPending && (
+          <span
+            className="flex h-3 w-3 shrink-0 rounded-full bg-amber-400 ring-2 ring-amber-400/40 animate-pulse"
+            title="Tienes mesas con pedidos pendientes sin aceptar"
+          />
+        )}
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
+            Mesas Activas
+          </h1>
+          <p className="text-dark-400">
+            Mesas que has abierto con cuentas activas
+            {hasPending && (
+              <span className="text-amber-400 font-medium"> · Pedidos pendientes</span>
+            )}
+          </p>
+        </div>
+      </div>
       {accounts.map((account) => {
         const totalConsumed =
           Number(account.initialBalance) - Number(account.currentBalance)

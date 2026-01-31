@@ -22,15 +22,6 @@ export default async function MesasActivasPage() {
     <div className="min-h-screen flex flex-col">
       {!isAdmin && <Navbar />}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1">
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
-            Mesas Activas
-          </h1>
-          <p className="text-dark-400">
-            Mesas que has abierto con cuentas activas
-          </p>
-        </div>
-
         <MesasActivasList accounts={accounts} />
       </main>
       {!isAdmin && <Footer />}

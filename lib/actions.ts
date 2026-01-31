@@ -1331,6 +1331,9 @@ export async function getMeseroActiveTables() {
           zone: true,
         },
       },
+      orders: {
+        select: { id: true, served: true, rejected: true },
+      },
     },
     orderBy: { createdAt: 'desc' },
   })
