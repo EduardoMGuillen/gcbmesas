@@ -10,6 +10,7 @@ interface MesasActivasListProps {
     initialBalance: string | number | { toString(): string }
     currentBalance: string | number | { toString(): string }
     createdAt: string | Date
+    clientName?: string | null
     table: {
       id: string
       name: string
@@ -57,6 +58,9 @@ export function MesasActivasList({ accounts }: MesasActivasListProps) {
               </h3>
               {account.table.zone && (
                 <p className="text-sm text-white/80">Zona: {account.table.zone}</p>
+              )}
+              {account.clientName && (
+                <p className="text-sm text-primary-400">Cliente: {account.clientName}</p>
               )}
               <p className="text-xs text-white/70 mt-1">
                 Abierta {formatDate(account.createdAt)}

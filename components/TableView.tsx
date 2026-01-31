@@ -20,6 +20,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
   const [error, setError] = useState('')
   const [showCreateAccount, setShowCreateAccount] = useState(!account)
   const [initialBalance, setInitialBalance] = useState('')
+  const [clientName, setClientName] = useState('')
   const [cuentaAbierta, setCuentaAbierta] = useState(false)
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const router = useRouter()
@@ -40,6 +41,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
       const newAccount = await createAccount({
         tableId: table.id,
         initialBalance: balance,
+        clientName: clientName.trim() || null,
       })
 
       setAccount({
@@ -48,6 +50,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
       })
       setShowCreateAccount(false)
       setInitialBalance('')
+      setClientName('')
       setCuentaAbierta(false)
     } catch (err: any) {
       setError(err.message || 'Error al crear cuenta')
@@ -155,6 +158,18 @@ export function TableView({ table, account: initialAccount, products }: TableVie
             Crear Cuenta
           </h2>
           <form onSubmit={handleCreateAccount} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-2">
+                Nombre del cliente (opcional)
+              </label>
+              <input
+                type="text"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Ej: Juan Pérez"
+              />
+            </div>
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"

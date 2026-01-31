@@ -16,6 +16,7 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
   const [selectedProductId, setSelectedProductId] = useState('')
   const [quantityInput, setQuantityInput] = useState('1')
   const [initialBalance, setInitialBalance] = useState('')
+  const [clientName, setClientName] = useState('')
   const [cuentaAbierta, setCuentaAbierta] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -57,10 +58,12 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
       await createAccount({
         tableId: selectedTableId,
         initialBalance: balance,
+        clientName: clientName.trim() || null,
       })
 
       setShowCreateAccount(false)
       setInitialBalance('')
+      setClientName('')
       setCuentaAbierta(false)
       setSuccess('Cuenta creada exitosamente')
       router.refresh()
@@ -153,6 +156,18 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
               </button>
             ) : (
               <form onSubmit={handleCreateAccount} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-2">
+                    Nombre del cliente (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Ej: Juan Pérez"
+                  />
+                </div>
                 <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -188,6 +203,7 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
                     onClick={() => {
                       setShowCreateAccount(false)
                       setInitialBalance('')
+                      setClientName('')
                       setCuentaAbierta(false)
                     }}
                     className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
@@ -226,6 +242,9 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
                     )}
                   </p>
                 </div>
+                {account.clientName && (
+                  <p className="text-sm text-primary-400 font-medium mb-1">Cliente: {account.clientName}</p>
+                )}
                 <div>
                   <p className="text-sm text-dark-400 mb-1">Disponible</p>
                   <p
