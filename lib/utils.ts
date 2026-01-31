@@ -17,6 +17,23 @@ export async function generateQRCode(data: string): Promise<string> {
   }
 }
 
+/** Valor centinela para "Cuenta Abierta" (sin límite de consumo) */
+export const OPEN_ACCOUNT_SENTINEL = 300000
+
+export function isOpenAccount(initialBalance: number | string | { toString(): string }): boolean {
+  const num = typeof initialBalance === 'object' ? parseFloat(initialBalance.toString()) : Number(initialBalance)
+  return num === OPEN_ACCOUNT_SENTINEL
+}
+
+export function formatAccountBalance(
+  initialBalance: number | string | { toString(): string },
+  currentBalance: number | string | { toString(): string }
+): string {
+  if (isOpenAccount(initialBalance)) return 'Cuenta Abierta'
+  const num = typeof currentBalance === 'object' ? parseFloat(currentBalance.toString()) : Number(currentBalance)
+  return formatCurrency(num)
+}
+
 export function formatCurrency(amount: number | string): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
   return new Intl.NumberFormat('es-HN', {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createOrder, createAccount, closeAccount } from '@/lib/actions'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount, OPEN_ACCOUNT_SENTINEL } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
 interface TableViewProps {
@@ -20,6 +20,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
   const [error, setError] = useState('')
   const [showCreateAccount, setShowCreateAccount] = useState(!account)
   const [initialBalance, setInitialBalance] = useState('')
+  const [cuentaAbierta, setCuentaAbierta] = useState(false)
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const router = useRouter()
 
@@ -29,8 +30,8 @@ export function TableView({ table, account: initialAccount, products }: TableVie
     setLoading(true)
 
     try {
-      const balance = parseFloat(initialBalance)
-      if (isNaN(balance) || balance <= 0) {
+      const balance = cuentaAbierta ? OPEN_ACCOUNT_SENTINEL : parseFloat(initialBalance)
+      if (!cuentaAbierta && (isNaN(balance) || balance <= 0)) {
         setError('El saldo inicial debe ser mayor a 0')
         setLoading(false)
         return
@@ -47,6 +48,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
       })
       setShowCreateAccount(false)
       setInitialBalance('')
+      setCuentaAbierta(false)
     } catch (err: any) {
       setError(err.message || 'Error al crear cuenta')
     } finally {
@@ -153,6 +155,19 @@ export function TableView({ table, account: initialAccount, products }: TableVie
             Crear Cuenta
           </h2>
           <form onSubmit={handleCreateAccount} className="space-y-4">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="cuentaAbiertaTable"
+                checked={cuentaAbierta}
+                onChange={(e) => setCuentaAbierta(e.target.checked)}
+                className="w-4 h-4 rounded border-dark-300 bg-dark-50 text-primary-600 focus:ring-primary-500"
+              />
+              <label htmlFor="cuentaAbiertaTable" className="text-sm font-medium text-dark-300 cursor-pointer">
+                Cuenta Abierta (sin límite)
+              </label>
+            </div>
+            {!cuentaAbierta && (
             <div>
               <label className="block text-sm font-medium text-dark-300 mb-2">
                 Saldo Inicial
@@ -168,6 +183,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
                 placeholder="0.00"
               />
             </div>
+            )}
             {error && (
               <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -242,12 +258,12 @@ export function TableView({ table, account: initialAccount, products }: TableVie
           </h3>
           <p
             className={`text-2xl font-bold ${
-              Number(account.currentBalance) < 0
+              !isOpenAccount(account.initialBalance) && Number(account.currentBalance) < 0
                 ? 'text-red-400'
                 : 'text-green-400'
             }`}
           >
-            {formatCurrency(account.currentBalance)}
+            {formatAccountBalance(account.initialBalance, account.currentBalance)}
           </p>
         </div>
       </div>

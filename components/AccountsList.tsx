@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount } from '@/lib/utils'
 import { closeAccount } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
@@ -272,7 +272,7 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
               <div>
                 <p className="text-sm text-dark-400 mb-1">Saldo Inicial</p>
                 <p className="text-lg font-semibold text-white">
-                  {formatCurrency(account.initialBalance)}
+                  {isOpenAccount(account.initialBalance) ? 'Cuenta Abierta' : formatCurrency(account.initialBalance)}
                 </p>
               </div>
               <div>
@@ -284,7 +284,7 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
               <div>
                 <p className="text-sm text-dark-400 mb-1">Saldo Final</p>
                 <p className="text-lg font-semibold text-white">
-                  {formatCurrency(account.currentBalance)}
+                  {formatAccountBalance(account.initialBalance, account.currentBalance)}
                 </p>
               </div>
             </div>

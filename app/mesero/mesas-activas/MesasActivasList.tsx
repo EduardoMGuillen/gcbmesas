@@ -1,6 +1,6 @@
 'use client'
 
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount } from '@/lib/utils'
 import Link from 'next/link'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 
@@ -67,16 +67,12 @@ export function MesasActivasList({ accounts }: MesasActivasListProps) {
                 <p className="text-xs text-white/70">Saldo disponible</p>
                 <p
                   className={`font-semibold ${
-                    Number(account.currentBalance) < 0
+                    !isOpenAccount(account.initialBalance) && Number(account.currentBalance) < 0
                       ? 'text-red-400'
                       : 'text-green-400'
                   }`}
                 >
-                  {formatCurrency(
-                    typeof account.currentBalance === 'object'
-                      ? account.currentBalance.toString()
-                      : account.currentBalance
-                  )}
+                  {formatAccountBalance(account.initialBalance, account.currentBalance)}
                 </p>
               </div>
               <div>

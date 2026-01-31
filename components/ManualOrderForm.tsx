@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createOrder, createAccount } from '@/lib/actions'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatAccountBalance, isOpenAccount, OPEN_ACCOUNT_SENTINEL } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
 interface ManualOrderFormProps {
@@ -16,6 +16,7 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
   const [selectedProductId, setSelectedProductId] = useState('')
   const [quantityInput, setQuantityInput] = useState('1')
   const [initialBalance, setInitialBalance] = useState('')
+  const [cuentaAbierta, setCuentaAbierta] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -46,8 +47,8 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
     setLoading(true)
 
     try {
-      const balance = parseFloat(initialBalance)
-      if (isNaN(balance) || balance <= 0) {
+      const balance = cuentaAbierta ? OPEN_ACCOUNT_SENTINEL : parseFloat(initialBalance)
+      if (!cuentaAbierta && (isNaN(balance) || balance <= 0)) {
         setError('El saldo inicial debe ser mayor a 0')
         setLoading(false)
         return
@@ -60,6 +61,7 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
 
       setShowCreateAccount(false)
       setInitialBalance('')
+      setCuentaAbierta(false)
       setSuccess('Cuenta creada exitosamente')
       router.refresh()
     } catch (err: any) {
@@ -151,6 +153,19 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
               </button>
             ) : (
               <form onSubmit={handleCreateAccount} className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="cuentaAbiertaManual"
+                    checked={cuentaAbierta}
+                    onChange={(e) => setCuentaAbierta(e.target.checked)}
+                    className="w-4 h-4 rounded border-dark-300 bg-dark-50 text-primary-600 focus:ring-primary-500"
+                  />
+                  <label htmlFor="cuentaAbiertaManual" className="text-sm font-medium text-dark-300 cursor-pointer">
+                    Cuenta Abierta (sin límite)
+                  </label>
+                </div>
+                {!cuentaAbierta && (
                 <div>
                   <label className="block text-sm font-medium text-dark-300 mb-2">
                     Saldo Inicial
@@ -166,12 +181,14 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
                     placeholder="0.00"
                   />
                 </div>
+                )}
                 <div className="flex space-x-3">
                   <button
                     type="button"
                     onClick={() => {
                       setShowCreateAccount(false)
                       setInitialBalance('')
+                      setCuentaAbierta(false)
                     }}
                     className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                   >
@@ -213,12 +230,12 @@ export function ManualOrderForm({ tables, products, initialTableId = '' }: Manua
                   <p className="text-sm text-dark-400 mb-1">Disponible</p>
                   <p
                     className={`text-lg font-semibold ${
-                      Number(account.currentBalance) < 0
+                      !isOpenAccount(account.initialBalance) && Number(account.currentBalance) < 0
                         ? 'text-red-400'
                         : 'text-green-400'
                     }`}
                   >
-                    {formatCurrency(account.currentBalance)}
+                    {formatAccountBalance(account.initialBalance, account.currentBalance)}
                   </p>
                 </div>
               </div>
