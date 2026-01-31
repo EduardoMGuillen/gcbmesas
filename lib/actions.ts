@@ -1620,6 +1620,7 @@ export async function getDashboardStats() {
     openAccounts,
     activeWaiters,
     topProducts,
+    activeMeserosWithTables,
   ] = await Promise.all([
     // Total consumido hoy
     prisma.order.aggregate({
@@ -1676,6 +1677,17 @@ export async function getDashboardStats() {
       },
       take: 10,
     }),
+
+    // Meseros con cuentas abiertas y cuántas mesas llevan
+    prisma.account.groupBy({
+      by: ['openedByUserId'],
+      where: {
+        status: 'OPEN',
+        openedByUserId: { not: null },
+      },
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+    }),
   ])
 
   // Get product details for top products
@@ -1683,6 +1695,26 @@ export async function getDashboardStats() {
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
   })
+
+  // Obtener nombres de meseros que tienen cuentas abiertas
+  const meseroIds = activeMeserosWithTables
+    .map((m) => m.openedByUserId)
+    .filter((id): id is string => id != null)
+  const meseros = await prisma.user.findMany({
+    where: { id: { in: meseroIds } },
+    select: { id: true, name: true, username: true },
+  })
+  const activeMeserosList = activeMeserosWithTables
+    .filter((m) => m.openedByUserId)
+    .map((m) => {
+      const user = meseros.find((u) => u.id === m.openedByUserId)
+      return {
+        id: m.openedByUserId!,
+        name: user?.name || user?.username || 'Desconocido',
+        username: user?.username || '',
+        tableCount: m._count.id,
+      }
+    })
 
   const topProductsWithDetails = topProducts.map((tp) => {
     const product = products.find((p) => p.id === tp.productId)
@@ -1699,6 +1731,7 @@ export async function getDashboardStats() {
     openAccounts,
     activeWaiters,
     topProducts: topProductsWithDetails,
+    activeMeserosList,
   }
 }
 
