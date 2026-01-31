@@ -99,6 +99,6 @@ export default function middleware(req: NextRequest, evt: NextFetchEvent) {
 }
 
 export const config = {
-  // Match everything except static assets; we bypass /mesa and /api/auth in code above
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  // Match everything except static assets; sw.js and manifest.json must be public for PWA/push on Android
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }

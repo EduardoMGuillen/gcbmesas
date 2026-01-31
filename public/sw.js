@@ -10,10 +10,11 @@ self.addEventListener('push', (event) => {
       badge: '/LogoCasaBlanca.png',
       tag: data.type || 'default',
       renotify: true,
-      requireInteraction: true,
+      requireInteraction: false,
       silent: false,
       vibrate: [200, 100, 200],
       data: data,
+      dir: 'auto',
     }
     event.waitUntil(self.registration.showNotification(title, options))
   } catch (e) {
