@@ -315,6 +315,8 @@ export async function getCashierDashboardData() {
         quantity: true,
         price: true,
         createdAt: true,
+        served: true,
+        rejected: true,
         product: { select: { name: true, price: true } },
         account: {
           select: {
@@ -727,8 +729,8 @@ export async function closeAccount(accountId: string) {
       initialBalance: account.initialBalance,
       totalConsumed,
       finalBalance: account.currentBalance,
-          ordersCount: account._count.orders,
-          autoAcceptedOrdersCount: pendingOrderIds.length,
+      ordersCount: account.orders.length,
+      autoAcceptedOrdersCount: pendingOrders.length,
     })
   }
 
