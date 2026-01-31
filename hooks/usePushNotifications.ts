@@ -17,12 +17,15 @@ export function usePushNotifications() {
     setMessage('')
 
     try {
-      // Register service worker FIRST (required on Android before permission)
-      const reg = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/',
-        updateViaCache: 'none',
-      })
-      // Wait for active worker - critical for Android
+      // Use existing registration if SW already active (e.g. from ServiceWorkerRegister), else register
+      let reg = await navigator.serviceWorker.getRegistration('/')
+      if (!reg || !reg.active) {
+        reg = await navigator.serviceWorker.register('/sw.js', {
+          scope: '/',
+          updateViaCache: 'none',
+        })
+      }
+      // Wait for active worker - critical for Android/Chrome
       const worker = reg.installing || reg.waiting || reg.active
       if (worker) {
         await new Promise<void>((resolve) => {
@@ -33,7 +36,7 @@ export function usePushNotifications() {
           worker.addEventListener('statechange', () => {
             if (worker.state === 'activated') resolve()
           })
-          setTimeout(resolve, 3000) // Fallback timeout
+          setTimeout(resolve, 5000) // Android puede tardar más
         })
       }
       await navigator.serviceWorker.ready

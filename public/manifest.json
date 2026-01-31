@@ -3,7 +3,9 @@
   "short_name": "Casa Blanca",
   "description": "Sistema de gestión de cuentas de consumo",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#000000",
   "theme_color": "#000000",
   "icons": [
