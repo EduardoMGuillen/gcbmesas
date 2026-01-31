@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount } from '@/lib/utils'
 import { closeAccount } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
@@ -8,9 +9,10 @@ import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 
 interface AccountsListProps {
   initialAccounts: any[]
+  userRole?: string
 }
 
-export function AccountsList({ initialAccounts }: AccountsListProps) {
+export function AccountsList({ initialAccounts, userRole }: AccountsListProps) {
   const [accounts, setAccounts] = useState(initialAccounts)
   const [selectedZone, setSelectedZone] = useState<string>('')
   const [selectedStatus, setSelectedStatus] = useState<string>('')
@@ -292,13 +294,25 @@ export function AccountsList({ initialAccounts }: AccountsListProps) {
               </div>
             </div>
 
-            <div className="flex justify-between items-center">
-              <button
-                onClick={() => setSelectedAccount(account)}
-                className="text-primary-400 hover:text-primary-300 text-sm font-medium"
-              >
-                Ver {account.orders.length} pedidos
-              </button>
+            <div className="flex justify-between items-center flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedAccount(account)}
+                  className="text-primary-400 hover:text-primary-300 text-sm font-medium"
+                >
+                  Ver {account.orders.length} pedidos
+                </button>
+                {account.status === 'OPEN' &&
+                  account.table?.id &&
+                  (userRole === 'ADMIN' || userRole === 'MESERO') && (
+                    <Link
+                      href={`/mesero/pedidos?tableId=${account.table.id}`}
+                      className="text-primary-400 hover:text-primary-300 text-sm font-medium underline"
+                    >
+                      Ir a mesa
+                    </Link>
+                  )}
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleExportExcel(account.id)}
