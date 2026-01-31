@@ -8,9 +8,15 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'TableControl - Gestión de Mesas',
   description: 'Sistema de gestión de cuentas de consumo para discotecas',
+  manifest: '/manifest.json',
+  icons: {
+    icon: '/LogoCasaBlanca.png',
+    apple: '/LogoCasaBlanca.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
+    title: 'Casa Blanca',
   },
 }
 
@@ -21,6 +27,7 @@ export const viewport = {
   maximumScale: 5,
   userScalable: true,
   viewportFit: 'cover',
+  themeColor: '#000000',
 }
 
 export default function RootLayout({
