@@ -27,13 +27,24 @@ export function usePushNotifications() {
           return
         }
         const tokenPromise = new Promise<string>((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Tiempo de espera agotado')), 15000)
+          const timeout = setTimeout(
+            () => reject(new Error('Tiempo de espera agotado. Comprueba conexión a internet y Google Play Services.')),
+            30000
+          )
           PushNotifications.addListener(
             'registration',
             (ev: { value: string }) => {
               clearTimeout(timeout)
               PushNotifications.removeAllListeners().catch(() => {})
               resolve(ev.value)
+            }
+          )
+          PushNotifications.addListener(
+            'registrationError',
+            (err: { error: string }) => {
+              clearTimeout(timeout)
+              PushNotifications.removeAllListeners().catch(() => {})
+              reject(new Error(err?.error || 'Error al obtener el token de notificaciones'))
             }
           )
         })
