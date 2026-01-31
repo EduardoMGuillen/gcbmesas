@@ -45,13 +45,19 @@ export async function sendPushToUser(
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId },
   })
+  if (subscriptions.length === 0) return
+  console.log('[Push] Enviando a usuario', userId, '|', subscriptions.length, 'suscripción(es) | título:', title)
+
   const toRemove: string[] = []
 
   for (const sub of subscriptions) {
     if (sub.endpoint.startsWith('fcm:')) {
       const token = sub.endpoint.slice(4)
       const app = getFirebaseAdmin()
-      if (!app) continue
+      if (!app) {
+        console.warn('[Push FCM] Firebase no inicializado, se omite suscripción')
+        continue
+      }
       try {
         await app.messaging().send({
           token,
@@ -59,6 +65,7 @@ export async function sendPushToUser(
           data: data ? Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])) : undefined,
           android: { priority: 'high' as const },
         })
+        console.log('[Push FCM] Enviado OK')
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         if (/invalid-registration-token|registration-token-not-registered|not-found/i.test(msg)) {
@@ -84,6 +91,7 @@ export async function sendPushToUser(
         payload,
         { TTL: 60 }
       )
+      console.log('[Push Web] Enviado OK')
     } catch (err: unknown) {
       const e = err as { statusCode?: number }
       if (e?.statusCode === 410 || e?.statusCode === 404) toRemove.push(sub.id)
