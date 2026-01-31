@@ -25,7 +25,7 @@ export function usePushNotifications() {
       // Wait for active worker - critical for Android
       const worker = reg.installing || reg.waiting || reg.active
       if (worker) {
-        await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
           if (worker.state === 'activated') {
             resolve()
             return
@@ -53,12 +53,27 @@ export function usePushNotifications() {
         return
       }
 
-      // Subscribe to push
+      // Subscribe to push - con reintentos (Chrome Android puede fallar intermitentemente)
       const key = urlBase64ToUint8Array(publicKey)
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: key as BufferSource,
-      })
+      const maxRetries = 3
+      let sub: PushSubscription | null = null
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          if (attempt > 0) {
+            await new Promise((r) => setTimeout(r, 1500 * attempt))
+          }
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: key as BufferSource,
+          })
+          break
+        } catch (e) {
+          if (attempt === maxRetries - 1) throw e
+        }
+      }
+
+      if (!sub) throw new Error('No se pudo suscribir a push')
 
       const subscription = sub.toJSON()
       const res = await fetch('/api/push-subscribe', {
@@ -83,9 +98,18 @@ export function usePushNotifications() {
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err)
       const isAndroid = /Android/i.test(navigator.userAgent)
-      const hint = isAndroid
-        ? ' En Android: agrega la app a pantalla de inicio y abre desde ahí. Revisa que las notificaciones estén permitidas en Chrome.'
-        : ''
+      const isPushServiceError = /push service|Registration failed.*push/i.test(errMsg)
+
+      let hint = ''
+      if (isAndroid) {
+        if (isPushServiceError) {
+          hint =
+            ' Prueba: 1) Agregar la app a pantalla de inicio y abrir desde ahí 2) Usar WiFi en lugar de datos 3) Actualizar Chrome y Google Play Services 4) Cerrar otras pestañas y reintentar.'
+        } else {
+          hint =
+            ' En Android: agrega la app a pantalla de inicio y abre desde ahí. Revisa que las notificaciones estén permitidas en Chrome.'
+        }
+      }
       setMessage(errMsg + hint)
       setStatus('error')
     }
