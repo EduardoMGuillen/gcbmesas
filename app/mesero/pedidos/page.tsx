@@ -26,6 +26,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
   const tables = await getTables()
   const products = await getProducts(true)
   const initialTableId = searchParams.tableId || ''
+  const isAdmin = session.user.role === 'ADMIN'
 
   // Si hay una mesa inicial seleccionada, obtener sus datos
   let initialTable = null
@@ -83,7 +84,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
-      <Navbar />
+      {!isAdmin && <Navbar />}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
@@ -113,7 +114,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
           <TableSelector tables={tablesForView} />
         )}
       </main>
-      <Footer />
+      {!isAdmin && <Footer />}
     </div>
   )
 }

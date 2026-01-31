@@ -16,10 +16,11 @@ export default async function MesasActivasPage() {
   }
 
   const accounts = await getMeseroActiveTables()
+  const isAdmin = session.user.role === 'ADMIN'
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
+      {!isAdmin && <Navbar />}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1">
         <div className="mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
@@ -32,7 +33,7 @@ export default async function MesasActivasPage() {
 
         <MesasActivasList accounts={accounts} />
       </main>
-      <Footer />
+      {!isAdmin && <Footer />}
     </div>
   )
 }

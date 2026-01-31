@@ -18,12 +18,14 @@ export default async function MeseroPage() {
   // Cerrar cuentas antiguas en background (no bloquea)
   closeOldAccounts().catch((err) => console.error('[MeseroPage] Error al cerrar cuentas antiguas:', err))
 
+  const isAdmin = session.user.role === 'ADMIN'
+
   return (
     <div className="min-h-screen flex flex-col">
       <Suspense fallback={null}>
         <CleanUrlParams />
       </Suspense>
-      <Navbar />
+      {!isAdmin && <Navbar />}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 flex-1">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
@@ -153,7 +155,7 @@ export default async function MeseroPage() {
           )}
         </div>
       </main>
-      <Footer />
+      {!isAdmin && <Footer />}
     </div>
   )
 }
