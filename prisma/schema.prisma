@@ -88,6 +88,8 @@ model Account {
   openedBy   User?   @relation(fields: [openedByUserId], references: [id], onDelete: SetNull)
   orders     Order[]
 
+  @@index([status, createdAt])
+  @@index([tableId, status])
   @@map("accounts")
 }
 
@@ -124,6 +126,8 @@ model Order {
   @@index([accountId])
   @@index([userId])
   @@index([createdAt])
+  @@index([served, rejected, createdAt])
+  @@index([accountId, rejected])
   @@map("orders")
 }
 

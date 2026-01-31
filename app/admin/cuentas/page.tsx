@@ -22,30 +22,35 @@ export default async function CuentasPage() {
     return
   }
 
-  // Cerrar automáticamente cuentas abiertas por más de 12 horas
-  try {
-    const closeResults = await closeOldAccounts()
-    if (closeResults.closed > 0) {
-      console.log(`[CuentasPage] Se cerraron automáticamente ${closeResults.closed} cuenta(s) antigua(s)`)
-    }
-  } catch (error: any) {
-    // No fallar la página si hay error al cerrar cuentas antiguas
-    console.error('[CuentasPage] Error al cerrar cuentas antiguas:', error)
-  }
+  // Cerrar cuentas antiguas en background (no bloquea la carga)
+  closeOldAccounts().catch((err) => {
+    console.error('[CuentasPage] Error al cerrar cuentas antiguas:', err)
+  })
 
   try {
     const accounts = await prisma.account.findMany({
-      include: {
-        table: true,
-        openedBy: {
-          select: { name: true, username: true },
-        },
+      select: {
+        id: true,
+        initialBalance: true,
+        currentBalance: true,
+        status: true,
+        createdAt: true,
+        closedAt: true,
+        clientName: true,
+        table: { select: { id: true, name: true, zone: true, shortCode: true } },
+        openedBy: { select: { name: true, username: true } },
         orders: {
-          include: {
-            product: true,
-            user: true,
+          select: {
+            id: true,
+            quantity: true,
+            price: true,
+            createdAt: true,
+            rejected: true,
+            product: { select: { name: true, price: true } },
+            user: { select: { username: true } },
           },
-          orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
         },
       },
       orderBy: { createdAt: 'desc' },

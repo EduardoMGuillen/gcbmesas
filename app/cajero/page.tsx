@@ -16,16 +16,8 @@ export default async function CajeroPage() {
     redirect('/login')
   }
 
-  // Cerrar automáticamente cuentas abiertas por más de 12 horas
-  try {
-    const closeResults = await closeOldAccounts()
-    if (closeResults.closed > 0) {
-      console.log(`[CajeroPage] Se cerraron automáticamente ${closeResults.closed} cuenta(s) antigua(s)`)
-    }
-  } catch (error: any) {
-    // No fallar la página si hay error al cerrar cuentas antiguas
-    console.error('[CajeroPage] Error al cerrar cuentas antiguas:', error)
-  }
+  // Cerrar cuentas antiguas en background (no bloquea)
+  closeOldAccounts().catch((err) => console.error('[CajeroPage] Error al cerrar cuentas antiguas:', err))
 
   const { accounts, pendingOrders, recentServed } =
     await getCashierDashboardData()

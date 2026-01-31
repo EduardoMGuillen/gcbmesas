@@ -307,12 +307,14 @@ export async function getCashierDashboardData() {
       },
     }),
     prisma.order.findMany({
-      where: { 
-        served: false,
-        rejected: false, // Excluir pedidos rechazados de la lista de pendientes
-      },
+      where: { served: false, rejected: false },
       orderBy: { createdAt: 'asc' },
-      include: {
+      take: 100,
+      select: {
+        id: true,
+        quantity: true,
+        price: true,
+        createdAt: true,
         product: { select: { name: true, price: true } },
         account: {
           select: {
@@ -727,8 +729,8 @@ export async function closeAccount(accountId: string) {
       initialBalance: account.initialBalance,
       totalConsumed,
       finalBalance: account.currentBalance,
-      ordersCount: account.orders.length,
-      autoAcceptedOrdersCount: pendingOrders.length,
+          ordersCount: account._count.orders,
+          autoAcceptedOrdersCount: pendingOrderIds.length,
     })
   }
 
@@ -741,17 +743,23 @@ export async function closeAccount(accountId: string) {
 export async function closeOldAccounts() {
   const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000)
 
-  // Buscar todas las cuentas abiertas creadas hace más de 12 horas
+  // Buscar cuentas antiguas (solo campos necesarios para cerrar)
   const oldAccounts = await prisma.account.findMany({
     where: {
       status: 'OPEN',
-      createdAt: {
-        lt: twelveHoursAgo,
-      },
+      createdAt: { lt: twelveHoursAgo },
     },
-    include: {
-      orders: true,
-      table: true,
+    select: {
+      id: true,
+      tableId: true,
+      createdAt: true,
+      initialBalance: true,
+      currentBalance: true,
+      _count: { select: { orders: true } },
+      orders: {
+        where: { served: false, rejected: false },
+        select: { id: true },
+      },
     },
   })
 
@@ -765,14 +773,12 @@ export async function closeOldAccounts() {
   for (const account of oldAccounts) {
     try {
       // Aceptar automáticamente todos los pedidos pendientes
-      const pendingOrders = account.orders.filter(
-        (order) => !order.served && !order.rejected
-      )
+      const pendingOrderIds = account.orders.map((o) => o.id)
 
-      if (pendingOrders.length > 0) {
+      if (pendingOrderIds.length > 0) {
         await prisma.order.updateMany({
           where: {
-            id: { in: pendingOrders.map((o) => o.id) },
+            id: { in: pendingOrderIds },
             accountId: account.id,
             served: false,
             rejected: false,
@@ -810,7 +816,7 @@ export async function closeOldAccounts() {
           totalConsumed,
           finalBalance: account.currentBalance,
           ordersCount: account.orders.length,
-          autoAcceptedOrdersCount: pendingOrders.length,
+          autoAcceptedOrdersCount: pendingOrderIds.length,
         }
       )
 
