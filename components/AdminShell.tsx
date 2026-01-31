@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation'
 import { PushNotifyButton } from './PushNotifyButton'
 import { Footer } from './Footer'
 import { CleanUrlParams } from './CleanUrlParams'
+import { Navbar } from './Navbar'
 
 const adminLinks = [
   { href: '/admin', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -30,55 +31,30 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // Mesero solo puede ver cuentas; redirigir si está en otra ruta admin
+  // Mesero/Cajero solo pueden ver cuentas; redirigir si está en otra ruta admin
   useEffect(() => {
-    if (userRole === 'MESERO' && pathname?.startsWith('/admin') && !pathname?.startsWith('/admin/cuentas')) {
-      router.replace('/mesero')
+    if (
+      (userRole === 'MESERO' || userRole === 'CAJERO') &&
+      pathname?.startsWith('/admin') &&
+      !pathname?.startsWith('/admin/cuentas')
+    ) {
+      router.replace(userRole === 'CAJERO' ? '/cajero' : '/mesero')
     }
   }, [userRole, pathname, router])
 
-  const isMeseroOnCuentas = userRole === 'MESERO' && pathname?.startsWith('/admin/cuentas')
+  const isNonAdminOnCuentas =
+    (userRole === 'MESERO' || userRole === 'CAJERO') && pathname?.startsWith('/admin/cuentas')
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/login' })
   }
 
-  // Mesero en cuentas: layout simple con Navbar estándar (sin sidebar)
-  if (isMeseroOnCuentas) {
+  // Mesero/Cajero en cuentas: usar Navbar estándar para misma experiencia que Panel/Mesas Activas
+  if (isNonAdminOnCuentas) {
     return (
       <div className="min-h-screen flex flex-col">
         <CleanUrlParams />
-        <header className="bg-dark-100 border-b border-dark-200 sticky top-0 z-50 pt-safe">
-          <div className="flex justify-between items-center h-14 px-4">
-            <Link href="/mesero" className="text-lg font-bold text-white">
-              La Gran Casa Blanca
-            </Link>
-            <div className="flex items-center gap-1 sm:gap-2">
-              <PushNotifyButton />
-              <span className="hidden sm:inline text-sm text-white/80 truncate max-w-[100px]">
-                {session?.user.name || session?.user.username}
-              </span>
-              <Link
-                href="/mesero"
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-dark-200 rounded-md"
-              >
-                Panel
-              </Link>
-              <Link
-                href="/mesero/mesas-activas"
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-primary-400"
-              >
-                Mesas Activas
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-white/80 hover:text-white hover:bg-dark-200 rounded-md"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </header>
+        <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
           {children}
         </main>
