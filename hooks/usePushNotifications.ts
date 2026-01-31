@@ -2,24 +2,68 @@
 
 import { useState, useCallback } from 'react'
 
+function isCapacitorAndroid(): boolean {
+  if (typeof window === 'undefined') return false
+  const cap = (window as any).Capacitor
+  return cap?.getPlatform?.() === 'android'
+}
+
 export function usePushNotifications() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState<string>('')
 
   const subscribe = useCallback(async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      const isWebView = typeof (window as any).Capacitor !== 'undefined' || /wv|WebView/i.test(navigator.userAgent)
-      if (isWebView) {
-        setMessage('Las notificaciones no están disponibles en la app instalada. Abre esta web en Chrome, añádela a pantalla de inicio y actívalas desde ahí.')
-      } else {
-        setMessage('Tu navegador no soporta notificaciones push. Usa Chrome en el móvil (y añade la web a pantalla de inicio) para recibirlas.')
+    setStatus('loading')
+    setMessage('')
+
+    // Android APK: usar FCM con plugin Capacitor
+    if (isCapacitorAndroid()) {
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications')
+        const perm = await PushNotifications.requestPermissions()
+        if (perm.receive !== 'granted') {
+          setMessage('Permiso denegado. Activa las notificaciones en Ajustes del dispositivo.')
+          setStatus('error')
+          return
+        }
+        const tokenPromise = new Promise<string>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Tiempo de espera agotado')), 15000)
+          PushNotifications.addListener(
+            'registration',
+            (ev: { value: string }) => {
+              clearTimeout(timeout)
+              PushNotifications.removeAllListeners().catch(() => {})
+              resolve(ev.value)
+            }
+          )
+        })
+        await PushNotifications.register()
+        const token = await tokenPromise
+        const res = await fetch('/api/push-subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: 'android', token }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || 'Error al registrar')
+        }
+        setMessage('Notificaciones activadas')
+        setStatus('success')
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        setMessage(errMsg)
+        setStatus('error')
       }
-      setStatus('error')
       return
     }
 
-    setStatus('loading')
-    setMessage('')
+    // Web: Web Push (Service Worker + VAPID)
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setMessage('Tu navegador no soporta notificaciones push. Usa Chrome en el móvil (y añade la web a pantalla de inicio) para recibirlas.')
+      setStatus('error')
+      return
+    }
 
     try {
       // Use existing registration if SW already active (e.g. from ServiceWorkerRegister), else register

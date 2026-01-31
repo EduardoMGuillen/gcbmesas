@@ -19,8 +19,26 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { endpoint, keys } = body
+    const { endpoint, keys, platform, token } = body
 
+    // Android (FCM): platform === 'android' y token
+    if (platform === 'android' && token) {
+      const endpointFcm = `fcm:${token}`
+      await prisma.pushSubscription.upsert({
+        where: { endpoint: endpointFcm },
+        create: {
+          userId: session.user.id,
+          endpoint: endpointFcm,
+          platform: 'android',
+          p256dh: null,
+          auth: null,
+        },
+        update: {},
+      })
+      return NextResponse.json({ success: true })
+    }
+
+    // Web (VAPID): endpoint + keys
     if (!endpoint || !keys?.p256dh || !keys?.auth) {
       return NextResponse.json(
         { error: 'Datos de suscripción inválidos' },
@@ -33,6 +51,7 @@ export async function POST(req: NextRequest) {
       create: {
         userId: session.user.id,
         endpoint,
+        platform: 'web',
         p256dh: keys.p256dh,
         auth: keys.auth,
       },
