@@ -12,7 +12,6 @@ interface CashierAccountsProps {
     currentBalance: string | number | { toString(): string }
     createdAt: string | Date
     openedBy?: { name: string | null; username: string } | null
-    clientName?: string | null
     orders: Array<{
       id: string
       createdAt: string | Date
@@ -94,9 +93,6 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                 <p className="text-sm text-primary-400 font-medium">
                   Mesero: {account.openedBy?.name || account.openedBy?.username || '—'}
                 </p>
-                {account.clientName && (
-                  <p className="text-sm text-white/90">Cliente: {account.clientName}</p>
-                )}
                 <p className="text-xs text-white/70">
                   Abierta {formatDate(account.createdAt)}
                 </p>

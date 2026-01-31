@@ -16,5 +16,5 @@ BEGIN
   END IF;
 END $$;
 
--- Fase 2: Agregar columna clientName a accounts
-ALTER TABLE accounts ADD COLUMN IF NOT EXISTS "clientName" VARCHAR(255) NULL;
+-- Fase 2: Agregar columna clientName a accounts (TEXT para evitar timeout)
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS "clientName" TEXT NULL;
