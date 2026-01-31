@@ -30,6 +30,7 @@ export default async function AdminDashboard() {
       openAccounts: 0,
       activeWaiters: 0,
       topProducts: [],
+      activeMeserosList: [],
     }
   }
 
@@ -69,6 +70,27 @@ export default async function AdminDashboard() {
             </p>
           </div>
         </div>
+
+        {stats.activeMeserosList.length > 0 && (
+          <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-white mb-3 sm:mb-4">
+              Meseros Activos y Mesas
+            </h2>
+            <div className="space-y-2 sm:space-y-3">
+              {stats.activeMeserosList.map((mesero) => (
+                <div
+                  key={mesero.id}
+                  className="bg-dark-50 border border-dark-200 rounded-lg p-3 sm:p-4 flex justify-between items-center"
+                >
+                  <p className="font-semibold text-white">{mesero.name}</p>
+                  <span className="text-primary-400 font-medium">
+                    {mesero.tableCount} {mesero.tableCount === 1 ? 'mesa' : 'mesas'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6">
           <h2 className="text-lg sm:text-xl font-semibold text-white mb-3 sm:mb-4">
