@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { createCustomerOrder, createOrder, closeAccount, addBalanceToAccount, cancelOrderByCustomer, cancelOrderByMesero } from '@/lib/actions'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount, OPEN_ACCOUNT_SENTINEL } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import Image from 'next/image'
@@ -78,6 +78,7 @@ export function CustomerOrderView({
   const [selectedZone, setSelectedZone] = useState<string>('')
   const [showCreateAccount, setShowCreateAccount] = useState(false)
   const [initialBalance, setInitialBalance] = useState('')
+  const [cuentaAbierta, setCuentaAbierta] = useState(false)
   const [showAddBalance, setShowAddBalance] = useState(false)
   const [balanceAmount, setBalanceAmount] = useState('')
   const [showConfirmAddBalance, setShowConfirmAddBalance] = useState(false)
@@ -203,8 +204,8 @@ export function CustomerOrderView({
     setLoading(true)
 
     try {
-      const balance = parseFloat(initialBalance)
-      if (isNaN(balance) || balance <= 0) {
+      const balance = cuentaAbierta ? OPEN_ACCOUNT_SENTINEL : parseFloat(initialBalance)
+      if (!cuentaAbierta && (isNaN(balance) || balance <= 0)) {
         setError('El saldo inicial debe ser mayor a 0')
         setLoading(false)
         return
@@ -214,6 +215,7 @@ export function CustomerOrderView({
         await onCreateAccount(selectedTableId, balance)
         setShowCreateAccount(false)
         setInitialBalance('')
+        setCuentaAbierta(false)
         router.refresh()
       }
     } catch (err: any) {
@@ -480,27 +482,42 @@ export function CustomerOrderView({
             Esta mesa no tiene cuenta abierta. Crea una cuenta primero.
           </p>
           <form onSubmit={handleCreateAccount} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">
-                Saldo Inicial
-              </label>
+            <div className="flex items-center gap-3">
               <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={initialBalance}
-                onChange={(e) => setInitialBalance(e.target.value)}
-                required
-                className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="0.00"
+                type="checkbox"
+                id="cuentaAbierta"
+                checked={cuentaAbierta}
+                onChange={(e) => setCuentaAbierta(e.target.checked)}
+                className="w-4 h-4 rounded border-dark-300 bg-dark-50 text-primary-600 focus:ring-primary-500"
               />
+              <label htmlFor="cuentaAbierta" className="text-sm font-medium text-white cursor-pointer">
+                Cuenta Abierta (sin límite)
+              </label>
             </div>
+            {!cuentaAbierta && (
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">
+                  Saldo Inicial
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={initialBalance}
+                  onChange={(e) => setInitialBalance(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="0.00"
+                />
+              </div>
+            )}
             <div className="flex space-x-3">
               <button
                 type="button"
                 onClick={() => {
                   setShowCreateAccount(false)
                   setInitialBalance('')
+                  setCuentaAbierta(false)
                 }}
                 className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
               >
@@ -566,12 +583,12 @@ export function CustomerOrderView({
               <h3 className="text-sm font-medium text-white mb-2">Saldo Disponible</h3>
               <p
                 className={`text-2xl font-bold ${
-                  Number(account.currentBalance) < 0
+                  !isOpenAccount(account.initialBalance) && Number(account.currentBalance) < 0
                     ? 'text-red-400'
                     : 'text-green-400'
                 }`}
               >
-                {formatCurrency(account.currentBalance)}
+                {formatAccountBalance(account.initialBalance, account.currentBalance)}
               </p>
             </div>
             <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
@@ -946,10 +963,10 @@ export function CustomerOrderView({
                   Monto: {formatCurrency(pendingBalanceAmount)}
                 </p>
                 <p className="text-sm text-dark-400 mt-2">
-                  Saldo actual: {formatCurrency(account.currentBalance)}
+                  Saldo actual: {formatAccountBalance(account.initialBalance, account.currentBalance)}
                 </p>
                 <p className="text-sm text-green-400 mt-1 font-semibold">
-                  Nuevo saldo: {formatCurrency(Number(account.currentBalance) + pendingBalanceAmount)}
+                  Nuevo saldo: {isOpenAccount(account.initialBalance) ? 'Cuenta Abierta' : formatCurrency(Number(account.currentBalance) + pendingBalanceAmount)}
                 </p>
               </div>
               {error && (

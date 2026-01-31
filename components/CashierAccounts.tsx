@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount } from '@/lib/utils'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 
 interface CashierAccountsProps {
@@ -101,11 +101,13 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                 <div>
                   <p className="text-xs text-white/70">Inicial</p>
                   <p className="text-white font-semibold">
-                    {formatCurrency(
-                      typeof account.initialBalance === 'object'
-                        ? account.initialBalance.toString()
-                        : account.initialBalance
-                    )}
+                    {isOpenAccount(account.initialBalance)
+                      ? 'Cuenta Abierta'
+                      : formatCurrency(
+                          typeof account.initialBalance === 'object'
+                            ? account.initialBalance.toString()
+                            : account.initialBalance
+                        )}
                   </p>
                 </div>
                 <div>
@@ -118,12 +120,12 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
                   <p className="text-xs text-white/70">Disponible</p>
                   <p
                     className={`font-semibold ${
-                      Number(account.currentBalance) < 0
+                      !isOpenAccount(account.initialBalance) && Number(account.currentBalance) < 0
                         ? 'text-red-400'
                         : 'text-green-400'
                     }`}
                   >
-                    {formatCurrency(Number(account.currentBalance))}
+                    {formatAccountBalance(account.initialBalance, account.currentBalance)}
                   </p>
                 </div>
               </div>
