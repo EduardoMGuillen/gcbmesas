@@ -1,13 +1,49 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { signIn } from 'next-auth/react'
+import { signIn, useSession, getSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sessionCheckDone, setSessionCheckDone] = useState(false)
+
+  // iOS: las cookies pueden tardar en estar disponibles al reabrir la PWA. Esperar y reintentar.
+  useEffect(() => {
+    if (status !== 'loading' && session?.user?.role) {
+      const url =
+        session.user.role === 'ADMIN' ? '/admin' :
+        session.user.role === 'MESERO' ? '/mesero' :
+        session.user.role === 'CAJERO' ? '/cajero' : '/'
+      router.replace(`${url}?from=callback`)
+      return
+    }
+    if (status === 'unauthenticated') {
+      // iOS: reintentar getSession tras 1s (cookies pueden tardar en estar disponibles)
+      const refetchT = setTimeout(async () => {
+        const s = await getSession()
+        if (s?.user?.role) {
+          const url = s.user.role === 'ADMIN' ? '/admin' : s.user.role === 'MESERO' ? '/mesero' : s.user.role === 'CAJERO' ? '/cajero' : '/'
+          router.replace(`${url}?from=callback`)
+        }
+      }, 1000)
+      const doneT = setTimeout(() => setSessionCheckDone(true), 2500)
+      return () => { clearTimeout(refetchT); clearTimeout(doneT) }
+    }
+    if (status === 'authenticated' && !session?.user?.role) {
+      setSessionCheckDone(true)
+    }
+    if (status === 'loading') {
+      // Máximo 4s esperando, luego mostrar formulario
+      const t = setTimeout(() => setSessionCheckDone(true), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [status, session, router])
 
   // Check for error in URL and clean up callbackUrl
   useEffect(() => {
@@ -116,6 +152,19 @@ export default function LoginPage() {
       setError(err?.message || 'Error al iniciar sesión.')
       setLoading(false)
     }
+  }
+
+  // iOS: mostrar "Verificando sesión..." mientras comprobamos (cookies pueden tardar al reabrir)
+  if (!sessionCheckDone && (status === 'loading' || status === 'unauthenticated')) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-dark-50 pt-safe">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4" />
+          <p className="text-white/80">Verificando sesión...</p>
+          <p className="text-dark-400 text-sm mt-2">Espera un momento</p>
+        </div>
+      </div>
+    )
   }
 
   return (
