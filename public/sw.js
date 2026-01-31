@@ -10,6 +10,9 @@ self.addEventListener('push', (event) => {
       badge: '/LogoCasaBlanca.png',
       tag: data.type || 'default',
       renotify: true,
+      requireInteraction: true,
+      silent: false,
+      vibrate: [200, 100, 200],
       data: data,
     }
     event.waitUntil(self.registration.showNotification(title, options))
@@ -20,7 +23,8 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  if (event.notification.data?.type === 'new_order') {
+  const type = event.notification.data?.type
+  if (type === 'new_order' || type === 'test') {
     event.waitUntil(
       clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
         for (const client of clientList) {
