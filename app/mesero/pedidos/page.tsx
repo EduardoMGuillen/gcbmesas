@@ -46,6 +46,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
             initialBalance: Number(tableData.accounts[0].initialBalance),
             currentBalance: Number(tableData.accounts[0].currentBalance),
             clientName: tableData.accounts[0].clientName || null,
+            openedBy: tableData.accounts[0].openedBy ? { name: tableData.accounts[0].openedBy.name, username: tableData.accounts[0].openedBy.username } : null,
             orders: tableData.accounts[0].orders.map((order: any) => ({
               id: order.id,
               product: {

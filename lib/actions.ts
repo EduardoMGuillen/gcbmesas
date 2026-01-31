@@ -1335,6 +1335,7 @@ export async function getTables() {
     include: {
       accounts: {
         where: { status: 'OPEN' },
+        include: { openedBy: { select: { name: true, username: true } } },
         orderBy: { createdAt: 'desc' },
       },
       _count: {
@@ -1353,6 +1354,7 @@ export async function getTableById(tableId: string) {
       accounts: {
         where: { status: 'OPEN' },
         include: {
+          openedBy: { select: { name: true, username: true } },
           orders: {
             include: {
               product: true,
@@ -1376,6 +1378,7 @@ export async function getTableByIdPublic(tableId: string) {
       accounts: {
         where: { status: 'OPEN' },
         include: {
+          openedBy: { select: { name: true, username: true } },
           orders: {
             where: { rejected: false },
             include: {
@@ -1401,6 +1404,7 @@ export async function getTableByShortCodePublic(shortCode: string) {
       accounts: {
         where: { status: 'OPEN' },
         include: {
+          openedBy: { select: { name: true, username: true } },
           orders: {
             where: { rejected: false },
             include: {
