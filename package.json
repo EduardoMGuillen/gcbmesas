@@ -22,7 +22,8 @@
     "import:bebidas": "node scripts/import-bebidas-wrapper.js",
     "cap:sync": "cap sync",
     "cap:android": "cap sync android && cap open android",
-    "android": "cap sync android && cap open android"
+    "android": "cap sync android && cap open android",
+    "build:apk": "cap sync android && cd android && build-apk.bat"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",
