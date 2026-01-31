@@ -135,41 +135,49 @@ export const authOptions: NextAuthOptions = {
     // Si NextAuth lanza error de config, redirigir a clientes
     error: '/clientes',
   },
+  // Recordar sesión siempre: 1 año. Cookies con maxAge persisten al cerrar webapp (iOS/Android).
   session: {
     strategy: 'jwt',
-    maxAge: 365 * 24 * 60 * 60, // 365 días - persistir al cerrar/abrir webapp (evita bug iOS WebKit con cookies de sesión)
-    updateAge: 24 * 60 * 60, // 24 hours
+    maxAge: 365 * 24 * 60 * 60, // 365 días
+    updateAge: 24 * 60 * 60,
   },
+  // Nombre de cookie debe coincidir con useSecureCookies en producción (__Secure- prefix)
+  useSecureCookies: process.env.NODE_ENV === 'production' || (process.env.NEXTAUTH_URL?.startsWith('https') ?? false),
   cookies: {
-    // Cookie persistente (con maxAge): evita logout al cerrar PWA. Cookies "session" (sin maxAge) se pierden en iOS.
     sessionToken: {
-      name: `next-auth.session-token`,
+      name: (process.env.NODE_ENV === 'production' || process.env.NEXTAUTH_URL?.startsWith('https'))
+        ? '__Secure-next-auth.session-token'
+        : 'next-auth.session-token',
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 365 * 24 * 60 * 60, // 365 días - explícito para persistencia en iOS/Android PWA
+        maxAge: 365 * 24 * 60 * 60, // 365 días - persistente (evita logout al cerrar PWA)
       },
     },
     callbackUrl: {
-      name: `next-auth.callback-url`,
+      name: (process.env.NODE_ENV === 'production' || process.env.NEXTAUTH_URL?.startsWith('https'))
+        ? '__Secure-next-auth.callback-url'
+        : 'next-auth.callback-url',
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 24 * 60 * 60, // 24h - persistente para evitar pérdida en iOS
+        maxAge: 7 * 24 * 60 * 60, // 7 días
       },
     },
     csrfToken: {
-      name: `next-auth.csrf-token`,
+      name: (process.env.NODE_ENV === 'production' || process.env.NEXTAUTH_URL?.startsWith('https'))
+        ? '__Host-next-auth.csrf-token'
+        : 'next-auth.csrf-token',
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 24 * 60 * 60, // 24h - persistente
+        maxAge: 7 * 24 * 60 * 60,
       },
     },
   },
