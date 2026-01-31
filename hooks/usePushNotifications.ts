@@ -193,7 +193,7 @@ export function usePushNotifications() {
       setMessage(errMsg + hint)
       setStatus('error')
     }
-  }, [])
+  }, [log])
 
   return { subscribe, status, message, logLines }
 }
