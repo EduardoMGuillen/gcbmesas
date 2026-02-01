@@ -93,16 +93,31 @@ export function usePushNotifications() {
       return
     }
 
+    const isAndroidWeb = /Android/i.test(navigator.userAgent)
+
     try {
-      // Use existing registration if SW already active (e.g. from ServiceWorkerRegister), else register
+      // En Android Chrome: pedir permiso primero (el gesto se pierde tras muchos awaits)
+      if (isAndroidWeb) {
+        log('1. [Android] Solicitando permiso primero...')
+        const permFirst = await Notification.requestPermission()
+        log('2. Permiso: ' + permFirst)
+        if (permFirst !== 'granted') {
+          setMessage(permFirst === 'denied' ? 'Permiso denegado. Activa notificaciones en Ajustes del sitio.' : 'Permiso denegado')
+          setStatus('error')
+          return
+        }
+      }
+
+      log(isAndroidWeb ? '3. Obteniendo registro SW...' : '1. Obteniendo registro SW...')
       let reg = await navigator.serviceWorker.getRegistration('/')
       if (!reg || !reg.active) {
+        log('Registrando SW /sw.js...')
         reg = await navigator.serviceWorker.register('/sw.js', {
           scope: '/',
           updateViaCache: 'none',
         })
       }
-      // Wait for active worker - critical for Android/Chrome
+      log('Esperando SW activo...')
       const worker = reg.installing || reg.waiting || reg.active
       if (worker) {
         await new Promise<void>((resolve) => {
@@ -113,27 +128,32 @@ export function usePushNotifications() {
           worker.addEventListener('statechange', () => {
             if (worker.state === 'activated') resolve()
           })
-          setTimeout(resolve, 5000) // Android puede tardar más
+          setTimeout(resolve, 8000)
         })
       }
       await navigator.serviceWorker.ready
+      log('SW listo')
 
-      // Get VAPID public key
+      if (!isAndroidWeb) {
+        log('Solicitando permiso...')
+        const permission = await Notification.requestPermission()
+        log('Permiso: ' + permission)
+        if (permission !== 'granted') {
+          setMessage(permission === 'denied' ? 'Permiso denegado.' : 'Permiso denegado')
+          setStatus('error')
+          return
+        }
+      }
+
+      log('Obteniendo clave VAPID...')
       const vapidRes = await fetch('/api/push-vapid')
       if (!vapidRes.ok) {
-        throw new Error('Push no disponible')
+        throw new Error('Push no disponible (servidor)')
       }
       const { publicKey } = await vapidRes.json()
+      if (!publicKey) throw new Error('Clave VAPID vacía')
 
-      // Request permission (must be after SW registration on Android)
-      const permission = await Notification.requestPermission()
-      if (permission !== 'granted') {
-        setMessage(permission === 'denied' ? 'Permiso denegado. Revisa la configuración de notificaciones del navegador.' : 'Permiso denegado')
-        setStatus('error')
-        return
-      }
-
-      // Subscribe to push - con reintentos (Chrome Android puede fallar intermitentemente)
+      log('Suscribiendo a push (reintentos 3)...')
       const key = urlBase64ToUint8Array(publicKey)
       const maxRetries = 3
       let sub: PushSubscription | null = null
@@ -141,6 +161,7 @@ export function usePushNotifications() {
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
           if (attempt > 0) {
+            log('Reintento ' + (attempt + 1) + '...')
             await new Promise((r) => setTimeout(r, 1500 * attempt))
           }
           sub = await reg.pushManager.subscribe({
@@ -149,12 +170,15 @@ export function usePushNotifications() {
           })
           break
         } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          log('Error subscribe: ' + msg)
           if (attempt === maxRetries - 1) throw e
         }
       }
 
       if (!sub) throw new Error('No se pudo suscribir a push')
 
+      log('Enviando suscripción al servidor...')
       const subscription = sub.toJSON()
       const res = await fetch('/api/push-subscribe', {
         method: 'POST',
@@ -173,6 +197,7 @@ export function usePushNotifications() {
         throw new Error(err.error || 'Error al registrar')
       }
 
+      log('OK. Notificaciones activadas.')
       setMessage('Notificaciones activadas')
       setStatus('success')
     } catch (err: unknown) {
