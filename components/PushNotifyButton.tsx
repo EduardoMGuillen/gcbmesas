@@ -73,12 +73,28 @@ export function PushNotifyButton() {
       </button>
       </div>
       {(message || testMsg) && (
-        <span
-          className={`text-xs max-w-[240px] text-right break-words ${
-            status === 'success' && !testMsg ? 'text-green-400' : status === 'error' ? 'text-red-400' : 'text-white/70'
-          }`}
-        >
-          {testMsg || message}
+        <span className="block max-w-[280px] text-right">
+          <span
+            className={`text-xs break-words ${
+              status === 'success' && !testMsg ? 'text-green-400' : status === 'error' ? 'text-red-400' : 'text-white/70'
+            }`}
+          >
+            {testMsg || message}
+          </span>
+          {status === 'success' && typeof navigator !== 'undefined' && (
+            <>
+              {!/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) && (
+                <span className="block text-[10px] text-white/50 mt-0.5">
+                  En PC: para ver la notificación, minimiza esta pestaña o cambia de ventana antes de &quot;Probar&quot;. Los pedidos llegarán cuando estés en otra pestaña o app.
+                </span>
+              )}
+              {/Android/i.test(navigator.userAgent) && (
+                <span className="block text-[10px] text-white/50 mt-0.5">
+                  Si en consola ves error de &quot;OAuth&quot; o &quot;authentication&quot;, puedes ignorarlo si las notis llegan.
+                </span>
+              )}
+            </>
+          )}
         </span>
       )}
       {(logLines?.length ?? 0) > 0 && logVisible && (
