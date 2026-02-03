@@ -9,6 +9,7 @@ export function PushNotifyButton() {
   const { subscribe, status, message, logLines = [] } = usePushNotifications()
   const [testLoading, setTestLoading] = useState(false)
   const [testMsg, setTestMsg] = useState('')
+  const [logVisible, setLogVisible] = useState(true)
 
   const handleTest = async () => {
     setTestMsg('')
@@ -47,7 +48,10 @@ export function PushNotifyButton() {
           </button>
         )}
         <button
-          onClick={subscribe}
+          onClick={() => {
+            setLogVisible(true)
+            subscribe()
+          }}
           disabled={status === 'loading'}
           className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white/80 hover:text-white hover:bg-dark-200 rounded-lg transition-colors disabled:opacity-50"
           title="Recibir notificaciones cuando un cliente agregue pedidos a tus mesas"
@@ -77,9 +81,22 @@ export function PushNotifyButton() {
           {testMsg || message}
         </span>
       )}
-      {(logLines?.length ?? 0) > 0 && (
+      {(logLines?.length ?? 0) > 0 && logVisible && (
         <div className="mt-2 w-full max-w-[280px] max-h-32 overflow-y-auto rounded bg-dark-200/80 px-2 py-1.5 text-left">
-          <p className="text-[10px] text-white/60 mb-1 font-medium">Registro (para pruebas):</p>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <p className="text-[10px] text-white/60 font-medium">Registro (para pruebas):</p>
+            <button
+              type="button"
+              onClick={() => setLogVisible(false)}
+              className="shrink-0 p-0.5 rounded text-white/50 hover:text-white hover:bg-white/10"
+              title="Cerrar registro"
+              aria-label="Cerrar registro"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           {(logLines || []).map((line, i) => (
             <p key={i} className="text-[10px] text-white/80 font-mono leading-tight break-all">
               {line}
