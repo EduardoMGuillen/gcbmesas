@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "892705622211",
+    "project_id": "gcbmesas-vercel-app",
+    "storage_bucket": "gcbmesas-vercel-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:892705622211:android:8360c2444f2999c185ba76",
+        "android_client_info": {
+          "package_name": "com.casablanca.gcbmesas"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJzdqAkCX3u8r_J2pK_PWelwuaGQGdK1Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
