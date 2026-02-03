@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { setOrderServed, rejectOrder } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -30,20 +30,22 @@ interface CashierOrdersProps {
     }
     user?: { username: string; name?: string | null }
   }>
+  /** Zona seleccionada (filtro compartido con Cuentas abiertas) */
+  selectedZone?: string
 }
 
 export function CashierOrders({
   pendingOrders,
   recentServed,
+  selectedZone = '',
 }: CashierOrdersProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [selectedZone, setSelectedZone] = useState<string>('')
-  
+
   // Auto-refresh cada 15 segundos para ver nuevos pedidos pendientes
   useAutoRefresh({ interval: 15000 })
 
-  // Filtrar pedidos por zona
+  // Filtrar pedidos por zona (filtro compartido desde el padre)
   const filteredPendingOrders = pendingOrders.filter((order) => {
     if (!selectedZone) return true
     return order.account.table.zone === selectedZone
@@ -53,14 +55,6 @@ export function CashierOrders({
     if (!selectedZone) return true
     return order.account.table.zone === selectedZone
   })
-
-  // Obtener zonas únicas de ambos listados
-  const zones = Array.from(
-    new Set([
-      ...pendingOrders.map((o) => o.account.table.zone).filter(Boolean),
-      ...recentServed.map((o) => o.account.table.zone).filter(Boolean),
-    ])
-  ).filter((zone): zone is string => Boolean(zone)).sort()
 
   const handleMarkServed = (orderId: string) => {
     startTransition(async () => {
@@ -85,25 +79,6 @@ export function CashierOrders({
 
   return (
     <div className="space-y-6">
-      {/* Filtro de zona */}
-      <div className="bg-dark-100 border border-dark-200 rounded-xl p-4">
-        <label className="block text-sm font-medium text-white mb-2">
-          Filtrar por Zona
-        </label>
-        <select
-          value={selectedZone}
-          onChange={(e) => setSelectedZone(e.target.value)}
-          className="w-full sm:w-auto px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-        >
-          <option value="">Todas las zonas</option>
-          {zones.map((zone) => (
-            <option key={zone} value={zone}>
-              {zone}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">

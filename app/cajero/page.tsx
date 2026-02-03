@@ -4,8 +4,7 @@ import { redirect } from 'next/navigation'
 import { getCashierDashboardData, closeOldAccounts } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
-import { CashierAccounts } from '@/components/CashierAccounts'
-import { CashierOrders } from '@/components/CashierOrders'
+import { CajeroDashboard } from './CajeroDashboard'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,19 +35,11 @@ export default async function CajeroPage() {
           </p>
         </div>
 
-        <section>
-          <CashierOrders
-            pendingOrders={pendingOrders}
-            recentServed={recentServed}
-          />
-        </section>
-
-        <section>
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Cuentas abiertas
-          </h2>
-          <CashierAccounts accounts={accounts} />
-        </section>
+        <CajeroDashboard
+          accounts={accounts}
+          pendingOrders={pendingOrders}
+          recentServed={recentServed}
+        />
       </main>
       {!isAdmin && <Footer />}
     </div>

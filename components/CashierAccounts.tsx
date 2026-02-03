@@ -23,14 +23,15 @@ interface CashierAccountsProps {
       user?: { username: string; name?: string | null }
     }>
   }>
+  /** Zona seleccionada (filtro compartido con Pedidos) */
+  selectedZone?: string
 }
 
 function pendingCount(orders: CashierAccountsProps['accounts'][0]['orders']) {
   return orders.filter((o) => !o.served && o.rejected !== true).length
 }
 
-export function CashierAccounts({ accounts }: CashierAccountsProps) {
-  const [selectedZone, setSelectedZone] = useState<string>('')
+export function CashierAccounts({ accounts, selectedZone = '' }: CashierAccountsProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   const toggleExpanded = (accountId: string) => {
@@ -45,7 +46,7 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
   // Auto-refresh cada 30 segundos para ver cambios en cuentas
   useAutoRefresh({ interval: 30000 })
 
-  // Filtrar cuentas por zona
+  // Filtrar cuentas por zona (filtro compartido desde el padre)
   const filteredAccounts = accounts.filter((acc) => {
     if (selectedZone && acc.table?.zone !== selectedZone) {
       return false
@@ -63,23 +64,6 @@ export function CashierAccounts({ accounts }: CashierAccountsProps) {
 
   return (
     <div className="space-y-6">
-      {/* Filtro por zona */}
-      <div className="bg-dark-100 border border-dark-200 rounded-xl p-4">
-        <label className="block text-sm font-medium text-white mb-2">
-          Filtrar por zona
-        </label>
-        <select
-          value={selectedZone}
-          onChange={(e) => setSelectedZone(e.target.value)}
-          className="w-full md:w-auto px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-        >
-          <option value="">Todas las zonas</option>
-          <option value="Astronomical">Astronomical</option>
-          <option value="Studio54">Studio54</option>
-          <option value="Beer Garden">Beer Garden</option>
-        </select>
-      </div>
-
       {filteredAccounts.length === 0 ? (
         <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
           <p className="text-white/80">
