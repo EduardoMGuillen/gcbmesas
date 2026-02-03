@@ -46,6 +46,11 @@ export async function sendPushToUser(
     where: { userId },
   })
   if (subscriptions.length === 0) return
+  const vapidKeys = getVapidKeys()
+  const webCount = subscriptions.filter((s) => !s.endpoint.startsWith('fcm:')).length
+  if (webCount > 0 && !vapidKeys) {
+    console.warn('[Push] Hay', webCount, 'suscripción(es) web (PC/iOS) pero no hay VAPID en el servidor. Añade VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY en Vercel.')
+  }
   console.log('[Push] Enviando a usuario', userId, '|', subscriptions.length, 'suscripción(es) | título:', title)
 
   const toRemove: string[] = []
@@ -77,8 +82,11 @@ export async function sendPushToUser(
       continue
     }
 
-    const keys = getVapidKeys()
-    if (!keys || !sub.p256dh || !sub.auth) continue
+    const keys = vapidKeys ?? getVapidKeys()
+    if (!keys || !sub.p256dh || !sub.auth) {
+      if (!keys) console.warn('[Push Web] Omitida suscripción PC/web: faltan VAPID_PUBLIC_KEY o VAPID_PRIVATE_KEY en el servidor.')
+      continue
+    }
     webpush.setVapidDetails(
       'mailto:support@lagrancasablanca.com',
       keys.publicKey,
@@ -104,6 +112,7 @@ export async function sendPushToUser(
   }
 }
 
+/** Notifica al usuario que abrió la mesa (mesero o admin). */
 export async function sendPushToAccountOpener(
   openedByUserId: string | null,
   tableName: string,
