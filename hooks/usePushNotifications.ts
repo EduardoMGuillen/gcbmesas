@@ -40,28 +40,30 @@ export function usePushNotifications() {
         const tokenPromise = new Promise<string>((resolve, reject) => {
           const timeout = setTimeout(
             () => reject(new Error('Tiempo de espera agotado. En emulador FCM suele fallar: prueba en un móvil real. Si es dispositivo real, revisa que Google Play Services esté actualizado.')),
-            30000
+            45000
           )
           PushNotifications.addListener(
             'registration',
             (ev: { value: string }) => {
               clearTimeout(timeout)
-              PushNotifications.removeAllListeners().catch(() => {})
               log('5. Token FCM recibido (primeros 20 chars: ' + (ev.value || '').slice(0, 20) + '...)')
               resolve(ev.value)
+              PushNotifications.removeAllListeners().catch(() => {})
             }
           )
           PushNotifications.addListener(
             'registrationError',
             (err: { error: string }) => {
               clearTimeout(timeout)
-              PushNotifications.removeAllListeners().catch(() => {})
               log('5. Error FCM: ' + (err?.error || 'desconocido'))
               reject(new Error(err?.error || 'Error al obtener el token de notificaciones'))
+              PushNotifications.removeAllListeners().catch(() => {})
             }
           )
         })
-        log('5. Llamando register() y esperando token (máx 30s)...')
+        // Dar un tick para que los listeners estén registrados antes de register() (evita race en Android)
+        await new Promise((r) => setTimeout(r, 150))
+        log('5. Llamando register() y esperando token (máx 45s)...')
         await PushNotifications.register()
         const token = await tokenPromise
         log('6. Enviando token al servidor...')
@@ -86,14 +88,82 @@ export function usePushNotifications() {
       return
     }
 
+    const isAndroidWeb = /Android/i.test(navigator.userAgent)
+    const firebaseWebConfig = (await import('@/lib/firebase-web-config')).getFirebaseWebConfig()
+
+    // Android PWA con Firebase Web: usar FCM en el navegador (mismo envío que APK, más fiable que Web Push)
+    if (isAndroidWeb && firebaseWebConfig) {
+      try {
+        log('1. [Android PWA] Usando FCM Web...')
+        const permFirst = await Notification.requestPermission()
+        log('2. Permiso: ' + permFirst)
+        if (permFirst !== 'granted') {
+          setMessage(permFirst === 'denied' ? 'Permiso denegado.' : 'Permiso denegado')
+          setStatus('error')
+          return
+        }
+        log('3. Obteniendo clave VAPID...')
+        const vapidRes = await fetch('/api/push-vapid')
+        if (!vapidRes.ok) throw new Error('Push no disponible (servidor)')
+        const { publicKey } = await vapidRes.json()
+        if (!publicKey) throw new Error('Clave VAPID vacía')
+        log('4. Registrando SW para FCM...')
+        let reg = await navigator.serviceWorker.getRegistration('/')
+        if (!reg || !reg.active) {
+          reg = await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+          await navigator.serviceWorker.ready
+        }
+        const worker = reg?.installing || reg?.waiting || reg?.active
+        if (worker && worker.state !== 'activated') {
+          await new Promise<void>((r) => {
+            worker.addEventListener('statechange', () => { if (worker.state === 'activated') r() })
+            setTimeout(r, 8000)
+          })
+        }
+        log('5. Inicializando Firebase Messaging...')
+        const { getApp, initializeApp } = await import('firebase/app')
+        const { getMessaging, getToken } = await import('firebase/messaging')
+        let app
+        try {
+          app = getApp()
+        } catch {
+          app = initializeApp(firebaseWebConfig)
+        }
+        const messaging = getMessaging(app)
+        log('6. Obteniendo token FCM...')
+        const token = await getToken(messaging, {
+          vapidKey: publicKey,
+          serviceWorkerRegistration: reg ?? undefined,
+        })
+        if (!token) throw new Error('No se obtuvo token FCM')
+        log('7. Enviando token al servidor...')
+        const res = await fetch('/api/push-subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: 'android', token }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || 'Error al registrar')
+        }
+        log('8. Notificaciones activadas (FCM Web).')
+        setMessage('Notificaciones activadas')
+        setStatus('success')
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        log('ERROR FCM Web: ' + errMsg)
+        setMessage(errMsg + ' Prueba de nuevo o usa la app instalada (APK).')
+        setStatus('error')
+      }
+      return
+    }
+
     // Web: Web Push (Service Worker + VAPID)
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       setMessage('Tu navegador no soporta notificaciones push. Usa Chrome en el móvil (y añade la web a pantalla de inicio) para recibirlas.')
       setStatus('error')
       return
     }
-
-    const isAndroidWeb = /Android/i.test(navigator.userAgent)
 
     try {
       // En Android Chrome: pedir permiso primero (el gesto se pierde tras muchos awaits)

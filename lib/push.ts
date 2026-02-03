@@ -89,13 +89,13 @@ export async function sendPushToUser(
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
         payload,
-        { TTL: 60 }
+        { TTL: 3600, contentEncoding: 'aes128gcm' as const }
       )
-      console.log('[Push Web] Enviado OK')
+      console.log('[Push Web] Enviado OK', sub.endpoint.includes('fcm.googleapis.com') ? '(Chrome Android)' : '')
     } catch (err: unknown) {
-      const e = err as { statusCode?: number }
+      const e = err as { statusCode?: number; body?: string }
       if (e?.statusCode === 410 || e?.statusCode === 404) toRemove.push(sub.id)
-      else console.error('[Push Web] Error:', sub.endpoint.slice(0, 50), err)
+      else console.error('[Push Web] Error', e?.statusCode || '', sub.endpoint.slice(0, 60), e?.body || err)
     }
   }
 

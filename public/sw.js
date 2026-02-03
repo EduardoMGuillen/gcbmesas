@@ -9,25 +9,39 @@ self.addEventListener('push', (event) => {
   if (event.data) {
     try {
       data = event.data.json()
-      title = data.title || title
-      body = data.body || ''
+      // Formato Web Push (VAPID): { title, body, ... }
+      // Formato FCM (Firebase Admin → token web): { notification: { title, body }, data: {} }
+      const notif = data.notification
+      if (notif && (notif.title != null || notif.body != null)) {
+        title = (notif.title != null && notif.title !== '') ? notif.title : title
+        body = (notif.body != null) ? String(notif.body) : ''
+        if (data.data) data = data.data
+      } else {
+        title = (data.title != null && data.title !== '') ? data.title : title
+        body = (data.body != null) ? String(data.body) : ''
+      }
     } catch (e) {
-      body = event.data.text() || ''
+      try {
+        body = event.data.text() || ''
+      } catch (_) {}
     }
   }
   const options = {
-    body: body,
+    body: body || ' ',
     icon: '/LogoCasaBlanca.png',
     badge: '/LogoCasaBlanca.png',
-    tag: data.type || 'default',
+    tag: (data && data.type) ? data.type : 'default',
     renotify: true,
     requireInteraction: false,
     silent: false,
     vibrate: [200, 100, 200],
-    data: data,
+    data: data || {},
     dir: 'auto',
   }
-  event.waitUntil(self.registration.showNotification(title, options))
+  const promise = self.registration.showNotification(title, options).catch(function (err) {
+    console.error('[sw] showNotification failed', err)
+  })
+  event.waitUntil(promise)
 })
 
 self.addEventListener('notificationclick', (event) => {
