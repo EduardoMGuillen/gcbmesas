@@ -20,6 +20,10 @@ export default function ScanPage() {
   const scannerRef = useRef<any>(null)
   const scannerContainerRef = useRef<HTMLDivElement>(null)
   const isMountedRef = useRef(true)
+  const camerasRef = useRef<{ id: string; label: string }[]>([])
+  const currentCameraIndexRef = useRef<number>(0)
+  const switchingCameraRef = useRef(false)
+  const [canSwitchCamera, setCanSwitchCamera] = useState(false)
 
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
@@ -220,7 +224,19 @@ export default function ScanPage() {
         return
       }
 
-      const preferredCamera = cameras.find((camera) => camera.label.toLowerCase().includes('back')) || cameras[0]
+      camerasRef.current = cameras
+      // Preferir cámara trasera: por etiqueta (back, rear, trasera) o en móviles suele ser la segunda
+      if (!switchingCameraRef.current) {
+        const backLabels = ['back', 'rear', 'trasera', 'posterior', 'environment']
+        const backIndex = cameras.findIndex((c) =>
+          backLabels.some((k) => c.label.toLowerCase().includes(k))
+        )
+        currentCameraIndexRef.current =
+          backIndex >= 0 ? backIndex : (cameras.length >= 2 ? 1 : 0)
+      }
+      switchingCameraRef.current = false
+      const cameraToUse = cameras[currentCameraIndexRef.current]
+      setCanSwitchCamera(cameras.length > 1)
 
       // Crear nueva instancia del escáner
       const html5QrCode = new Html5Qrcode(scannerContainerRef.current.id, {
@@ -236,7 +252,7 @@ export default function ScanPage() {
       scannerRef.current = html5QrCode
 
       await html5QrCode.start(
-        preferredCamera.id,
+        cameraToUse.id,
         {
           fps: 10,
           qrbox: window.innerWidth < 640 ? { width: 220, height: 220 } : { width: 300, height: 300 },
@@ -274,6 +290,16 @@ export default function ScanPage() {
     } else {
       startScanner()
     }
+  }
+
+  const handleSwitchCamera = async () => {
+    if (camerasRef.current.length <= 1) return
+    switchingCameraRef.current = true
+    currentCameraIndexRef.current =
+      (currentCameraIndexRef.current + 1) % camerasRef.current.length
+    await stopScanner()
+    await new Promise((r) => setTimeout(r, 300))
+    await startScanner()
   }
 
   return (
@@ -350,8 +376,19 @@ export default function ScanPage() {
 
             {isScanning && (
               <div className="space-y-3">
-                <div className="text-sm text-dark-300">
-                  Apunta la cámara al código QR de la mesa. El escaneo se detendrá automáticamente cuando lo detectemos.
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-dark-300">
+                    Apunta la cámara al código QR de la mesa. El escaneo se detendrá automáticamente cuando lo detectemos.
+                  </span>
+                  {canSwitchCamera && (
+                    <button
+                      type="button"
+                      onClick={handleSwitchCamera}
+                      className="shrink-0 px-3 py-1.5 text-sm font-medium bg-dark-200 hover:bg-dark-300 text-white rounded-lg"
+                    >
+                      Cambiar cámara
+                    </button>
+                  )}
                 </div>
                 <div
                   id="qr-reader"
