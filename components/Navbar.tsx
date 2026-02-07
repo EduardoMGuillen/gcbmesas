@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { PushNotifyButton } from './PushNotifyButton'
+import { RefreshButton } from './RefreshButton'
 
 export function Navbar() {
   const { data: session } = useSession()
@@ -74,7 +75,8 @@ export function Navbar() {
           </div>
 
           {/* User Info and Mobile Menu Button */}
-          <div className="flex items-center space-x-2 sm:space-x-4">
+          <div className="flex items-center space-x-1 sm:space-x-3">
+            <RefreshButton />
             <PushNotifyButton />
             {/* User info - Hidden on small mobile */}
             <span className="hidden sm:inline-block text-xs sm:text-sm text-white/80 truncate max-w-[150px] lg:max-w-none">
