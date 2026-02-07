@@ -69,7 +69,7 @@ function loadSavedSelection(userId: string, activeMeseroIds: string[]): Set<stri
 
 function saveSelection(userId: string, ids: Set<string>) {
   try {
-    localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify([...ids]))
+    localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(Array.from(ids)))
   } catch {}
 }
 
