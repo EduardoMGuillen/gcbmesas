@@ -15,6 +15,7 @@ interface CashierOrdersProps {
     product: { name: string; price: string | number | { toString(): string } }
     account: {
       id: string
+      openedByUserId?: string | null
       table: { name: string; shortCode: string; zone?: string | null }
     }
     user?: { username: string; name?: string | null }
@@ -26,18 +27,22 @@ interface CashierOrdersProps {
     product: { name: string; price: string | number | { toString(): string } }
     account: {
       id: string
+      openedByUserId?: string | null
       table: { name: string; shortCode: string; zone?: string | null }
     }
     user?: { username: string; name?: string | null }
   }>
-  /** Zona seleccionada (filtro compartido con Cuentas abiertas) */
-  selectedZone?: string
+  /** IDs de meseros seleccionados en el filtro */
+  selectedMeseroIds: Set<string>
+  /** True cuando ningún mesero está seleccionado */
+  noneSelected: boolean
 }
 
 export function CashierOrders({
   pendingOrders,
   recentServed,
-  selectedZone = '',
+  selectedMeseroIds,
+  noneSelected,
 }: CashierOrdersProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -45,16 +50,22 @@ export function CashierOrders({
   // Auto-refresh cada 15 segundos para ver nuevos pedidos pendientes
   useAutoRefresh({ interval: 15000 })
 
-  // Filtrar pedidos por zona (filtro compartido desde el padre)
-  const filteredPendingOrders = pendingOrders.filter((order) => {
-    if (!selectedZone) return true
-    return order.account.table.zone === selectedZone
-  })
+  // Filtrar pedidos por mesero seleccionado
+  const filteredPendingOrders = noneSelected
+    ? []
+    : pendingOrders.filter((order) =>
+        order.account.openedByUserId
+          ? selectedMeseroIds.has(order.account.openedByUserId)
+          : true
+      )
 
-  const filteredRecentServed = recentServed.filter((order) => {
-    if (!selectedZone) return true
-    return order.account.table.zone === selectedZone
-  })
+  const filteredRecentServed = noneSelected
+    ? []
+    : recentServed.filter((order) =>
+        order.account.openedByUserId
+          ? selectedMeseroIds.has(order.account.openedByUserId)
+          : true
+      )
 
   const handleMarkServed = (orderId: string) => {
     startTransition(async () => {
@@ -96,7 +107,9 @@ export function CashierOrders({
           </div>
 
           {filteredPendingOrders.length === 0 ? (
-          <p className="text-white/80">No hay pedidos pendientes.</p>
+          <p className="text-white/80">
+            {noneSelected ? 'Selecciona al menos un mesero para ver pedidos.' : 'No hay pedidos pendientes.'}
+          </p>
         ) : (
           <div className="space-y-4">
             {filteredPendingOrders.map((order) => (
@@ -172,7 +185,9 @@ export function CashierOrders({
         </div>
 
         {filteredRecentServed.length === 0 ? (
-          <p className="text-white/80">Aún no hay pedidos completados{selectedZone ? ` en ${selectedZone}` : ''}.</p>
+          <p className="text-white/80">
+            {noneSelected ? 'Selecciona al menos un mesero.' : 'Aún no hay pedidos completados.'}
+          </p>
         ) : (
           <div className="space-y-3">
             {filteredRecentServed.map((order) => (
@@ -209,4 +224,3 @@ export function CashierOrders({
     </div>
   )
 }
-
