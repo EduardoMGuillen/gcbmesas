@@ -344,9 +344,9 @@ export async function getCashierDashboardData() {
         user: { select: { username: true, name: true } },
       },
     }),
-    // Todos los meseros para el filtro del cajero (admins se muestran siempre, sin chip)
+    // Todos los meseros para el filtro del cajero (admins y cliente se excluyen del filtro)
     prisma.user.findMany({
-      where: { role: 'MESERO' },
+      where: { role: 'MESERO', username: { not: 'CLIENTE' } },
       select: { id: true, name: true, username: true },
       orderBy: { name: 'asc' },
     }),
