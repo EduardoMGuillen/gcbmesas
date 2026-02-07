@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { CashierOrders } from '@/components/CashierOrders'
 import { CashierAccounts } from '@/components/CashierAccounts'
 
@@ -48,6 +48,29 @@ interface CajeroDashboardProps {
   pendingOrders: OrderItem[]
   recentServed: OrderItem[]
   activeMeseros: ActiveMesero[]
+  userId: string
+}
+
+const STORAGE_KEY_PREFIX = 'cajero-meseros-'
+
+function loadSavedSelection(userId: string, activeMeseroIds: string[]): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PREFIX + userId)
+    if (raw) {
+      const saved: string[] = JSON.parse(raw)
+      // Solo conservar IDs que sigan siendo meseros activos hoy
+      const valid = saved.filter((id) => activeMeseroIds.includes(id))
+      if (valid.length > 0) return new Set(valid)
+    }
+  } catch {}
+  // Si no hay guardado o ninguno es válido, seleccionar todos
+  return new Set(activeMeseroIds)
+}
+
+function saveSelection(userId: string, ids: Set<string>) {
+  try {
+    localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify([...ids]))
+  } catch {}
 }
 
 export function CajeroDashboard({
@@ -55,23 +78,31 @@ export function CajeroDashboard({
   pendingOrders,
   recentServed,
   activeMeseros,
+  userId,
 }: CajeroDashboardProps) {
-  // Inicializar con todos los meseros activos seleccionados
+  const activeMeseroIds = activeMeseros.map((m) => m.id)
+
+  // Inicializar desde localStorage o con todos seleccionados
   const [selectedMeseroIds, setSelectedMeseroIds] = useState<Set<string>>(
-    () => new Set(activeMeseros.map((m) => m.id))
+    () => loadSavedSelection(userId, activeMeseroIds)
   )
 
-  const toggleMesero = (id: string) => {
+  // Guardar en localStorage cada vez que cambie la selección
+  useEffect(() => {
+    saveSelection(userId, selectedMeseroIds)
+  }, [userId, selectedMeseroIds])
+
+  const toggleMesero = useCallback((id: string) => {
     setSelectedMeseroIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
-  }
+  }, [])
 
   const selectAll = () =>
-    setSelectedMeseroIds(new Set(activeMeseros.map((m) => m.id)))
+    setSelectedMeseroIds(new Set(activeMeseroIds))
   const deselectAll = () => setSelectedMeseroIds(new Set())
 
   const allSelected = activeMeseros.length > 0 && selectedMeseroIds.size === activeMeseros.length
