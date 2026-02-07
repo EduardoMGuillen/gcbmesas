@@ -28,8 +28,8 @@ export function PushNotifyButton() {
     }
   }
 
-  // Meseros y admins (ambos pueden abrir mesas y recibir avisos de pedidos)
-  if (!session || !['MESERO', 'ADMIN'].includes(session.user.role)) {
+  // Meseros, admins y cajeros pueden recibir notificaciones de pedidos
+  if (!session || !['MESERO', 'ADMIN', 'CAJERO'].includes(session.user.role)) {
     return null
   }
 
@@ -50,7 +50,7 @@ export function PushNotifyButton() {
           onClick={subscribe}
           disabled={status === 'loading'}
           className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white/80 hover:text-white hover:bg-dark-200 rounded-lg transition-colors disabled:opacity-50"
-          title="Recibir notificaciones cuando un cliente agregue pedidos a las mesas que tengas abiertas (meseros y admins)"
+          title="Recibir notificaciones de nuevos pedidos"
         >
         <svg
           className="w-5 h-5"

@@ -127,3 +127,29 @@ export async function sendPushToAccountOpener(
     { type: 'new_order', tableName, productName, quantity: String(quantity) }
   )
 }
+
+/** Notifica a todos los cajeros con push activo sobre un nuevo pedido. */
+export async function sendPushToCajeros(
+  tableName: string,
+  productName: string,
+  quantity: number,
+  meseroName: string
+) {
+  const cajeroSubs = await prisma.pushSubscription.findMany({
+    where: { user: { role: 'CAJERO' } },
+    select: { userId: true },
+  })
+  // IDs únicos de cajeros con suscripción push
+  const uniqueIds = Array.from(new Set(cajeroSubs.map((s) => s.userId)))
+  if (uniqueIds.length === 0) return
+
+  const title = 'Nuevo pedido pendiente'
+  const body = `${quantity}x ${productName} - Mesa ${tableName} (${meseroName})`
+  const data = { type: 'new_order_cajero', tableName, productName, quantity: String(quantity), meseroName }
+
+  for (const userId of uniqueIds) {
+    sendPushToUser(userId, title, body, data).catch((e) =>
+      console.error('[Push Cajero] Error enviando a', userId, e)
+    )
+  }
+}

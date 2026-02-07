@@ -1191,7 +1191,7 @@ export async function createOrder(data: {
     include: {
       table: true,
       orders: true,
-      openedBy: { select: { id: true } },
+      openedBy: { select: { id: true, name: true, username: true } },
     },
   })
 
@@ -1274,6 +1274,14 @@ export async function createOrder(data: {
       product.name,
       quantity
     ).catch((e) => console.error('[Push] Error:', e))
+  }
+
+  // Notificar a cajeros con push activo
+  {
+    const meseroName = account.openedBy?.name || account.openedBy?.username || 'Desconocido'
+    const { sendPushToCajeros } = await import('@/lib/push')
+    sendPushToCajeros(account.table.name, product.name, quantity, meseroName)
+      .catch((e) => console.error('[Push Cajero] Error:', e))
   }
 
   // Revalidar rutas para que tanto clientes como meseros vean los cambios
@@ -1507,7 +1515,7 @@ export async function createCustomerOrder(data: {
     include: {
       table: true,
       orders: true,
-      openedBy: { select: { id: true } },
+      openedBy: { select: { id: true, name: true, username: true } },
     },
   })
 
@@ -1590,6 +1598,14 @@ export async function createCustomerOrder(data: {
       product.name,
       quantity
     ).catch((e) => console.error('[Push] Error:', e))
+  }
+
+  // Notificar a cajeros con push activo
+  {
+    const meseroName = account.openedBy?.name || account.openedBy?.username || 'Desconocido'
+    const { sendPushToCajeros } = await import('@/lib/push')
+    sendPushToCajeros(account.table.name, product.name, quantity, meseroName)
+      .catch((e) => console.error('[Push Cajero] Error:', e))
   }
 
   // Revalidar todas las posibles rutas que pueden mostrar esta mesa
