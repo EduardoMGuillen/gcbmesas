@@ -81,6 +81,8 @@ export function CajeroDashboard({
   userId,
 }: CajeroDashboardProps) {
   const activeMeseroIds = activeMeseros.map((m) => m.id)
+  // Set con todos los IDs de meseros (para distinguir meseros de admins en el filtro)
+  const allMeseroIds = new Set(activeMeseroIds)
 
   // Inicializar desde localStorage o con todos seleccionados
   const [selectedMeseroIds, setSelectedMeseroIds] = useState<Set<string>>(
@@ -126,7 +128,7 @@ export function CajeroDashboard({
         </div>
         {activeMeseros.length === 0 ? (
           <p className="text-sm text-white/60">
-            No hay meseros con sesión iniciada hoy.
+            No hay meseros registrados.
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -169,6 +171,7 @@ export function CajeroDashboard({
           pendingOrders={pendingOrders}
           recentServed={recentServed}
           selectedMeseroIds={selectedMeseroIds}
+          allMeseroIds={allMeseroIds}
           noneSelected={noneSelected}
         />
       </section>
@@ -177,7 +180,7 @@ export function CajeroDashboard({
         <h2 className="text-xl font-semibold text-white mb-4">
           Cuentas abiertas
         </h2>
-        <CashierAccounts accounts={accounts} selectedMeseroIds={selectedMeseroIds} noneSelected={noneSelected} />
+        <CashierAccounts accounts={accounts} selectedMeseroIds={selectedMeseroIds} allMeseroIds={allMeseroIds} noneSelected={noneSelected} />
       </section>
     </>
   )
