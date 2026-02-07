@@ -47,7 +47,20 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const type = event.notification.data?.type
-  if (type === 'new_order' || type === 'test') {
+  if (type === 'new_order_cajero') {
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes('/cajero') && 'focus' in client) {
+            return client.focus()
+          }
+        }
+        if (clients.openWindow) {
+          return clients.openWindow('/cajero')
+        }
+      })
+    )
+  } else if (type === 'new_order' || type === 'test') {
     event.waitUntil(
       clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
         for (const client of clientList) {
