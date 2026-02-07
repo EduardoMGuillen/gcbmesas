@@ -347,16 +347,26 @@ export async function getCashierDashboardData() {
         user: { select: { username: true, name: true } },
       },
     }),
-    // Meseros que iniciaron sesión hoy
+    // Meseros activos: que iniciaron sesión hoy O que tienen cuentas abiertas
     prisma.user.findMany({
       where: {
-        role: 'MESERO',
-        logs: {
-          some: {
-            action: 'LOGIN',
-            createdAt: { gte: today },
+        role: { in: ['MESERO', 'ADMIN'] },
+        OR: [
+          {
+            role: 'MESERO',
+            logs: {
+              some: {
+                action: 'LOGIN',
+                createdAt: { gte: today },
+              },
+            },
           },
-        },
+          {
+            openedAccounts: {
+              some: { status: 'OPEN' },
+            },
+          },
+        ],
       },
       select: { id: true, name: true, username: true },
       orderBy: { name: 'asc' },
