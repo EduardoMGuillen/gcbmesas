@@ -72,7 +72,7 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
       <CleanUrlParams />
 
       {/* Top bar - always visible */}
-      <header className="bg-dark-100 border-b border-dark-200 sticky top-0 z-50 md:z-40 w-full md:absolute md:left-0 md:right-0 pt-safe">
+      <header className="bg-dark-100 border-b border-dark-200 fixed top-0 z-50 w-full left-0 right-0 pt-safe">
         <div className="flex justify-between items-center h-14 sm:h-16 px-4 sm:px-6">
           <div className="flex items-center gap-3">
             {/* Sidebar toggle - desktop only */}

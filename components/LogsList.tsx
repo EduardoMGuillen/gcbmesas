@@ -27,6 +27,10 @@ const actionLabels: Record<LogAction, string> = {
   USER_DELETED: 'Usuario Eliminado',
   LOGIN: 'Inicio de Sesión',
   LOGOUT: 'Cierre de Sesión',
+  EVENT_CREATED: 'Evento Creado',
+  EVENT_UPDATED: 'Evento Actualizado',
+  ENTRY_SOLD: 'Entrada Vendida',
+  ENTRY_USED: 'Entrada Utilizada',
 }
 
 function getActionLabel(action: string): string {
