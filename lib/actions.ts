@@ -2242,6 +2242,31 @@ export async function markEntryUsed(entryId: string) {
   revalidatePath('/cajero/entradas')
 }
 
+export async function revertEntryToActive(entryId: string) {
+  const user = await getCurrentUser()
+  ensureCashierAccess(user.role)
+
+  const entry = await prisma.entry.findUnique({
+    where: { id: entryId },
+  })
+
+  if (!entry) throw new Error('Entrada no encontrada')
+  if (entry.status !== 'USED') throw new Error('Solo se pueden revertir entradas marcadas como usadas')
+
+  await prisma.entry.update({
+    where: { id: entryId },
+    data: { status: 'ACTIVE' },
+  })
+
+  await createLog('ENTRY_USED', user.id, undefined, {
+    entryId,
+    clientName: entry.clientName,
+    action: 'reverted_to_active',
+  })
+
+  revalidatePath('/cajero/entradas')
+}
+
 export async function cancelEntry(entryId: string) {
   const user = await getCurrentUser()
   ensureCashierAccess(user.role)
