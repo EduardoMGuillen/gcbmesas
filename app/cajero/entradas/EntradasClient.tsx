@@ -178,6 +178,221 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
     }
   }
 
+  const handlePrintEntry = (data: NonNullable<typeof success>) => {
+    const appUrl = window.location.origin
+    const validationUrl = `${appUrl}/entradas/validar/${data.qrToken}`
+    const now = new Date()
+    const dateStr = now.toLocaleDateString('es-HN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+    const timeStr = now.toLocaleTimeString('es-HN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    const pricePerEntry = data.totalPrice / data.numberOfEntries
+
+    const printWindow = window.open('', '_blank', 'width=400,height=700')
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Entrada - ${data.eventName}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            font-family: 'Courier New', monospace;
+            width: 302px;
+            margin: 0 auto;
+            padding: 16px 12px;
+            color: #000;
+            background: #fff;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 2px dashed #000;
+            padding-bottom: 12px;
+            margin-bottom: 12px;
+          }
+          .header h1 {
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 2px;
+          }
+          .header p {
+            font-size: 11px;
+            margin-top: 4px;
+            color: #444;
+          }
+          .title {
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 8px 0;
+            border-bottom: 1px dashed #999;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          .info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 3px 0;
+          }
+          .info-row .label { color: #555; }
+          .info-row .value { font-weight: bold; text-align: right; max-width: 60%; }
+          .divider {
+            border-top: 1px dashed #999;
+            margin: 10px 0;
+          }
+          .items-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 4px 0;
+            border-bottom: 1px solid #000;
+          }
+          .item-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 4px 0;
+          }
+          .total-section {
+            border-top: 2px solid #000;
+            margin-top: 8px;
+            padding-top: 8px;
+          }
+          .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 4px 0;
+          }
+          .qr-section {
+            text-align: center;
+            padding: 14px 0;
+            border-top: 1px dashed #999;
+            margin-top: 12px;
+          }
+          .qr-section img {
+            width: 180px;
+            height: 180px;
+          }
+          .qr-section p {
+            font-size: 10px;
+            color: #666;
+            margin-top: 6px;
+          }
+          .footer {
+            text-align: center;
+            border-top: 2px dashed #000;
+            padding-top: 12px;
+            margin-top: 12px;
+            font-size: 11px;
+            color: #555;
+          }
+          .footer .thanks {
+            font-size: 13px;
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 4px;
+          }
+          @media print {
+            body { width: 100%; padding: 0 8px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>CASA BLANCA</h1>
+          <p>Comprobante de Entrada</p>
+        </div>
+
+        <div class="title">${data.eventName}</div>
+
+        <div class="info-row">
+          <span class="label">Fecha:</span>
+          <span class="value">${dateStr}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Hora:</span>
+          <span class="value">${timeStr}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">No. Transacción:</span>
+          <span class="value">${data.entryId.slice(-8).toUpperCase()}</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="info-row">
+          <span class="label">Cliente:</span>
+          <span class="value">${data.clientName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Email:</span>
+          <span class="value" style="font-size:10px">${data.clientEmail}</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="items-header">
+          <span>DESCRIPCIÓN</span>
+          <span>CANT</span>
+          <span>P/U</span>
+          <span>TOTAL</span>
+        </div>
+        <div class="item-row">
+          <span style="flex:2">Cover</span>
+          <span style="flex:0.5;text-align:center">${data.numberOfEntries}</span>
+          <span style="flex:1;text-align:right">L ${pricePerEntry.toFixed(2)}</span>
+          <span style="flex:1;text-align:right">L ${data.totalPrice.toFixed(2)}</span>
+        </div>
+
+        <div class="total-section">
+          <div class="total-row">
+            <span>TOTAL</span>
+            <span>L ${data.totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+
+        <div class="qr-section">
+          <img id="qrImg" alt="QR Code" />
+          <p>Presenta este QR en la entrada</p>
+        </div>
+
+        <div class="footer">
+          <p class="thanks">¡Gracias por tu compra!</p>
+          <p>Casa Blanca &copy; ${now.getFullYear()}</p>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"><\/script>
+        <script>
+          QRCode.toDataURL('${validationUrl}', {
+            width: 180,
+            margin: 1,
+            color: { dark: '#000000', light: '#ffffff' }
+          }).then(function(url) {
+            document.getElementById('qrImg').src = url;
+            setTimeout(function() { window.print(); }, 300);
+          }).catch(function() {
+            setTimeout(function() { window.print(); }, 300);
+          });
+        <\/script>
+      </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
   if (events.length === 0) {
     return (
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center">
@@ -347,6 +562,16 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
                   {sendingEmail ? 'Enviando...' : 'Enviar QR por Email'}
                 </button>
               )}
+
+              <button
+                onClick={() => handlePrintEntry(success)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Imprimir Entrada
+              </button>
 
               <button
                 onClick={() => {
