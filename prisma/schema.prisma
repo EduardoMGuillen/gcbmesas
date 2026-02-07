@@ -40,6 +40,16 @@ enum LogAction {
   USER_DELETED
   LOGIN
   LOGOUT
+  EVENT_CREATED
+  EVENT_UPDATED
+  ENTRY_SOLD
+  ENTRY_USED
+}
+
+enum EntryStatus {
+  ACTIVE
+  USED
+  CANCELLED
 }
 
 model User {
@@ -55,6 +65,8 @@ model User {
   logs              Log[]
   openedAccounts    Account[]
   pushSubscriptions PushSubscription[]
+  createdEvents     Event[]
+  createdEntries    Entry[]
 
   @@map("users")
 }
@@ -163,5 +175,46 @@ model Log {
   @@index([action])
   @@index([createdAt])
   @@map("logs")
+}
+
+model Event {
+  id              String   @id @default(cuid())
+  name            String
+  date            DateTime
+  coverPrice      Decimal  @db.Decimal(10, 2)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+
+  createdBy User?   @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  entries   Entry[]
+
+  @@index([isActive])
+  @@index([date])
+  @@map("events")
+}
+
+model Entry {
+  id              String      @id @default(cuid())
+  eventId         String
+  clientName      String
+  clientEmail     String
+  numberOfEntries Int
+  totalPrice      Decimal     @db.Decimal(10, 2)
+  qrToken         String      @unique
+  status          EntryStatus @default(ACTIVE)
+  emailSent       Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  createdByUserId String?
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User? @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+  @@index([qrToken])
+  @@index([status])
+  @@index([createdAt])
+  @@map("entries")
 }
 
