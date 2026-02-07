@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { PushNotifyButton } from './PushNotifyButton'
+import { RefreshButton } from './RefreshButton'
 import { Footer } from './Footer'
 import { CleanUrlParams } from './CleanUrlParams'
 import { Navbar } from './Navbar'
@@ -105,7 +106,8 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
             </button>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-1 sm:gap-3">
+            <RefreshButton />
             <PushNotifyButton />
             <span className="hidden sm:inline-block text-xs sm:text-sm text-white/80 truncate max-w-[120px] lg:max-w-none">
               {session?.user.name || session?.user.username} (Admin)
