@@ -72,17 +72,28 @@ export function usePushNotifications() {
     }
 
     const isAndroidWeb = /Android/i.test(navigator.userAgent)
+
+    // Pedir permiso inmediatamente después del gesto del usuario (tap).
+    // iOS Safari pierde el contexto del gesto tras múltiples awaits,
+    // así que solicitamos el permiso ANTES de cualquier operación pesada.
+    if ('Notification' in window) {
+      const permFirst = await Notification.requestPermission()
+      if (permFirst !== 'granted') {
+        setMessage(
+          permFirst === 'denied'
+            ? 'Permiso denegado. Activa notificaciones en Ajustes del sitio o dispositivo.'
+            : 'Permiso denegado'
+        )
+        setStatus('error')
+        return
+      }
+    }
+
     const firebaseWebConfig = (await import('@/lib/firebase-web-config')).getFirebaseWebConfig()
 
     // Android PWA con Firebase Web: usar FCM en el navegador (mismo envío que APK, más fiable que Web Push)
     if (isAndroidWeb && firebaseWebConfig) {
       try {
-        const permFirst = await Notification.requestPermission()
-        if (permFirst !== 'granted') {
-          setMessage(permFirst === 'denied' ? 'Permiso denegado.' : 'Permiso denegado')
-          setStatus('error')
-          return
-        }
         const vapidRes = await fetch('/api/push-vapid')
         if (!vapidRes.ok) throw new Error('Push no disponible (servidor)')
         const { publicKey } = await vapidRes.json()
@@ -140,16 +151,6 @@ export function usePushNotifications() {
     }
 
     try {
-      // En Android Chrome: pedir permiso primero (el gesto se pierde tras muchos awaits)
-      if (isAndroidWeb) {
-        const permFirst = await Notification.requestPermission()
-        if (permFirst !== 'granted') {
-          setMessage(permFirst === 'denied' ? 'Permiso denegado. Activa notificaciones en Ajustes del sitio.' : 'Permiso denegado')
-          setStatus('error')
-          return
-        }
-      }
-
       let reg = await navigator.serviceWorker.getRegistration('/')
       if (!reg || !reg.active) {
         reg = await navigator.serviceWorker.register('/sw.js', {
@@ -171,15 +172,6 @@ export function usePushNotifications() {
         })
       }
       await navigator.serviceWorker.ready
-
-      if (!isAndroidWeb) {
-        const permission = await Notification.requestPermission()
-        if (permission !== 'granted') {
-          setMessage(permission === 'denied' ? 'Permiso denegado.' : 'Permiso denegado')
-          setStatus('error')
-          return
-        }
-      }
 
       const vapidRes = await fetch('/api/push-vapid')
       if (!vapidRes.ok) {
