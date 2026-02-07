@@ -40,6 +40,7 @@ export default async function CajeroPage() {
           pendingOrders={pendingOrders}
           recentServed={recentServed}
           activeMeseros={activeMeseros}
+          userId={session.user.id}
         />
       </main>
       {!isAdmin && <Footer />}
