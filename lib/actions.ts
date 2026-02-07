@@ -1790,3 +1790,191 @@ export async function getDashboardStats() {
   }
 }
 
+// ========== REPORTES ==========
+
+export async function getReportData(fromStr: string, toStr: string) {
+  const currentUser = await getCurrentUser()
+  if (currentUser.role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden generar reportes')
+  }
+
+  const from = new Date(fromStr)
+  from.setHours(0, 0, 0, 0)
+  const to = new Date(toStr)
+  to.setHours(23, 59, 59, 999)
+
+  const dateFilter = { gte: from, lte: to }
+
+  const [
+    totalSales,
+    totalOrders,
+    rejectedOrders,
+    accountsOpened,
+    accountsClosed,
+    ordersByProduct,
+    ordersByHour,
+    ordersByDay,
+    meseroAccounts,
+    meseroSales,
+  ] = await Promise.all([
+    // Total de ventas
+    prisma.order.aggregate({
+      where: { createdAt: dateFilter, rejected: false },
+      _sum: { price: true },
+    }),
+    // Total de pedidos aceptados
+    prisma.order.count({
+      where: { createdAt: dateFilter, rejected: false },
+    }),
+    // Total de pedidos rechazados
+    prisma.order.count({
+      where: { createdAt: dateFilter, rejected: true },
+    }),
+    // Cuentas abiertas en rango
+    prisma.account.count({
+      where: { createdAt: dateFilter },
+    }),
+    // Cuentas cerradas en rango
+    prisma.account.count({
+      where: { closedAt: dateFilter },
+    }),
+    // Pedidos agrupados por producto
+    prisma.order.groupBy({
+      by: ['productId'],
+      where: { createdAt: dateFilter, rejected: false },
+      _sum: { quantity: true, price: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+    }),
+    // Pedidos agrupados por hora (raw SQL para extraer hora)
+    prisma.$queryRaw<Array<{ hour: number; count: bigint }>>`
+      SELECT EXTRACT(HOUR FROM "createdAt") as hour, COUNT(*)::bigint as count
+      FROM orders
+      WHERE "createdAt" >= ${from} AND "createdAt" <= ${to} AND rejected = false
+      GROUP BY hour
+      ORDER BY hour
+    `,
+    // Ventas por día (raw SQL)
+    prisma.$queryRaw<Array<{ day: string; sales: string; orders: bigint; accounts: bigint }>>`
+      SELECT
+        TO_CHAR(o."createdAt", 'YYYY-MM-DD') as day,
+        COALESCE(SUM(o.price), 0)::text as sales,
+        COUNT(*)::bigint as orders,
+        COUNT(DISTINCT o."accountId")::bigint as accounts
+      FROM orders o
+      WHERE o."createdAt" >= ${from} AND o."createdAt" <= ${to} AND o.rejected = false
+      GROUP BY day
+      ORDER BY day
+    `,
+    // Mesas por mesero
+    prisma.account.groupBy({
+      by: ['openedByUserId'],
+      where: { createdAt: dateFilter, openedByUserId: { not: null } },
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+    }),
+    // Ventas por mesero (a través de las cuentas que abrieron)
+    prisma.$queryRaw<Array<{ userId: string; totalSales: string; totalOrders: bigint }>>`
+      SELECT
+        a."openedByUserId" as "userId",
+        COALESCE(SUM(o.price), 0)::text as "totalSales",
+        COUNT(o.id)::bigint as "totalOrders"
+      FROM orders o
+      JOIN accounts a ON o."accountId" = a.id
+      WHERE o."createdAt" >= ${from} AND o."createdAt" <= ${to}
+        AND o.rejected = false
+        AND a."openedByUserId" IS NOT NULL
+      GROUP BY a."openedByUserId"
+      ORDER BY "totalSales" DESC
+    `,
+  ])
+
+  // Obtener nombres de productos
+  const productIds = ordersByProduct.map((p) => p.productId)
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, name: true, category: true },
+  })
+
+  // Obtener nombres de meseros
+  const meseroIds = Array.from(new Set([
+    ...meseroAccounts.map((m) => m.openedByUserId).filter((id): id is string => id != null),
+    ...meseroSales.map((m) => m.userId),
+  ]))
+  const meseros = await prisma.user.findMany({
+    where: { id: { in: meseroIds } },
+    select: { id: true, name: true, username: true },
+  })
+
+  // Calcular promedio de consumo por mesa
+  const avgConsumption = accountsOpened > 0
+    ? Number(totalSales._sum.price || 0) / accountsOpened
+    : 0
+
+  // Armar datos de productos
+  const productData = ordersByProduct.map((p) => {
+    const prod = products.find((pr) => pr.id === p.productId)
+    return {
+      name: prod?.name || 'Desconocido',
+      category: prod?.category || 'Sin categoría',
+      quantity: p._sum.quantity || 0,
+      amount: Number(p._sum.price || 0),
+    }
+  })
+
+  // Ventas por categoría
+  const categoryMap = new Map<string, { quantity: number; amount: number }>()
+  for (const p of productData) {
+    const existing = categoryMap.get(p.category) || { quantity: 0, amount: 0 }
+    existing.quantity += p.quantity
+    existing.amount += p.amount
+    categoryMap.set(p.category, existing)
+  }
+  const categoryData = Array.from(categoryMap.entries())
+    .map(([category, data]) => ({ category, ...data }))
+    .sort((a, b) => b.amount - a.amount)
+
+  // Armar datos de meseros (combinar mesas + ventas)
+  const meseroData = meseroIds.map((id) => {
+    const user = meseros.find((u) => u.id === id)
+    const accs = meseroAccounts.find((m) => m.openedByUserId === id)
+    const sales = meseroSales.find((m) => m.userId === id)
+    return {
+      name: user?.name || user?.username || 'Desconocido',
+      tables: accs?._count.id || 0,
+      sales: Number(sales?.totalSales || 0),
+      orders: Number(sales?.totalOrders || 0),
+    }
+  }).sort((a, b) => b.sales - a.sales)
+
+  // Horarios
+  const hourData = Array.from({ length: 24 }, (_, i) => {
+    const match = ordersByHour.find((h) => Number(h.hour) === i)
+    return { hour: i, orders: match ? Number(match.count) : 0 }
+  }).filter((h) => h.orders > 0)
+
+  // Ventas por día
+  const dailyData = ordersByDay.map((d) => ({
+    date: d.day,
+    sales: Number(d.sales),
+    orders: Number(d.orders),
+    tables: Number(d.accounts),
+  }))
+
+  return {
+    summary: {
+      totalSales: Number(totalSales._sum.price || 0),
+      totalOrders,
+      rejectedOrders,
+      accountsOpened,
+      accountsClosed,
+      avgConsumption,
+    },
+    dailyData,
+    meseroData,
+    productData,
+    categoryData,
+    hourData,
+    dateRange: { from: fromStr, to: toStr },
+  }
+}
+
