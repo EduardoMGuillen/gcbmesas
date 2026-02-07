@@ -94,6 +94,11 @@ export default function middleware(req: NextRequest, evt: NextFetchEvent) {
     return NextResponse.next()
   }
 
+  // Let /entradas/validar/* bypass auth (public QR validation page)
+  if (path.startsWith('/entradas/validar')) {
+    return NextResponse.next()
+  }
+
   // For everything else, run the auth middleware
   return (authMiddleware as any)(req, evt)
 }

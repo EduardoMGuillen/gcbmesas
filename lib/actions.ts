@@ -1978,3 +1978,319 @@ export async function getReportData(fromStr: string, toStr: string) {
   }
 }
 
+// ========== EVENT ACTIONS ==========
+
+export async function createEvent(data: {
+  name: string
+  date: string
+  coverPrice: number
+}) {
+  const user = await getCurrentUser()
+  ensureCashierAccess(user.role)
+
+  const event = await prisma.event.create({
+    data: {
+      name: data.name,
+      date: new Date(data.date),
+      coverPrice: data.coverPrice,
+      createdByUserId: user.id,
+    },
+  })
+
+  await createLog('EVENT_CREATED', user.id, undefined, {
+    eventId: event.id,
+    name: data.name,
+    date: data.date,
+    coverPrice: data.coverPrice,
+  })
+
+  revalidatePath('/cajero/entradas')
+  return event
+}
+
+export async function getEvents(onlyActive = false) {
+  const where = onlyActive ? { isActive: true } : {}
+  return prisma.event.findMany({
+    where,
+    orderBy: { date: 'desc' },
+    include: {
+      _count: { select: { entries: true } },
+      createdBy: { select: { name: true, username: true } },
+    },
+  })
+}
+
+export async function updateEvent(
+  id: string,
+  data: { name?: string; date?: string; coverPrice?: number; isActive?: boolean }
+) {
+  const user = await getCurrentUser()
+  ensureCashierAccess(user.role)
+
+  const updateData: any = {}
+  if (data.name !== undefined) updateData.name = data.name
+  if (data.date !== undefined) updateData.date = new Date(data.date)
+  if (data.coverPrice !== undefined) updateData.coverPrice = data.coverPrice
+  if (data.isActive !== undefined) updateData.isActive = data.isActive
+
+  const event = await prisma.event.update({
+    where: { id },
+    data: updateData,
+  })
+
+  await createLog('EVENT_UPDATED', user.id, undefined, {
+    eventId: event.id,
+    changes: data,
+  })
+
+  revalidatePath('/cajero/entradas')
+  return event
+}
+
+export async function deleteEvent(id: string) {
+  const user = await getCurrentUser()
+  ensureCashierAccess(user.role)
+
+  // Check if the event has entries
+  const entryCount = await prisma.entry.count({ where: { eventId: id } })
+  if (entryCount > 0) {
+    throw new Error('No se puede eliminar un evento que ya tiene entradas vendidas')
+  }
+
+  await prisma.event.delete({ where: { id } })
+
+  await createLog('EVENT_UPDATED', user.id, undefined, {
+    eventId: id,
+    action: 'deleted',
+  })
+
+  revalidatePath('/cajero/entradas')
+}
+
+// ========== ENTRY ACTIONS ==========
+
+function generateQRToken(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  let token = ''
+  for (let i = 0; i < 24; i++) {
+    token += chars[Math.floor(Math.random() * chars.length)]
+  }
+  return token
+}
+
+export async function createEntry(data: {
+  eventId: string
+  clientName: string
+  clientEmail: string
+  numberOfEntries: number
+}) {
+  const user = await getCurrentUser()
+  ensureCashierAccess(user.role)
+
+  // Get event to calculate price
+  const event = await prisma.event.findUnique({
+    where: { id: data.eventId },
+  })
+
+  if (!event) throw new Error('Evento no encontrado')
+  if (!event.isActive) throw new Error('Este evento no está activo')
+
+  const totalPrice = Number(event.coverPrice) * data.numberOfEntries
+
+  // Generate unique QR token
+  let qrToken = generateQRToken()
+  let attempts = 0
+  while (attempts < 10) {
+    const existing = await prisma.entry.findUnique({
+      where: { qrToken },
+      select: { id: true },
+    })
+    if (!existing) break
+    qrToken = generateQRToken()
+    attempts++
+  }
+
+  const entry = await prisma.entry.create({
+    data: {
+      eventId: data.eventId,
+      clientName: data.clientName,
+      clientEmail: data.clientEmail,
+      numberOfEntries: data.numberOfEntries,
+      totalPrice,
+      qrToken,
+      createdByUserId: user.id,
+    },
+    include: {
+      event: true,
+    },
+  })
+
+  await createLog('ENTRY_SOLD', user.id, undefined, {
+    entryId: entry.id,
+    eventId: data.eventId,
+    clientName: data.clientName,
+    clientEmail: data.clientEmail,
+    numberOfEntries: data.numberOfEntries,
+    totalPrice,
+  })
+
+  revalidatePath('/cajero/entradas')
+  return entry
+}
+
+export async function getEntries(filters?: {
+  eventId?: string
+  status?: 'ACTIVE' | 'USED' | 'CANCELLED'
+  search?: string
+}) {
+  const where: any = {}
+  if (filters?.eventId) where.eventId = filters.eventId
+  if (filters?.status) where.status = filters.status
+  if (filters?.search) {
+    where.OR = [
+      { clientName: { contains: filters.search, mode: 'insensitive' } },
+      { clientEmail: { contains: filters.search, mode: 'insensitive' } },
+    ]
+  }
+
+  return prisma.entry.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      event: { select: { name: true, date: true, coverPrice: true } },
+      createdBy: { select: { name: true, username: true } },
+    },
+    take: 200,
+  })
+}
+
+export async function getEntradasDashboardData() {
+  const user = await getCurrentUser()
+  ensureCashierAccess(user.role)
+
+  const [events, recentEntries, todayStats] = await Promise.all([
+    prisma.event.findMany({
+      orderBy: { date: 'desc' },
+      include: {
+        _count: { select: { entries: true } },
+        createdBy: { select: { name: true, username: true } },
+      },
+    }),
+    prisma.entry.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        event: { select: { name: true, date: true, coverPrice: true } },
+        createdBy: { select: { name: true, username: true } },
+      },
+    }),
+    // Today stats
+    prisma.entry.aggregate({
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+        },
+      },
+      _sum: { totalPrice: true, numberOfEntries: true },
+      _count: true,
+    }),
+  ])
+
+  return {
+    events: events.map((e: any) => ({
+      ...e,
+      coverPrice: Number(e.coverPrice),
+    })),
+    recentEntries: recentEntries.map((e: any) => ({
+      ...e,
+      totalPrice: Number(e.totalPrice),
+      event: {
+        ...e.event,
+        coverPrice: Number(e.event.coverPrice),
+      },
+    })),
+    todayStats: {
+      totalSales: Number(todayStats._sum.totalPrice || 0),
+      totalEntries: Number(todayStats._sum.numberOfEntries || 0),
+      totalTransactions: todayStats._count,
+    },
+  }
+}
+
+export async function markEntryUsed(entryId: string) {
+  const user = await getCurrentUser()
+  ensureCashierAccess(user.role)
+
+  const entry = await prisma.entry.findUnique({
+    where: { id: entryId },
+  })
+
+  if (!entry) throw new Error('Entrada no encontrada')
+  if (entry.status === 'USED') throw new Error('Esta entrada ya fue utilizada')
+  if (entry.status === 'CANCELLED') throw new Error('Esta entrada fue cancelada')
+
+  await prisma.entry.update({
+    where: { id: entryId },
+    data: { status: 'USED' },
+  })
+
+  await createLog('ENTRY_USED', user.id, undefined, {
+    entryId,
+    clientName: entry.clientName,
+  })
+
+  revalidatePath('/cajero/entradas')
+}
+
+export async function cancelEntry(entryId: string) {
+  const user = await getCurrentUser()
+  ensureCashierAccess(user.role)
+
+  const entry = await prisma.entry.findUnique({
+    where: { id: entryId },
+  })
+
+  if (!entry) throw new Error('Entrada no encontrada')
+  if (entry.status === 'USED') throw new Error('No se puede cancelar una entrada ya utilizada')
+
+  await prisma.entry.update({
+    where: { id: entryId },
+    data: { status: 'CANCELLED' },
+  })
+
+  revalidatePath('/cajero/entradas')
+}
+
+export async function validateEntryByToken(token: string) {
+  const entry = await prisma.entry.findUnique({
+    where: { qrToken: token },
+    include: {
+      event: { select: { name: true, date: true, coverPrice: true } },
+    },
+  })
+
+  if (!entry) return null
+
+  return {
+    id: entry.id,
+    clientName: entry.clientName,
+    clientEmail: entry.clientEmail,
+    numberOfEntries: entry.numberOfEntries,
+    totalPrice: Number(entry.totalPrice),
+    status: entry.status,
+    createdAt: entry.createdAt,
+    event: {
+      name: entry.event.name,
+      date: entry.event.date,
+      coverPrice: Number(entry.event.coverPrice),
+    },
+  }
+}
+
+export async function markEntryEmailSent(entryId: string) {
+  await prisma.entry.update({
+    where: { id: entryId },
+    data: { emailSent: true },
+  })
+}
+
