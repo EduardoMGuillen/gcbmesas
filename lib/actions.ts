@@ -285,7 +285,10 @@ export async function getCashierDashboardData() {
   const currentUser = await getCurrentUser()
   ensureCashierAccess(currentUser.role)
 
-  const [accounts, pendingOrders, recentServed] = await Promise.all([
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const [accounts, pendingOrders, recentServed, activeMeseros] = await Promise.all([
     prisma.account.findMany({
       where: { status: 'OPEN' },
       orderBy: { createdAt: 'desc' },
@@ -294,7 +297,7 @@ export async function getCashierDashboardData() {
           select: { id: true, name: true, zone: true, shortCode: true },
         },
         openedBy: {
-          select: { name: true, username: true },
+          select: { id: true, name: true, username: true },
         },
         orders: {
           orderBy: { createdAt: 'desc' },
@@ -321,6 +324,7 @@ export async function getCashierDashboardData() {
         account: {
           select: {
             id: true,
+            openedByUserId: true,
             table: { select: { name: true, shortCode: true, zone: true } },
           },
         },
@@ -330,21 +334,36 @@ export async function getCashierDashboardData() {
     prisma.order.findMany({
       where: { served: true },
       orderBy: { createdAt: 'desc' },
-      take: 7, // Mostrar solo los 7 pedidos más recientes para mantener la lista corta
+      take: 7,
       include: {
         product: { select: { name: true, price: true } },
         account: {
           select: {
             id: true,
+            openedByUserId: true,
             table: { select: { name: true, shortCode: true, zone: true } },
           },
         },
         user: { select: { username: true, name: true } },
       },
     }),
+    // Meseros que iniciaron sesión hoy
+    prisma.user.findMany({
+      where: {
+        role: 'MESERO',
+        logs: {
+          some: {
+            action: 'LOGIN',
+            createdAt: { gte: today },
+          },
+        },
+      },
+      select: { id: true, name: true, username: true },
+      orderBy: { name: 'asc' },
+    }),
   ])
 
-  return { accounts, pendingOrders, recentServed }
+  return { accounts, pendingOrders, recentServed, activeMeseros }
 }
 
 export async function setOrderServed(orderId: string, served: boolean) {

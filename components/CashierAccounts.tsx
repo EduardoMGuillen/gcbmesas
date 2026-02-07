@@ -11,7 +11,7 @@ interface CashierAccountsProps {
     initialBalance: string | number | { toString(): string }
     currentBalance: string | number | { toString(): string }
     createdAt: string | Date
-    openedBy?: { name: string | null; username: string } | null
+    openedBy?: { id: string; name: string | null; username: string } | null
     clientName?: string | null
     orders: Array<{
       id: string
@@ -23,15 +23,17 @@ interface CashierAccountsProps {
       user?: { username: string; name?: string | null }
     }>
   }>
-  /** Zona seleccionada (filtro compartido con Pedidos) */
-  selectedZone?: string
+  /** IDs de meseros seleccionados en el filtro */
+  selectedMeseroIds: Set<string>
+  /** True cuando ningún mesero está seleccionado */
+  noneSelected: boolean
 }
 
 function pendingCount(orders: CashierAccountsProps['accounts'][0]['orders']) {
   return orders.filter((o) => !o.served && o.rejected !== true).length
 }
 
-export function CashierAccounts({ accounts, selectedZone = '' }: CashierAccountsProps) {
+export function CashierAccounts({ accounts, selectedMeseroIds, noneSelected }: CashierAccountsProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   const toggleExpanded = (accountId: string) => {
@@ -46,13 +48,12 @@ export function CashierAccounts({ accounts, selectedZone = '' }: CashierAccounts
   // Auto-refresh cada 30 segundos para ver cambios en cuentas
   useAutoRefresh({ interval: 30000 })
 
-  // Filtrar cuentas por zona (filtro compartido desde el padre)
-  const filteredAccounts = accounts.filter((acc) => {
-    if (selectedZone && acc.table?.zone !== selectedZone) {
-      return false
-    }
-    return true
-  })
+  // Filtrar cuentas por mesero seleccionado
+  const filteredAccounts = noneSelected
+    ? []
+    : accounts.filter((acc) =>
+        acc.openedBy?.id ? selectedMeseroIds.has(acc.openedBy.id) : true
+      )
 
   if (!accounts.length) {
     return (
@@ -67,9 +68,9 @@ export function CashierAccounts({ accounts, selectedZone = '' }: CashierAccounts
       {filteredAccounts.length === 0 ? (
         <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
           <p className="text-white/80">
-            {selectedZone
-              ? `No hay cuentas abiertas en la zona "${selectedZone}"`
-              : 'No hay cuentas abiertas en este momento.'}
+            {noneSelected
+              ? 'Selecciona al menos un mesero para ver cuentas.'
+              : 'No hay cuentas abiertas para los meseros seleccionados.'}
           </p>
         </div>
       ) : (
