@@ -285,9 +285,6 @@ export async function getCashierDashboardData() {
   const currentUser = await getCurrentUser()
   ensureCashierAccess(currentUser.role)
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
   const [accounts, pendingOrders, recentServed, activeMeseros] = await Promise.all([
     prisma.account.findMany({
       where: { status: 'OPEN' },
@@ -347,27 +344,9 @@ export async function getCashierDashboardData() {
         user: { select: { username: true, name: true } },
       },
     }),
-    // Meseros activos: que iniciaron sesión hoy O que tienen cuentas abiertas
+    // Todos los meseros (y admins) para el filtro del cajero
     prisma.user.findMany({
-      where: {
-        role: { in: ['MESERO', 'ADMIN'] },
-        OR: [
-          {
-            role: 'MESERO',
-            logs: {
-              some: {
-                action: 'LOGIN',
-                createdAt: { gte: today },
-              },
-            },
-          },
-          {
-            openedAccounts: {
-              some: { status: 'OPEN' },
-            },
-          },
-        ],
-      },
+      where: { role: { in: ['MESERO', 'ADMIN'] } },
       select: { id: true, name: true, username: true },
       orderBy: { name: 'asc' },
     }),
