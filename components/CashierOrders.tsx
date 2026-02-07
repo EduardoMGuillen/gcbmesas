@@ -34,6 +34,8 @@ interface CashierOrdersProps {
   }>
   /** IDs de meseros seleccionados en el filtro */
   selectedMeseroIds: Set<string>
+  /** IDs de todos los meseros (para distinguir de admins) */
+  allMeseroIds: Set<string>
   /** True cuando ningún mesero está seleccionado */
   noneSelected: boolean
 }
@@ -42,6 +44,7 @@ export function CashierOrders({
   pendingOrders,
   recentServed,
   selectedMeseroIds,
+  allMeseroIds,
   noneSelected,
 }: CashierOrdersProps) {
   const router = useRouter()
@@ -50,22 +53,20 @@ export function CashierOrders({
   // Auto-refresh cada 15 segundos para ver nuevos pedidos pendientes
   useAutoRefresh({ interval: 15000 })
 
-  // Filtrar pedidos por mesero seleccionado
+  // Filtrar pedidos por mesero seleccionado (admins siempre pasan)
+  const filterByMesero = (openedByUserId: string | null | undefined) => {
+    if (!openedByUserId) return true // sin dueño → mostrar
+    if (!allMeseroIds.has(openedByUserId)) return true // admin → siempre mostrar
+    return selectedMeseroIds.has(openedByUserId) // mesero → solo si seleccionado
+  }
+
   const filteredPendingOrders = noneSelected
     ? []
-    : pendingOrders.filter((order) =>
-        order.account.openedByUserId
-          ? selectedMeseroIds.has(order.account.openedByUserId)
-          : true
-      )
+    : pendingOrders.filter((order) => filterByMesero(order.account.openedByUserId))
 
   const filteredRecentServed = noneSelected
     ? []
-    : recentServed.filter((order) =>
-        order.account.openedByUserId
-          ? selectedMeseroIds.has(order.account.openedByUserId)
-          : true
-      )
+    : recentServed.filter((order) => filterByMesero(order.account.openedByUserId))
 
   const handleMarkServed = (orderId: string) => {
     startTransition(async () => {

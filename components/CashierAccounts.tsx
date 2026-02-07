@@ -25,6 +25,8 @@ interface CashierAccountsProps {
   }>
   /** IDs de meseros seleccionados en el filtro */
   selectedMeseroIds: Set<string>
+  /** IDs de todos los meseros (para distinguir de admins) */
+  allMeseroIds: Set<string>
   /** True cuando ningún mesero está seleccionado */
   noneSelected: boolean
 }
@@ -33,7 +35,7 @@ function pendingCount(orders: CashierAccountsProps['accounts'][0]['orders']) {
   return orders.filter((o) => !o.served && o.rejected !== true).length
 }
 
-export function CashierAccounts({ accounts, selectedMeseroIds, noneSelected }: CashierAccountsProps) {
+export function CashierAccounts({ accounts, selectedMeseroIds, allMeseroIds, noneSelected }: CashierAccountsProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   const toggleExpanded = (accountId: string) => {
@@ -48,12 +50,15 @@ export function CashierAccounts({ accounts, selectedMeseroIds, noneSelected }: C
   // Auto-refresh cada 30 segundos para ver cambios en cuentas
   useAutoRefresh({ interval: 30000 })
 
-  // Filtrar cuentas por mesero seleccionado
+  // Filtrar cuentas por mesero seleccionado (admins siempre pasan)
   const filteredAccounts = noneSelected
     ? []
-    : accounts.filter((acc) =>
-        acc.openedBy?.id ? selectedMeseroIds.has(acc.openedBy.id) : true
-      )
+    : accounts.filter((acc) => {
+        const openerId = acc.openedBy?.id
+        if (!openerId) return true // sin dueño → mostrar
+        if (!allMeseroIds.has(openerId)) return true // admin → siempre mostrar
+        return selectedMeseroIds.has(openerId) // mesero → solo si seleccionado
+      })
 
   if (!accounts.length) {
     return (
