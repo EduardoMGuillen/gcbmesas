@@ -67,6 +67,7 @@ export default async function ValidarEntradaPage({
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
+                  timeZone: 'UTC',
                 })}
               </p>
             </div>
