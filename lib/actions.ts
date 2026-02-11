@@ -1991,7 +1991,7 @@ export async function createEvent(data: {
   const event = await prisma.event.create({
     data: {
       name: data.name,
-      date: new Date(data.date),
+      date: new Date(data.date + 'T12:00:00'),
       coverPrice: data.coverPrice,
       createdByUserId: user.id,
     },
@@ -2029,7 +2029,7 @@ export async function updateEvent(
 
   const updateData: any = {}
   if (data.name !== undefined) updateData.name = data.name
-  if (data.date !== undefined) updateData.date = new Date(data.date)
+  if (data.date !== undefined) updateData.date = new Date(data.date + 'T12:00:00')
   if (data.coverPrice !== undefined) updateData.coverPrice = data.coverPrice
   if (data.isActive !== undefined) updateData.isActive = data.isActive
 

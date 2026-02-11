@@ -189,18 +189,18 @@ export function EntradasClient({ events, recentEntries }: EntradasClientProps) {
 
   return (
     <div>
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
               activeTab === tab.id
                 ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
                 : 'bg-dark-100 border border-dark-200 text-white/70 hover:text-white hover:bg-dark-50'
             }`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
             </svg>
             {tab.label}
@@ -318,7 +318,7 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Form */}
-      <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
+      <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-white mb-4">Nueva Entrada</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -327,7 +327,7 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
               <option value="">Seleccionar evento...</option>
               {events.map((ev) => (
                 <option key={ev.id} value={ev.id}>
-                  {ev.name} - L {ev.coverPrice.toFixed(2)} ({new Date(ev.date).toLocaleDateString('es-HN')})
+                  {ev.name} - L {ev.coverPrice.toFixed(2)} ({new Date(ev.date).toLocaleDateString('es-HN', { timeZone: 'UTC' })})
                 </option>
               ))}
             </select>
@@ -365,7 +365,7 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
       </div>
 
       {/* Success / QR section */}
-      <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
+      <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6">
         {success ? (
           <div className="text-center space-y-4">
             <div className="w-16 h-16 mx-auto bg-green-500/20 border border-green-500/50 rounded-full flex items-center justify-center">
@@ -584,7 +584,7 @@ function EscanearTab() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Scanner */}
-      <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
+      <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-white mb-4">Escanear Entrada</h2>
         <div className="space-y-4">
           <div className="flex gap-3">
@@ -735,7 +735,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
       )}
 
       {showForm && (
-        <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
+        <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-white mb-4">{editingId ? 'Editar Evento' : 'Nuevo Evento'}</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -770,7 +770,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h4 className="font-semibold text-white">{ev.name}</h4>
-                  <p className="text-sm text-dark-300">{new Date(ev.date).toLocaleDateString('es-HN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  <p className="text-sm text-dark-300">{new Date(ev.date).toLocaleDateString('es-HN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}</p>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${ev.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{ev.isActive ? 'Activo' : 'Inactivo'}</span>
               </div>
@@ -869,7 +869,7 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap">
         {([{ id: 'all' as const, label: 'Todas' }, { id: 'ACTIVE' as const, label: 'Activas' }, { id: 'USED' as const, label: 'Usadas' }, { id: 'CANCELLED' as const, label: 'Canceladas' }]).map((f) => (
-          <button key={f.id} onClick={() => setFilter(f.id)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filter === f.id ? 'bg-primary-600 text-white' : 'bg-dark-100 border border-dark-200 text-white/60 hover:text-white'}`}>{f.label}</button>
+          <button key={f.id} onClick={() => setFilter(f.id)} className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${filter === f.id ? 'bg-primary-600 text-white' : 'bg-dark-100 border border-dark-200 text-white/60 hover:text-white'}`}>{f.label}</button>
         ))}
       </div>
 
@@ -890,8 +890,8 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
                       <h4 className="font-semibold text-white truncate">{entry.clientName}</h4>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sc.bg} ${sc.text}`}>{sc.label}</span>
                     </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-dark-300">
-                      <span>{entry.clientEmail}</span>
+                    <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1 text-xs sm:text-sm text-dark-300">
+                      <span className="truncate max-w-[180px] sm:max-w-none">{entry.clientEmail}</span>
                       <span>{entry.event.name}</span>
                       <span>{entry.numberOfEntries} entrada{entry.numberOfEntries > 1 ? 's' : ''}</span>
                       <span className="text-primary-400 font-semibold">L {entry.totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })}</span>
@@ -904,15 +904,15 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
                   </div>
 
                   {/* Action buttons */}
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-1.5 sm:gap-2 flex-wrap">
                     {/* Email & Print - always available for non-cancelled */}
                     {entry.status !== 'CANCELLED' && (
                       <>
-                        <button onClick={() => handleEmail(entry)} disabled={sendingEmailId === entry.id} className="text-xs px-3 py-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1">
+                        <button onClick={() => handleEmail(entry)} disabled={sendingEmailId === entry.id} className="text-xs px-2.5 sm:px-3 py-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                           {sendingEmailId === entry.id ? 'Enviando...' : 'Email'}
                         </button>
-                        <button onClick={() => handlePrint(entry)} disabled={printingId === entry.id} className="text-xs px-3 py-1.5 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1">
+                        <button onClick={() => handlePrint(entry)} disabled={printingId === entry.id} className="text-xs px-2.5 sm:px-3 py-1.5 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                           Imprimir
                         </button>
@@ -922,12 +922,12 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
                     {/* Status actions */}
                     {entry.status === 'ACTIVE' && (
                       <>
-                        <button onClick={() => handleMarkUsed(entry.id)} disabled={isPending} className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50">Marcar Usada</button>
-                        <button onClick={() => handleCancel(entry.id)} disabled={isPending} className="text-xs px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors disabled:opacity-50">Cancelar</button>
+                        <button onClick={() => handleMarkUsed(entry.id)} disabled={isPending} className="text-xs px-2.5 sm:px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50">Marcar Usada</button>
+                        <button onClick={() => handleCancel(entry.id)} disabled={isPending} className="text-xs px-2.5 sm:px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors disabled:opacity-50">Cancelar</button>
                       </>
                     )}
                     {entry.status === 'USED' && (
-                      <button onClick={() => handleRevert(entry.id)} disabled={isPending} className="text-xs px-3 py-1.5 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 rounded-lg transition-colors disabled:opacity-50">Revertir a Activa</button>
+                      <button onClick={() => handleRevert(entry.id)} disabled={isPending} className="text-xs px-2.5 sm:px-3 py-1.5 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 rounded-lg transition-colors disabled:opacity-50">Revertir</button>
                     )}
                   </div>
                 </div>
