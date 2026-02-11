@@ -2138,6 +2138,68 @@ export async function createEntry(data: {
   return entry
 }
 
+export async function createBulkEntries(data: {
+  eventId: string
+  clientEmail: string
+  guestNames: string[]
+}) {
+  const user = await getCurrentUser()
+  ensureCashierAccess(user.role)
+
+  const event = await prisma.event.findUnique({
+    where: { id: data.eventId },
+  })
+
+  if (!event) throw new Error('Evento no encontrado')
+  if (!event.isActive) throw new Error('Este evento no está activo')
+
+  const pricePerEntry = Number(event.coverPrice)
+  const entries = []
+
+  for (const guestName of data.guestNames) {
+    let qrToken = generateQRToken()
+    let attempts = 0
+    while (attempts < 10) {
+      const existing = await prisma.entry.findUnique({
+        where: { qrToken },
+        select: { id: true },
+      })
+      if (!existing) break
+      qrToken = generateQRToken()
+      attempts++
+    }
+
+    const entry = await prisma.entry.create({
+      data: {
+        eventId: data.eventId,
+        clientName: guestName.trim(),
+        clientEmail: data.clientEmail.trim(),
+        numberOfEntries: 1,
+        totalPrice: pricePerEntry,
+        qrToken,
+        createdByUserId: user.id,
+      },
+      include: {
+        event: true,
+      },
+    })
+
+    entries.push(entry)
+  }
+
+  await createLog('ENTRY_SOLD', user.id, undefined, {
+    eventId: data.eventId,
+    clientEmail: data.clientEmail,
+    guestNames: data.guestNames,
+    numberOfEntries: data.guestNames.length,
+    totalPrice: pricePerEntry * data.guestNames.length,
+    entryIds: entries.map((e) => e.id),
+  })
+
+  revalidatePath('/cajero/entradas')
+  return entries
+}
+
 export async function getEntries(filters?: {
   eventId?: string
   status?: 'ACTIVE' | 'USED' | 'CANCELLED'

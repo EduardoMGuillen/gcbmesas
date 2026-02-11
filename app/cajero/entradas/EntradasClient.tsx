@@ -8,6 +8,7 @@ import {
   updateEvent,
   deleteEvent,
   createEntry,
+  createBulkEntries,
   markEntryUsed,
   revertEntryToActive,
   cancelEntry,
@@ -173,10 +174,17 @@ async function handleSendEntryEmail(data: {
   eventName: string
   eventDate: string
 }) {
+  // Convert single entry to the new multi-entry format
   const res = await fetch('/api/send-entry-email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      entries: [{ entryId: data.entryId, qrToken: data.qrToken, clientName: data.clientName }],
+      clientEmail: data.clientEmail,
+      eventName: data.eventName,
+      eventDate: data.eventDate,
+      totalPrice: data.totalPrice,
+    }),
   })
   const result = await res.json()
   if (!res.ok) throw new Error(result.error || 'Error al enviar email')
@@ -230,16 +238,13 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [eventId, setEventId] = useState('')
-  const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
   const [numberOfEntries, setNumberOfEntries] = useState(1)
+  const [guestNames, setGuestNames] = useState<string[]>([''])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<{
-    entryId: string
-    qrToken: string
-    clientName: string
+    entries: { entryId: string; qrToken: string; clientName: string }[]
     clientEmail: string
-    numberOfEntries: number
     totalPrice: number
     eventName: string
     eventDate: string
@@ -251,37 +256,87 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
   const selectedEvent = events.find((e) => e.id === eventId)
   const totalPrice = selectedEvent ? selectedEvent.coverPrice * numberOfEntries : 0
 
+  // Keep guestNames array in sync with numberOfEntries
+  const updateNumberOfEntries = (n: number) => {
+    const newN = Math.max(1, n)
+    setNumberOfEntries(newN)
+    setGuestNames((prev) => {
+      if (newN > prev.length) {
+        return [...prev, ...Array(newN - prev.length).fill('')]
+      }
+      return prev.slice(0, newN)
+    })
+  }
+
+  const updateGuestName = (index: number, name: string) => {
+    setGuestNames((prev) => {
+      const next = [...prev]
+      next[index] = name
+      return next
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setSuccess(null)
 
     if (!eventId) { setError('Selecciona un evento'); return }
-    if (!clientName.trim()) { setError('Ingresa el nombre del cliente'); return }
     if (!clientEmail.trim()) { setError('Ingresa el email del cliente'); return }
     if (numberOfEntries < 1) { setError('Mínimo 1 entrada'); return }
 
+    // Validate all guest names
+    for (let i = 0; i < numberOfEntries; i++) {
+      if (!guestNames[i]?.trim()) {
+        setError(`Ingresa el nombre para la entrada ${i + 1}`)
+        return
+      }
+    }
+
     startTransition(async () => {
       try {
-        const entry = await createEntry({
-          eventId,
-          clientName: clientName.trim(),
-          clientEmail: clientEmail.trim(),
-          numberOfEntries,
-        })
-        setSuccess({
-          entryId: entry.id,
-          qrToken: entry.qrToken,
-          clientName: entry.clientName,
-          clientEmail: entry.clientEmail,
-          numberOfEntries: entry.numberOfEntries,
-          totalPrice: Number(entry.totalPrice),
-          eventName: entry.event.name,
-          eventDate: String(entry.event.date),
-        })
-        setClientName('')
+        if (numberOfEntries === 1) {
+          // Single entry - use original action
+          const entry = await createEntry({
+            eventId,
+            clientName: guestNames[0].trim(),
+            clientEmail: clientEmail.trim(),
+            numberOfEntries: 1,
+          })
+          setSuccess({
+            entries: [{
+              entryId: entry.id,
+              qrToken: entry.qrToken,
+              clientName: entry.clientName,
+            }],
+            clientEmail: entry.clientEmail,
+            totalPrice: Number(entry.totalPrice),
+            eventName: entry.event.name,
+            eventDate: String(entry.event.date),
+          })
+        } else {
+          // Multiple entries - create individual entries
+          const entries = await createBulkEntries({
+            eventId,
+            clientEmail: clientEmail.trim(),
+            guestNames: guestNames.slice(0, numberOfEntries).map((n) => n.trim()),
+          })
+          const first = entries[0]
+          setSuccess({
+            entries: entries.map((e: any) => ({
+              entryId: e.id,
+              qrToken: e.qrToken,
+              clientName: e.clientName,
+            })),
+            clientEmail: first.clientEmail,
+            totalPrice: entries.reduce((sum: number, e: any) => sum + Number(e.totalPrice), 0),
+            eventName: first.event.name,
+            eventDate: String(first.event.date),
+          })
+        }
         setClientEmail('')
         setNumberOfEntries(1)
+        setGuestNames([''])
         router.refresh()
       } catch (err: any) {
         setError(err.message || 'Error al crear la entrada')
@@ -294,7 +349,20 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
     setSendingEmail(true)
     setError('')
     try {
-      await handleSendEntryEmail(success)
+      await fetch('/api/send-entry-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entries: success.entries,
+          clientEmail: success.clientEmail,
+          eventName: success.eventName,
+          eventDate: success.eventDate,
+          totalPrice: success.totalPrice,
+        }),
+      }).then(async (res) => {
+        const result = await res.json()
+        if (!res.ok) throw new Error(result.error || 'Error al enviar email')
+      })
       setEmailSent(true)
     } catch (err: any) {
       setError(err.message || 'Error al enviar email')
@@ -307,7 +375,41 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
     if (!success) return
     setPrinting(true)
     try {
-      await handlePrintEntry(success)
+      const appUrl = window.location.origin
+      const logoUrl = `${appUrl}/LogoCasaBlanca.png`
+      // Generate all print pages in one window
+      const qrDataUrls = await Promise.all(
+        success.entries.map((entry) =>
+          generateQRDataUrl(`${appUrl}/entradas/validar/${entry.qrToken}`)
+        )
+      )
+      const pages = success.entries.map((entry, i) =>
+        buildPrintHtml({
+          entryId: entry.entryId,
+          qrToken: entry.qrToken,
+          clientName: entry.clientName,
+          clientEmail: success.clientEmail,
+          numberOfEntries: 1,
+          totalPrice: selectedEvent?.coverPrice || success.totalPrice / success.entries.length,
+          eventName: success.eventName,
+          eventDate: success.eventDate,
+          qrDataUrl: qrDataUrls[i],
+          logoUrl,
+        })
+      )
+      // Open one window with all receipts separated by page breaks
+      const printWindow = window.open('', '_blank', 'width=400,height=700')
+      if (printWindow) {
+        const combined = pages.map((html, i) => {
+          // Extract body content from each HTML page
+          const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/)
+          return bodyMatch ? `<div ${i > 0 ? 'style="page-break-before:always"' : ''}>${bodyMatch[1]}</div>` : ''
+        }).join('')
+        const styleMatch = pages[0].match(/<style>([\s\S]*?)<\/style>/)
+        const styles = styleMatch ? styleMatch[1] : ''
+        printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${styles} @media print { div[style*="page-break"] { page-break-before: always; } }</style></head><body>${combined}<script>window.onload=function(){window.print();}<\/script></body></html>`)
+        printWindow.document.close()
+      }
     } finally {
       setPrinting(false)
     }
@@ -343,20 +445,36 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-dark-300 mb-2">Nombre del Cliente</label>
-            <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nombre completo" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
-          </div>
-          <div>
             <label className="block text-sm font-medium text-dark-300 mb-2">Email del Cliente</label>
             <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="correo@ejemplo.com" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-300 mb-2">Número de Entradas</label>
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setNumberOfEntries(Math.max(1, numberOfEntries - 1))} className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors">-</button>
-              <input type="number" min={1} value={numberOfEntries} onChange={(e) => setNumberOfEntries(Math.max(1, parseInt(e.target.value) || 1))} className="w-20 text-center px-3 py-2.5 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <button type="button" onClick={() => setNumberOfEntries(numberOfEntries + 1)} className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors">+</button>
+              <button type="button" onClick={() => updateNumberOfEntries(numberOfEntries - 1)} className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors">-</button>
+              <input type="number" min={1} value={numberOfEntries} onChange={(e) => updateNumberOfEntries(parseInt(e.target.value) || 1)} className="w-20 text-center px-3 py-2.5 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <button type="button" onClick={() => updateNumberOfEntries(numberOfEntries + 1)} className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors">+</button>
             </div>
+          </div>
+          {/* Guest names */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-dark-300">
+              {numberOfEntries === 1 ? 'Nombre del Cliente' : `Nombres (${numberOfEntries} entradas)`}
+            </label>
+            {guestNames.slice(0, numberOfEntries).map((name, i) => (
+              <div key={i} className="flex items-center gap-2">
+                {numberOfEntries > 1 && (
+                  <span className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-primary-600/20 text-primary-400 text-xs font-bold">{i + 1}</span>
+                )}
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => updateGuestName(i, e.target.value)}
+                  placeholder={numberOfEntries === 1 ? 'Nombre completo' : `Nombre entrada ${i + 1}`}
+                  className="flex-1 px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            ))}
           </div>
           {selectedEvent && (
             <div className="bg-primary-600/10 border border-primary-500/30 rounded-lg p-4">
@@ -384,9 +502,21 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
             <h3 className="text-lg font-semibold text-white">Venta Registrada</h3>
             <div className="space-y-2 text-sm">
               <p className="text-dark-300"><span className="text-white font-medium">{success.eventName}</span></p>
-              <p className="text-dark-300">Cliente: <span className="text-white">{success.clientName}</span></p>
               <p className="text-dark-300">Email: <span className="text-white">{success.clientEmail}</span></p>
-              <p className="text-dark-300">Entradas: <span className="text-white">{success.numberOfEntries}</span></p>
+              <p className="text-dark-300">Entradas: <span className="text-white">{success.entries.length}</span></p>
+              {success.entries.length > 1 && (
+                <div className="bg-dark-50 border border-dark-200 rounded-lg p-3 text-left space-y-1">
+                  {success.entries.map((entry, i) => (
+                    <div key={entry.entryId} className="flex items-center gap-2">
+                      <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-primary-600/20 text-primary-400 text-[10px] font-bold">{i + 1}</span>
+                      <span className="text-white text-sm">{entry.clientName}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {success.entries.length === 1 && (
+                <p className="text-dark-300">Cliente: <span className="text-white">{success.entries[0].clientName}</span></p>
+              )}
               <p className="text-dark-300">Total: <span className="text-primary-400 font-bold">L {success.totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })}</span></p>
             </div>
             <div className="border-t border-dark-200 pt-4 space-y-3">
@@ -395,12 +525,12 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
               ) : (
                 <button onClick={handleEmail} disabled={sendingEmail} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                  {sendingEmail ? 'Enviando...' : 'Enviar QR por Email'}
+                  {sendingEmail ? 'Enviando...' : `Enviar ${success.entries.length > 1 ? `${success.entries.length} QRs` : 'QR'} por Email`}
                 </button>
               )}
               <button onClick={handlePrint} disabled={printing} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                {printing ? 'Generando...' : 'Imprimir Entrada'}
+                {printing ? 'Generando...' : `Imprimir ${success.entries.length > 1 ? `${success.entries.length} Entradas` : 'Entrada'}`}
               </button>
               <button onClick={() => { setSuccess(null); setEmailSent(false); setError('') }} className="w-full bg-dark-50 hover:bg-dark-200 text-white/80 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm">
                 Vender otra entrada

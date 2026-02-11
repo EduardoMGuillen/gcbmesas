@@ -7,6 +7,12 @@ import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
 
+type EntryData = {
+  entryId: string
+  qrToken: string
+  clientName: string
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Auth check
@@ -16,21 +22,56 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { entryId, qrToken, clientName, clientEmail, numberOfEntries, totalPrice, eventName, eventDate } = body
 
-    if (!entryId || !qrToken || !clientEmail || !eventName) {
+    // Support both old single-entry format and new multi-entry format
+    let entries: EntryData[]
+    let clientEmail: string
+    let eventName: string
+    let eventDate: string | undefined
+    let totalPrice: number
+
+    if (body.entries && Array.isArray(body.entries)) {
+      // New multi-entry format
+      entries = body.entries
+      clientEmail = body.clientEmail
+      eventName = body.eventName
+      eventDate = body.eventDate
+      totalPrice = body.totalPrice
+    } else {
+      // Legacy single-entry format (from historial tab)
+      entries = [{
+        entryId: body.entryId,
+        qrToken: body.qrToken,
+        clientName: body.clientName,
+      }]
+      clientEmail = body.clientEmail
+      eventName = body.eventName
+      eventDate = body.eventDate
+      totalPrice = body.totalPrice || 0
+    }
+
+    if (!entries.length || !clientEmail || !eventName) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
     }
 
-    // Generate QR code with validation URL
     const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const validationUrl = `${appUrl}/entradas/validar/${qrToken}`
-    const qrDataUrl = await generateQRCode(validationUrl)
 
-    // Extract base64 from data URL for email attachment
-    const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, '')
+    // Generate QR codes for all entries
+    const qrData = await Promise.all(
+      entries.map(async (entry, i) => {
+        const validationUrl = `${appUrl}/entradas/validar/${entry.qrToken}`
+        const qrDataUrl = await generateQRCode(validationUrl)
+        const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, '')
+        return {
+          ...entry,
+          validationUrl,
+          qrBase64,
+          cid: `qrcode${i}`,
+        }
+      })
+    )
 
-    // Read logo file for email attachment
+    // Read logo file
     const logoPath = path.join(process.cwd(), 'public', 'LogoCasaBlanca.png')
     const logoBuffer = fs.readFileSync(logoPath)
 
@@ -38,6 +79,22 @@ export async function POST(req: NextRequest) {
     const eventDateStr = eventDate
       ? new Date(eventDate).toLocaleDateString('es-HN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
       : ''
+
+    const isBulk = entries.length > 1
+    const firstGuestName = entries[0].clientName
+
+    // Build QR sections HTML
+    const qrSectionsHtml = qrData.map((qr) => `
+                <div style="text-align:center;margin:0 0 24px;${isBulk ? 'border:1px solid #334155;border-radius:12px;padding:20px;' : ''}">
+                  ${isBulk ? `<p style="color:#fff;font-size:15px;font-weight:bold;margin:0 0 8px;">${qr.clientName}</p>` : ''}
+                  <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">
+                    ${isBulk ? 'QR de entrada:' : 'Presenta este código QR en la entrada:'}
+                  </p>
+                  <div style="background:#fff;display:inline-block;padding:16px;border-radius:12px;">
+                    <img src="cid:${qr.cid}" alt="QR Code" style="width:220px;height:220px;display:block;" />
+                  </div>
+                </div>
+    `).join('')
 
     // Configure SMTP transporter
     const transporter = nodemailer.createTransport({
@@ -54,7 +111,7 @@ export async function POST(req: NextRequest) {
     await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: clientEmail,
-      subject: `Tu entrada para ${eventName} - Casa Blanca`,
+      subject: `${isBulk ? `Tus ${entries.length} entradas` : 'Tu entrada'} para ${eventName} - Casa Blanca`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -68,16 +125,19 @@ export async function POST(req: NextRequest) {
               <!-- Header -->
               <div style="background:linear-gradient(135deg,#1a1a2e 0%,#0f172a 100%);padding:30px 20px;text-align:center;">
                 <img src="cid:logo" alt="Casa Blanca" style="width:120px;height:120px;display:inline-block;" />
-                <p style="color:#c9a84c;margin:8px 0 0;font-size:14px;letter-spacing:1px;">Confirmación de Entrada</p>
+                <p style="color:#c9a84c;margin:8px 0 0;font-size:14px;letter-spacing:1px;">Confirmación de Entrada${isBulk ? 's' : ''}</p>
               </div>
               
               <!-- Content -->
               <div style="padding:30px 20px;">
                 <h2 style="color:#fff;margin:0 0 20px;font-size:20px;text-align:center;">
-                  ¡Hola ${clientName}!
+                  ¡Hola ${firstGuestName}!
                 </h2>
                 <p style="color:#94a3b8;text-align:center;margin:0 0 24px;font-size:15px;">
-                  Tu entrada para <strong style="color:#fff;">${eventName}</strong> ha sido confirmada.
+                  ${isBulk
+                    ? `Tus <strong style="color:#fff;">${entries.length} entradas</strong> para <strong style="color:#fff;">${eventName}</strong> han sido confirmadas.`
+                    : `Tu entrada para <strong style="color:#fff;">${eventName}</strong> ha sido confirmada.`
+                  }
                 </p>
                 
                 <!-- Details card -->
@@ -93,7 +153,7 @@ export async function POST(req: NextRequest) {
                     </tr>` : ''}
                     <tr>
                       <td style="padding:8px 0;color:#94a3b8;font-size:14px;">Entradas</td>
-                      <td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${numberOfEntries}</td>
+                      <td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${entries.length}</td>
                     </tr>
                     <tr>
                       <td style="padding:8px 0;color:#94a3b8;font-size:14px;">Total Pagado</td>
@@ -102,19 +162,11 @@ export async function POST(req: NextRequest) {
                   </table>
                 </div>
                 
-                <!-- QR Code -->
-                <div style="text-align:center;margin:0 0 24px;">
-                  <p style="color:#94a3b8;font-size:14px;margin:0 0 12px;">
-                    Presenta este código QR en la entrada:
-                  </p>
-                  <div style="background:#fff;display:inline-block;padding:16px;border-radius:12px;">
-                    <img src="cid:qrcode" alt="QR Code" style="width:250px;height:250px;display:block;" />
-                  </div>
-                </div>
+                <!-- QR Codes -->
+                ${qrSectionsHtml}
                 
                 <p style="color:#64748b;text-align:center;font-size:12px;margin:0;">
-                  También puedes verificar tu entrada en:<br>
-                  <a href="${validationUrl}" style="color:#3b82f6;text-decoration:underline;">${validationUrl}</a>
+                  Cada persona debe presentar su QR individual en la entrada.
                 </p>
               </div>
               
@@ -131,20 +183,22 @@ export async function POST(req: NextRequest) {
       `,
       attachments: [
         {
-          filename: 'entrada-qr.png',
-          content: Buffer.from(qrBase64, 'base64'),
-          cid: 'qrcode',
-        },
-        {
           filename: 'LogoCasaBlanca.png',
           content: logoBuffer,
           cid: 'logo',
         },
+        ...qrData.map((qr) => ({
+          filename: `entrada-qr-${qr.clientName.replace(/\s+/g, '-').toLowerCase()}.png`,
+          content: Buffer.from(qr.qrBase64, 'base64'),
+          cid: qr.cid,
+        })),
       ],
     })
 
-    // Mark email as sent
-    await markEntryEmailSent(entryId)
+    // Mark all entries as email sent
+    for (const entry of entries) {
+      await markEntryEmailSent(entry.entryId)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
