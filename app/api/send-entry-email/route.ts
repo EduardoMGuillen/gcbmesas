@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { markEntryEmailSent } from '@/lib/actions'
 import { generateQRCode } from '@/lib/utils'
 import nodemailer from 'nodemailer'
+import path from 'path'
+import fs from 'fs'
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { entryId, qrToken, clientName, clientEmail, numberOfEntries, totalPrice, eventName } = body
+    const { entryId, qrToken, clientName, clientEmail, numberOfEntries, totalPrice, eventName, eventDate } = body
 
     if (!entryId || !qrToken || !clientEmail || !eventName) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
@@ -27,6 +29,15 @@ export async function POST(req: NextRequest) {
 
     // Extract base64 from data URL for email attachment
     const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, '')
+
+    // Read logo file for email attachment
+    const logoPath = path.join(process.cwd(), 'public', 'LogoCasaBlanca.png')
+    const logoBuffer = fs.readFileSync(logoPath)
+
+    // Format event date
+    const eventDateStr = eventDate
+      ? new Date(eventDate).toLocaleDateString('es-HN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
+      : ''
 
     // Configure SMTP transporter
     const transporter = nodemailer.createTransport({
@@ -55,9 +66,9 @@ export async function POST(req: NextRequest) {
           <div style="max-width:600px;margin:0 auto;padding:20px;">
             <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:16px;overflow:hidden;border:1px solid #334155;">
               <!-- Header -->
-              <div style="background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);padding:30px 20px;text-align:center;">
-                <h1 style="color:#fff;margin:0;font-size:24px;">Casa Blanca</h1>
-                <p style="color:#e0e7ff;margin:8px 0 0;font-size:14px;">Confirmación de Entrada</p>
+              <div style="background:linear-gradient(135deg,#1a1a2e 0%,#0f172a 100%);padding:30px 20px;text-align:center;">
+                <img src="cid:logo" alt="Casa Blanca" style="width:120px;height:120px;display:inline-block;" />
+                <p style="color:#c9a84c;margin:8px 0 0;font-size:14px;letter-spacing:1px;">Confirmación de Entrada</p>
               </div>
               
               <!-- Content -->
@@ -76,6 +87,10 @@ export async function POST(req: NextRequest) {
                       <td style="padding:8px 0;color:#94a3b8;font-size:14px;">Evento</td>
                       <td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${eventName}</td>
                     </tr>
+                    ${eventDateStr ? `<tr>
+                      <td style="padding:8px 0;color:#94a3b8;font-size:14px;">Fecha</td>
+                      <td style="padding:8px 0;color:#c9a84c;font-size:14px;text-align:right;font-weight:bold;text-transform:capitalize;">${eventDateStr}</td>
+                    </tr>` : ''}
                     <tr>
                       <td style="padding:8px 0;color:#94a3b8;font-size:14px;">Entradas</td>
                       <td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${numberOfEntries}</td>
@@ -119,6 +134,11 @@ export async function POST(req: NextRequest) {
           filename: 'entrada-qr.png',
           content: Buffer.from(qrBase64, 'base64'),
           cid: 'qrcode',
+        },
+        {
+          filename: 'LogoCasaBlanca.png',
+          content: logoBuffer,
+          cid: 'logo',
         },
       ],
     })

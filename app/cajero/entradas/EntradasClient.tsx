@@ -66,11 +66,14 @@ function buildPrintHtml(data: {
   numberOfEntries: number
   totalPrice: number
   eventName: string
+  eventDate: string
   qrDataUrl: string
+  logoUrl: string
 }) {
   const now = new Date()
   const dateStr = now.toLocaleDateString('es-HN', { year: 'numeric', month: 'long', day: 'numeric' })
   const timeStr = now.toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit' })
+  const eventDateStr = new Date(data.eventDate).toLocaleDateString('es-HN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
   const pricePerEntry = data.totalPrice / data.numberOfEntries
 
   return `<!DOCTYPE html>
@@ -82,9 +85,10 @@ function buildPrintHtml(data: {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Courier New', monospace; width: 302px; margin: 0 auto; padding: 16px 12px; color: #000; background: #fff; }
     .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 12px; margin-bottom: 12px; }
-    .header h1 { font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+    .header img { width: 120px; height: 120px; object-fit: contain; }
     .header p { font-size: 11px; margin-top: 4px; color: #444; }
     .title { text-align: center; font-size: 14px; font-weight: bold; padding: 8px 0; border-bottom: 1px dashed #999; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+    .event-date { text-align: center; font-size: 11px; color: #555; margin-top: -6px; margin-bottom: 10px; text-transform: capitalize; }
     .info-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
     .info-row .label { color: #555; }
     .info-row .value { font-weight: bold; text-align: right; max-width: 60%; }
@@ -103,11 +107,12 @@ function buildPrintHtml(data: {
 </head>
 <body>
   <div class="header">
-    <h1>CASA BLANCA</h1>
+    <img src="${data.logoUrl}" alt="Casa Blanca" />
     <p>Comprobante de Entrada</p>
   </div>
   <div class="title">${data.eventName}</div>
-  <div class="info-row"><span class="label">Fecha:</span><span class="value">${dateStr}</span></div>
+  <div class="event-date">${eventDateStr}</div>
+  <div class="info-row"><span class="label">Fecha compra:</span><span class="value">${dateStr}</span></div>
   <div class="info-row"><span class="label">Hora:</span><span class="value">${timeStr}</span></div>
   <div class="info-row"><span class="label">No. Transacción:</span><span class="value">${data.entryId.slice(-8).toUpperCase()}</span></div>
   <div class="divider"></div>
@@ -145,14 +150,16 @@ async function handlePrintEntry(data: {
   numberOfEntries: number
   totalPrice: number
   eventName: string
+  eventDate: string
 }) {
   const appUrl = window.location.origin
   const validationUrl = `${appUrl}/entradas/validar/${data.qrToken}`
   const qrDataUrl = await generateQRDataUrl(validationUrl)
+  const logoUrl = `${appUrl}/LogoCasaBlanca.png`
 
   const printWindow = window.open('', '_blank', 'width=400,height=700')
   if (!printWindow) return
-  printWindow.document.write(buildPrintHtml({ ...data, qrDataUrl }))
+  printWindow.document.write(buildPrintHtml({ ...data, qrDataUrl, logoUrl }))
   printWindow.document.close()
 }
 
@@ -164,6 +171,7 @@ async function handleSendEntryEmail(data: {
   numberOfEntries: number
   totalPrice: number
   eventName: string
+  eventDate: string
 }) {
   const res = await fetch('/api/send-entry-email', {
     method: 'POST',
@@ -234,6 +242,7 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
     numberOfEntries: number
     totalPrice: number
     eventName: string
+    eventDate: string
   } | null>(null)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
@@ -268,6 +277,7 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
           numberOfEntries: entry.numberOfEntries,
           totalPrice: Number(entry.totalPrice),
           eventName: entry.event.name,
+          eventDate: String(entry.event.date),
         })
         setClientName('')
         setClientEmail('')
@@ -837,6 +847,7 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
         numberOfEntries: entry.numberOfEntries,
         totalPrice: entry.totalPrice,
         eventName: entry.event.name,
+        eventDate: String(entry.event.date),
       })
       setActionMsg(`Email enviado a ${entry.clientEmail}`)
       router.refresh()
@@ -855,6 +866,7 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
         numberOfEntries: entry.numberOfEntries,
         totalPrice: entry.totalPrice,
         eventName: entry.event.name,
+        eventDate: String(entry.event.date),
       })
     } finally { setPrintingId(null) }
   }
