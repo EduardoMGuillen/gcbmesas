@@ -143,6 +143,44 @@ function buildPrintHtml(data: {
 </html>`
 }
 
+function printHtml(html: string) {
+  // Use a hidden iframe to print — avoids the iOS PWA issue where
+  // window.open() opens a view with no back/close button.
+  const iframe = document.createElement('iframe')
+  iframe.style.position = 'fixed'
+  iframe.style.top = '-10000px'
+  iframe.style.left = '-10000px'
+  iframe.style.width = '0'
+  iframe.style.height = '0'
+  iframe.style.border = 'none'
+  document.body.appendChild(iframe)
+
+  const doc = iframe.contentDocument || iframe.contentWindow?.document
+  if (!doc) { document.body.removeChild(iframe); return }
+
+  // Strip the auto-print script — we'll trigger print manually
+  const cleanHtml = html.replace(/<script>window\.onload=function\(\)\{window\.print\(\);\}<\/script>/g, '')
+  doc.open()
+  doc.write(cleanHtml)
+  doc.close()
+
+  // Wait for images (logo, QR) to load before printing
+  const images = Array.from(doc.querySelectorAll('img'))
+  const loadPromises = images.map(
+    (img) => img.complete ? Promise.resolve() : new Promise<void>((resolve) => { img.onload = () => resolve(); img.onerror = () => resolve() })
+  )
+
+  Promise.all(loadPromises).then(() => {
+    setTimeout(() => {
+      iframe.contentWindow?.print()
+      // Clean up after a delay to let the print dialog finish
+      setTimeout(() => {
+        try { document.body.removeChild(iframe) } catch {}
+      }, 1000)
+    }, 300)
+  })
+}
+
 async function handlePrintEntry(data: {
   entryId: string
   qrToken: string
@@ -158,10 +196,7 @@ async function handlePrintEntry(data: {
   const qrDataUrl = await generateQRDataUrl(validationUrl)
   const logoUrl = `${appUrl}/LogoCasaBlanca.png`
 
-  const printWindow = window.open('', '_blank', 'width=400,height=700')
-  if (!printWindow) return
-  printWindow.document.write(buildPrintHtml({ ...data, qrDataUrl, logoUrl }))
-  printWindow.document.close()
+  printHtml(buildPrintHtml({ ...data, qrDataUrl, logoUrl }))
 }
 
 async function handleSendEntryEmail(data: {
@@ -397,19 +432,14 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
           logoUrl,
         })
       )
-      // Open one window with all receipts separated by page breaks
-      const printWindow = window.open('', '_blank', 'width=400,height=700')
-      if (printWindow) {
-        const combined = pages.map((html, i) => {
-          // Extract body content from each HTML page
-          const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/)
-          return bodyMatch ? `<div ${i > 0 ? 'style="page-break-before:always"' : ''}>${bodyMatch[1]}</div>` : ''
-        }).join('')
-        const styleMatch = pages[0].match(/<style>([\s\S]*?)<\/style>/)
-        const styles = styleMatch ? styleMatch[1] : ''
-        printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${styles} @media print { div[style*="page-break"] { page-break-before: always; } }</style></head><body>${combined}<script>window.onload=function(){window.print();}<\/script></body></html>`)
-        printWindow.document.close()
-      }
+      // Combine all receipts with page breaks and print via iframe
+      const combined = pages.map((html, i) => {
+        const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/)
+        return bodyMatch ? `<div ${i > 0 ? 'style="page-break-before:always"' : ''}>${bodyMatch[1]}</div>` : ''
+      }).join('')
+      const styleMatch = pages[0].match(/<style>([\s\S]*?)<\/style>/)
+      const styles = styleMatch ? styleMatch[1] : ''
+      printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${styles} @media print { div[style*="page-break"] { page-break-before: always; } }</style></head><body>${combined}</body></html>`)
     } finally {
       setPrinting(false)
     }
