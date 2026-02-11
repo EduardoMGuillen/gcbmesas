@@ -627,10 +627,10 @@ function EscanearTab() {
           )}
 
           <div className="border-t border-dark-200 pt-4">
-            <form onSubmit={handleManualSubmit} className="flex gap-3">
-              <input type="text" value={manualToken} onChange={(e) => setManualToken(e.target.value)} placeholder="Código o URL de entrada..." className="flex-1 px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <button type="submit" disabled={isPending} className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
-                {isPending ? 'Buscando...' : 'Buscar'}
+            <form onSubmit={handleManualSubmit} className="flex gap-2 sm:gap-3">
+              <input type="text" value={manualToken} onChange={(e) => setManualToken(e.target.value)} placeholder="Código o URL de entrada..." className="flex-1 min-w-0 px-3 sm:px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <button type="submit" disabled={isPending} className="shrink-0 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold py-3 px-4 sm:px-6 rounded-lg transition-colors">
+                {isPending ? '...' : 'Buscar'}
               </button>
             </form>
           </div>
@@ -807,12 +807,25 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [filter, setFilter] = useState<'all' | 'ACTIVE' | 'USED' | 'CANCELLED'>('all')
+  const [searchName, setSearchName] = useState('')
+  const [eventFilter, setEventFilter] = useState<string>('all')
   const [error, setError] = useState('')
   const [actionMsg, setActionMsg] = useState('')
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const [printingId, setPrintingId] = useState<string | null>(null)
 
-  const filtered = filter === 'all' ? entries : entries.filter((e) => e.status === filter)
+  // Get unique event names for the filter dropdown
+  const uniqueEvents = Array.from(new Set(entries.map((e) => e.event.name))).sort()
+
+  const filtered = entries.filter((e) => {
+    if (filter !== 'all' && e.status !== filter) return false
+    if (eventFilter !== 'all' && e.event.name !== eventFilter) return false
+    if (searchName.trim()) {
+      const q = searchName.trim().toLowerCase()
+      if (!e.clientName.toLowerCase().includes(q) && !e.clientEmail.toLowerCase().includes(q)) return false
+    }
+    return true
+  })
 
   const handleMarkUsed = async (entryId: string) => {
     setError(''); setActionMsg('')
@@ -879,17 +892,44 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
 
   return (
     <div className="space-y-4">
+      {/* Status filter buttons */}
       <div className="flex gap-2 flex-wrap">
         {([{ id: 'all' as const, label: 'Todas' }, { id: 'ACTIVE' as const, label: 'Activas' }, { id: 'USED' as const, label: 'Usadas' }, { id: 'CANCELLED' as const, label: 'Canceladas' }]).map((f) => (
           <button key={f.id} onClick={() => setFilter(f.id)} className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${filter === f.id ? 'bg-primary-600 text-white' : 'bg-dark-100 border border-dark-200 text-white/60 hover:text-white'}`}>{f.label}</button>
         ))}
       </div>
 
+      {/* Search and event filter */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <input
+            type="text"
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+            placeholder="Buscar por nombre o email..."
+            className="w-full pl-9 pr-3 py-2.5 bg-dark-100 border border-dark-200 rounded-lg text-white text-sm placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+        {uniqueEvents.length > 1 && (
+          <select
+            value={eventFilter}
+            onChange={(e) => setEventFilter(e.target.value)}
+            className="px-3 py-2.5 bg-dark-100 border border-dark-200 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 sm:w-auto"
+          >
+            <option value="all">Todos los eventos</option>
+            {uniqueEvents.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
       {error && <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">{error}</div>}
       {actionMsg && <div className="bg-green-500/20 border border-green-500/50 text-green-400 px-4 py-3 rounded-lg text-sm">{actionMsg}</div>}
 
       {filtered.length === 0 ? (
-        <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center"><p className="text-white/40">No hay entradas registradas.</p></div>
+        <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center"><p className="text-white/40">{searchName || eventFilter !== 'all' ? 'No se encontraron entradas con esos filtros.' : 'No hay entradas registradas.'}</p></div>
       ) : (
         <div className="space-y-3">
           {filtered.map((entry) => {
