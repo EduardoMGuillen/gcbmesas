@@ -53,6 +53,14 @@ export default async function ValidarEntradaPage({
     <div className="min-h-screen bg-gradient-to-br from-dark-300 via-dark-200 to-dark-300 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="bg-dark-100 border border-dark-200 rounded-2xl overflow-hidden shadow-2xl">
+          {/* Flyer */}
+          {entry.event.coverImage && (
+            <div className="relative">
+              <img src={entry.event.coverImage} alt={entry.event.name} className="w-full h-48 object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            </div>
+          )}
+
           {/* Header */}
           <div className={`bg-gradient-to-r ${eventHasPassed ? 'from-gray-600 to-gray-700' : sc.headerBg} p-6 text-center`}>
             <svg className="w-16 h-16 mx-auto text-white mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

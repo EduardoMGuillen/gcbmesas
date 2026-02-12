@@ -43,9 +43,12 @@ async function getPayPalAccessToken() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { orderId, eventId, clientName, clientEmail, clientPhone, numberOfEntries } = body
+    const { orderId, eventId, clientNames, clientName, clientEmail, clientPhone, numberOfEntries } = body
 
-    if (!orderId || !eventId || !clientName || !clientEmail || !numberOfEntries) {
+    // Support both clientNames array and legacy clientName string
+    const names: string[] = clientNames || (clientName ? Array(numberOfEntries).fill(clientName) : [])
+
+    if (!orderId || !eventId || !names.length || !clientEmail || !numberOfEntries) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
     }
 
@@ -83,10 +86,11 @@ export async function POST(req: NextRequest) {
     const entries = []
     for (let i = 0; i < numberOfEntries; i++) {
       const qrToken = generateToken()
+      const entryName = (names[i] || names[0]).trim()
       const entry = await prisma.entry.create({
         data: {
           eventId,
-          clientName: clientName.trim(),
+          clientName: entryName,
           clientEmail: clientEmail.trim(),
           clientPhone: clientPhone?.trim() || null,
           numberOfEntries: 1,
@@ -104,7 +108,7 @@ export async function POST(req: NextRequest) {
         action: 'ENTRY_SOLD',
         details: {
           eventId,
-          clientName,
+          clientNames: names,
           clientEmail,
           numberOfEntries,
           totalPrice: Number(event.paypalPrice) * numberOfEntries,
@@ -121,6 +125,7 @@ export async function POST(req: NextRequest) {
       const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://gcbmesas.vercel.app'
       const eventName = entries[0].event.name
       const eventDate = String(entries[0].event.date)
+      const eventCoverImage = event.coverImage
       const totalPrice = entries.reduce((sum: number, e: any) => sum + Number(e.totalPrice), 0)
 
       const qrData = await Promise.all(
@@ -167,12 +172,13 @@ export async function POST(req: NextRequest) {
           <body style="margin:0;padding:0;background-color:#1a1a2e;font-family:Arial,sans-serif;">
             <div style="max-width:600px;margin:0 auto;padding:20px;">
               <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:16px;overflow:hidden;border:1px solid #334155;">
+                ${eventCoverImage ? `<div style="text-align:center;"><img src="${eventCoverImage}" alt="${eventName}" style="width:100%;max-height:250px;object-fit:cover;display:block;" /></div>` : ''}
                 <div style="padding:30px 20px;text-align:center;">
-                  <img src="cid:logo" alt="Casa Blanca" style="width:120px;height:120px;display:inline-block;" />
+                  <img src="cid:logo" alt="Casa Blanca" style="width:100px;height:100px;display:inline-block;" />
                   <p style="color:#c9a84c;margin:8px 0 0;font-size:14px;letter-spacing:1px;">Confirmacion de Compra Online</p>
                 </div>
                 <div style="padding:30px 20px;">
-                  <h2 style="color:#fff;margin:0 0 20px;font-size:20px;text-align:center;">Hola ${clientName}!</h2>
+                  <h2 style="color:#fff;margin:0 0 20px;font-size:20px;text-align:center;">Hola ${names[0]}!</h2>
                   <p style="color:#94a3b8;text-align:center;margin:0 0 24px;font-size:15px;">
                     ${isBulk ? `Tus <strong style="color:#fff;">${entries.length} entradas</strong>` : 'Tu entrada'} para <strong style="color:#fff;">${eventName}</strong> ${isBulk ? 'han sido confirmadas' : 'ha sido confirmada'}.
                   </p>
