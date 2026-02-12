@@ -2477,7 +2477,7 @@ export async function createPublicEntry(data: {
         clientEmail: data.clientEmail.trim(),
         clientPhone: data.clientPhone?.trim() || null,
         numberOfEntries: 1,
-        totalPrice: Number(event.paypalPrice),
+        totalPrice: Number(event.coverPrice),
         qrToken,
       },
       include: { event: true },

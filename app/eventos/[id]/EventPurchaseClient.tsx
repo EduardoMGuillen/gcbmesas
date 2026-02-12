@@ -19,7 +19,7 @@ type PurchaseSuccess = {
   clientEmail: string
   eventName: string
   eventDate: string
-  totalPrice: number
+  totalPriceUsd: number
   paypalOrderId: string
 }
 
@@ -333,7 +333,7 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
   <div class="info-row"><span class="label">Email:</span><span class="value" style="font-size:10px">${success.clientEmail}</span></div>
   <div class="divider"></div>
   <div class="total-section">
-    <div class="total-row"><span>TOTAL</span><span>$${(success.totalPrice / success.entries.length).toFixed(2)} USD</span></div>
+    <div class="total-row"><span>TOTAL</span><span>$${(success.totalPriceUsd / success.entries.length).toFixed(2)} USD</span></div>
   </div>
   <div class="qr-section">
     <img src="${qrDataUrl}" alt="QR Code"/>
@@ -365,7 +365,7 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
         : `*${entry.clientName}*\n${url}`
     }).join('\n\n')
 
-    const fullMessage = `🎟️ *Tu entrada para ${success.eventName}*\n📅 ${eventDateStr}\n💰 $${success.totalPrice.toFixed(2)} USD\n\n${message}\n\nPresenta el QR en la entrada. Te esperamos! 🎉`
+    const fullMessage = `🎟️ *Tu entrada para ${success.eventName}*\n📅 ${eventDateStr}\n💰 $${success.totalPriceUsd.toFixed(2)} USD\n\n${message}\n\nPresenta el QR en la entrada. Te esperamos! 🎉`
 
     window.open(`https://wa.me/?text=${encodeURIComponent(fullMessage)}`, '_blank')
   }
@@ -393,7 +393,7 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
             <div style={{ borderTop: `1px solid ${cardBorder}` }} />
             <div className="flex justify-between"><span className="text-sm text-white/40">Entradas</span><span className="text-white font-bold">{success.entries.length}</span></div>
             <div style={{ borderTop: `1px solid ${cardBorder}` }} />
-            <div className="flex justify-between"><span className="text-sm text-white/40">Total Pagado</span><span className="font-bold text-lg" style={{ color: '#c9a84c' }}>${success.totalPrice.toFixed(2)} USD</span></div>
+            <div className="flex justify-between"><span className="text-sm text-white/40">Total Pagado</span><span className="font-bold text-lg" style={{ color: '#c9a84c' }}>${success.totalPriceUsd.toFixed(2)} USD</span></div>
             <div style={{ borderTop: `1px solid ${cardBorder}` }} />
             <div className="flex justify-between"><span className="text-sm text-white/40">Email</span><span className="text-white text-sm">{success.clientEmail}</span></div>
           </div>
