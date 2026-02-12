@@ -119,7 +119,7 @@ export default async function EventosPage() {
               const monthStr = eventDate.toLocaleDateString('es-HN', { month: 'short', timeZone: 'UTC' }).toUpperCase()
               const weekday = eventDate.toLocaleDateString('es-HN', { weekday: 'long', timeZone: 'UTC' })
               const fullDate = eventDate.toLocaleDateString('es-HN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
-              const priceLps = Number(event.coverPrice)
+              const priceUsd = Number(event.paypalPrice)
 
               return (
                 <Link
@@ -160,7 +160,7 @@ export default async function EventosPage() {
                       )}
                       <div className="flex items-center justify-between">
                         <span className="text-white/40 text-xs capitalize">{fullDate}</span>
-                        <span className="font-bold text-lg" style={{ color: '#c9a84c' }}>L {priceLps.toFixed(0)}</span>
+                        <span className="font-bold text-lg" style={{ color: '#c9a84c' }}>${priceUsd.toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
