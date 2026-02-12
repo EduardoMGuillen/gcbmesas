@@ -2082,6 +2082,7 @@ export async function createEntry(data: {
   eventId: string
   clientName: string
   clientEmail: string
+  clientPhone?: string
   numberOfEntries: number
 }) {
   const user = await getCurrentUser()
@@ -2115,6 +2116,7 @@ export async function createEntry(data: {
       eventId: data.eventId,
       clientName: data.clientName,
       clientEmail: data.clientEmail,
+      clientPhone: data.clientPhone?.trim() || null,
       numberOfEntries: data.numberOfEntries,
       totalPrice,
       qrToken,
@@ -2141,6 +2143,7 @@ export async function createEntry(data: {
 export async function createBulkEntries(data: {
   eventId: string
   clientEmail: string
+  clientPhone?: string
   guestNames: string[]
 }) {
   const user = await getCurrentUser()
@@ -2174,6 +2177,7 @@ export async function createBulkEntries(data: {
         eventId: data.eventId,
         clientName: guestName.trim(),
         clientEmail: data.clientEmail.trim(),
+        clientPhone: data.clientPhone?.trim() || null,
         numberOfEntries: 1,
         totalPrice: pricePerEntry,
         qrToken,
@@ -2362,6 +2366,7 @@ export async function validateEntryByToken(token: string) {
     id: entry.id,
     clientName: entry.clientName,
     clientEmail: entry.clientEmail,
+    clientPhone: entry.clientPhone,
     numberOfEntries: entry.numberOfEntries,
     totalPrice: Number(entry.totalPrice),
     status: entry.status,
@@ -2378,6 +2383,13 @@ export async function markEntryEmailSent(entryId: string) {
   await prisma.entry.update({
     where: { id: entryId },
     data: { emailSent: true },
+  })
+}
+
+export async function markEntryWhatsappSent(entryId: string) {
+  await prisma.entry.update({
+    where: { id: entryId },
+    data: { whatsappSent: true },
   })
 }
 

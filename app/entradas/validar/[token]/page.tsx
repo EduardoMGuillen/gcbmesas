@@ -43,18 +43,33 @@ export default async function ValidarEntradaPage({
 
   const sc = statusConfig[entry.status]
 
+  // Check if the event date has already passed (give 1 day buffer after event)
+  const eventDate = new Date(entry.event.date)
+  const now = new Date()
+  const oneDayAfterEvent = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000)
+  const eventHasPassed = now > oneDayAfterEvent
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-300 via-dark-200 to-dark-300 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="bg-dark-100 border border-dark-200 rounded-2xl overflow-hidden shadow-2xl">
           {/* Header */}
-          <div className={`bg-gradient-to-r ${sc.headerBg} p-6 text-center`}>
+          <div className={`bg-gradient-to-r ${eventHasPassed ? 'from-gray-600 to-gray-700' : sc.headerBg} p-6 text-center`}>
             <svg className="w-16 h-16 mx-auto text-white mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sc.icon} />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={eventHasPassed ? 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' : sc.icon} />
             </svg>
-            <h1 className="text-2xl font-bold text-white">Entrada {sc.label}</h1>
+            <h1 className="text-2xl font-bold text-white">
+              {eventHasPassed ? 'Evento Finalizado' : `Entrada ${sc.label}`}
+            </h1>
             <p className="text-white/80 text-sm mt-1">Casa Blanca</p>
           </div>
+
+          {/* Event passed banner */}
+          {eventHasPassed && (
+            <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-3 text-center">
+              <p className="text-amber-400 text-sm font-medium">Este evento ya pas&oacute;. Esta entrada ya no es v&aacute;lida para acceso.</p>
+            </div>
+          )}
 
           {/* Content */}
           <div className="p-6 space-y-4">
@@ -73,7 +88,7 @@ export default async function ValidarEntradaPage({
             </div>
 
             {/* Details */}
-            <div className="bg-dark-50 border border-dark-200 rounded-xl p-4 space-y-3">
+            <div className={`bg-dark-50 border border-dark-200 rounded-xl p-4 space-y-3 ${eventHasPassed ? 'opacity-60' : ''}`}>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-dark-300">Cliente</span>
                 <span className="text-white font-medium">{entry.clientName}</span>
@@ -98,13 +113,20 @@ export default async function ValidarEntradaPage({
             </div>
 
             {/* Status badge */}
-            <div className={`${sc.bg} ${sc.border} border rounded-xl p-4 text-center`}>
-              <p className={`text-lg font-bold ${sc.text}`}>
-                {entry.status === 'ACTIVE' && 'Entrada válida para acceso'}
-                {entry.status === 'USED' && 'Esta entrada ya fue utilizada'}
-                {entry.status === 'CANCELLED' && 'Esta entrada fue cancelada'}
-              </p>
-            </div>
+            {eventHasPassed ? (
+              <div className="bg-gray-500/20 border border-gray-500/50 rounded-xl p-4 text-center">
+                <p className="text-lg font-bold text-gray-400">Evento finalizado</p>
+                <p className="text-sm text-gray-500 mt-1">Gracias por asistir</p>
+              </div>
+            ) : (
+              <div className={`${sc.bg} ${sc.border} border rounded-xl p-4 text-center`}>
+                <p className={`text-lg font-bold ${sc.text}`}>
+                  {entry.status === 'ACTIVE' && 'Entrada válida para acceso'}
+                  {entry.status === 'USED' && 'Esta entrada ya fue utilizada'}
+                  {entry.status === 'CANCELLED' && 'Esta entrada fue cancelada'}
+                </p>
+              </div>
+            )}
 
             {/* Timestamp */}
             <p className="text-center text-xs text-dark-300/60">

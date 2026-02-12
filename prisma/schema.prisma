@@ -200,11 +200,13 @@ model Entry {
   eventId         String
   clientName      String
   clientEmail     String
+  clientPhone     String?
   numberOfEntries Int
   totalPrice      Decimal     @db.Decimal(10, 2)
   qrToken         String      @unique
   status          EntryStatus @default(ACTIVE)
   emailSent       Boolean     @default(false)
+  whatsappSent    Boolean     @default(false)
   createdAt       DateTime    @default(now())
   createdByUserId String?
 
