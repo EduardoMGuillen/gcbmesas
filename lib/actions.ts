@@ -2366,7 +2366,7 @@ export async function validateEntryByToken(token: string) {
   const entry = await prisma.entry.findUnique({
     where: { qrToken: token },
     include: {
-      event: { select: { name: true, date: true, coverPrice: true } },
+      event: { select: { name: true, date: true, coverPrice: true, coverImage: true } },
     },
   })
 
@@ -2385,6 +2385,7 @@ export async function validateEntryByToken(token: string) {
       name: entry.event.name,
       date: entry.event.date,
       coverPrice: Number(entry.event.coverPrice),
+      coverImage: entry.event.coverImage,
     },
   }
 }

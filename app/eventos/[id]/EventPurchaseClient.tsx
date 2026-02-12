@@ -38,7 +38,7 @@ const inputBg = 'rgba(10,10,25,0.9)'
 const inputBorder = 'rgba(255,255,255,0.1)'
 
 export function EventPurchaseClient({ event }: { event: EventData }) {
-  const [clientName, setClientName] = useState('')
+  const [clientNames, setClientNames] = useState<string[]>([''])
   const [clientEmail, setClientEmail] = useState('')
   const [clientPhone, setClientPhone] = useState('')
   const [numberOfEntries, setNumberOfEntries] = useState(1)
@@ -56,7 +56,25 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     timeZone: 'UTC',
   })
 
-  const formValid = clientName.trim() && clientEmail.trim() && numberOfEntries >= 1
+  const handleQtyChange = (newQty: number) => {
+    setNumberOfEntries(newQty)
+    setClientNames((prev) => {
+      const updated = [...prev]
+      while (updated.length < newQty) updated.push('')
+      return updated.slice(0, newQty)
+    })
+  }
+
+  const updateName = (index: number, value: string) => {
+    setClientNames((prev) => {
+      const updated = [...prev]
+      updated[index] = value
+      return updated
+    })
+  }
+
+  const allNamesValid = clientNames.every((n) => n.trim().length > 0)
+  const formValid = allNamesValid && clientEmail.trim() && numberOfEntries >= 1
 
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
 
@@ -93,17 +111,50 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
         <div className="w-12 h-0.5 mb-5" style={{ background: goldGradient }} />
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-white/50 mb-2">Nombre completo *</label>
-            <input
-              type="text"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder="Tu nombre"
-              className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none focus:ring-2 transition-all"
-              style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-              onFocus={(e) => e.target.style.borderColor = 'rgba(201,168,76,0.5)'}
-              onBlur={(e) => e.target.style.borderColor = inputBorder}
-            />
+            <label className="block text-sm font-medium text-white/50 mb-2">Cantidad de entradas</label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleQtyChange(Math.max(1, numberOfEntries - 1))}
+                className="w-10 h-10 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors"
+                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+              >-</button>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={numberOfEntries}
+                onChange={(e) => handleQtyChange(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                className="w-20 text-center px-3 py-2.5 rounded-lg text-white focus:outline-none"
+                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+              />
+              <button
+                type="button"
+                onClick={() => handleQtyChange(Math.min(10, numberOfEntries + 1))}
+                className="w-10 h-10 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors"
+                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+              >+</button>
+            </div>
+          </div>
+          {/* Names */}
+          <div className="space-y-3">
+            {clientNames.map((name, i) => (
+              <div key={i}>
+                <label className="block text-sm font-medium text-white/50 mb-2">
+                  {numberOfEntries > 1 ? `Nombre entrada ${i + 1} *` : 'Nombre completo *'}
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => updateName(i, e.target.value)}
+                  placeholder={numberOfEntries > 1 ? `Nombre persona ${i + 1}` : 'Tu nombre'}
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none focus:ring-2 transition-all"
+                  style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+                  onFocus={(e) => e.target.style.borderColor = 'rgba(201,168,76,0.5)'}
+                  onBlur={(e) => e.target.style.borderColor = inputBorder}
+                />
+              </div>
+            ))}
           </div>
           <div>
             <label className="block text-sm font-medium text-white/50 mb-2">Email *</label>
@@ -117,7 +168,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               onFocus={(e) => e.target.style.borderColor = 'rgba(201,168,76,0.5)'}
               onBlur={(e) => e.target.style.borderColor = inputBorder}
             />
-            <p className="text-xs text-white/20 mt-1">Recibiras tu entrada y QR aqui</p>
+            <p className="text-xs text-white/20 mt-1">Recibiras todas las entradas y QRs aqui</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-white/50 mb-2">WhatsApp <span className="text-white/20 font-normal">(opcional)</span></label>
@@ -131,32 +182,6 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               onFocus={(e) => e.target.style.borderColor = 'rgba(201,168,76,0.5)'}
               onBlur={(e) => e.target.style.borderColor = inputBorder}
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-white/50 mb-2">Cantidad de entradas</label>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setNumberOfEntries(Math.max(1, numberOfEntries - 1))}
-                className="w-10 h-10 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors"
-                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-              >-</button>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={numberOfEntries}
-                onChange={(e) => setNumberOfEntries(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
-                className="w-20 text-center px-3 py-2.5 rounded-lg text-white focus:outline-none"
-                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-              />
-              <button
-                type="button"
-                onClick={() => setNumberOfEntries(Math.min(10, numberOfEntries + 1))}
-                className="w-10 h-10 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors"
-                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-              >+</button>
-            </div>
           </div>
 
           {/* Total */}
@@ -193,7 +218,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                   const res = await fetch('/api/paypal/create-order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ eventId: event.id, numberOfEntries }),
+                    body: JSON.stringify({ eventId: event.id, numberOfEntries, clientNames: clientNames.map(n => n.trim()) }),
                   })
                   const data = await res.json()
                   if (!res.ok) throw new Error(data.error || 'Error al crear orden')
@@ -209,7 +234,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                       body: JSON.stringify({
                         orderId: data.orderID,
                         eventId: event.id,
-                        clientName: clientName.trim(),
+                        clientNames: clientNames.map(n => n.trim()),
                         clientEmail: clientEmail.trim(),
                         clientPhone: clientPhone.trim() || undefined,
                         numberOfEntries,
