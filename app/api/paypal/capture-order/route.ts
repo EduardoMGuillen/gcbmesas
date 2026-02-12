@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
           clientEmail: clientEmail.trim(),
           clientPhone: clientPhone?.trim() || null,
           numberOfEntries: 1,
-          totalPrice: Number(event.paypalPrice),
+          totalPrice: Number(event.coverPrice),
           qrToken,
         },
         include: { event: true },
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
       const eventName = entries[0].event.name
       const eventDate = String(entries[0].event.date)
       const eventCoverImage = event.coverImage
-      const totalPrice = entries.reduce((sum: number, e: any) => sum + Number(e.totalPrice), 0)
+      const totalPriceUsd = Number(event.paypalPrice) * entries.length
 
       const qrData = await Promise.all(
         entries.map(async (entry: any, i: number) => {
@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Evento</td><td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${eventName}</td></tr>
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Fecha</td><td style="padding:8px 0;color:#c9a84c;font-size:14px;text-align:right;font-weight:bold;text-transform:capitalize;">${eventDateStr}</td></tr>
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Entradas</td><td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${entries.length}</td></tr>
-                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Total Pagado</td><td style="padding:8px 0;color:#3b82f6;font-size:18px;text-align:right;font-weight:bold;">$${totalPrice.toFixed(2)} USD</td></tr>
+                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Total Pagado</td><td style="padding:8px 0;color:#3b82f6;font-size:18px;text-align:right;font-weight:bold;">$${totalPriceUsd.toFixed(2)} USD</td></tr>
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">PayPal Order</td><td style="padding:8px 0;color:#64748b;font-size:12px;text-align:right;">${orderId}</td></tr>
                     </table>
                   </div>
@@ -232,7 +232,7 @@ export async function POST(req: NextRequest) {
       clientEmail,
       eventName: entries[0].event.name,
       eventDate: String(entries[0].event.date),
-      totalPrice: entries.reduce((sum: number, e: any) => sum + Number(e.totalPrice), 0),
+      totalPriceUsd: Number(event.paypalPrice) * entries.length,
       paypalOrderId: orderId,
     })
   } catch (error: any) {
