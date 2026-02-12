@@ -297,16 +297,43 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
     setDownloading(true)
     try {
       const logoUrl = `${appUrl}/LogoCasaBlanca.png`
+      const pricePerEntry = (success.totalPriceUsd / success.entries.length).toFixed(2)
 
-      for (const entry of success.entries) {
-        const validationUrl = `${appUrl}/entradas/validar/${entry.qrToken}`
-        const qrDataUrl = await generateQRDataUrl(validationUrl)
+      const ticketSections = await Promise.all(
+        success.entries.map(async (entry, i) => {
+          const validationUrl = `${appUrl}/entradas/validar/${entry.qrToken}`
+          const qrDataUrl = await generateQRDataUrl(validationUrl)
+          return `
+            <div class="ticket${i > 0 ? ' page-break' : ''}">
+              <div class="header"><img src="${logoUrl}" alt="Casa Blanca"/><p>Comprobante de Entrada</p></div>
+              <div class="title">${success.eventName}</div>
+              <div class="event-date">${eventDateStr}</div>
+              <div class="divider"></div>
+              <div class="info-row"><span class="label">Cliente:</span><span class="value">${entry.clientName}</span></div>
+              <div class="info-row"><span class="label">Email:</span><span class="value" style="font-size:10px">${success.clientEmail}</span></div>
+              ${success.entries.length > 1 ? `<div class="info-row"><span class="label">Entrada:</span><span class="value">${i + 1} de ${success.entries.length}</span></div>` : ''}
+              <div class="divider"></div>
+              <div class="total-section">
+                <div class="total-row"><span>TOTAL</span><span>$${pricePerEntry} USD</span></div>
+              </div>
+              <div class="qr-section">
+                <img src="${qrDataUrl}" alt="QR Code"/>
+                <p>Presenta este QR en la entrada</p>
+              </div>
+              <div class="footer">
+                <p class="thanks">Gracias por tu compra!</p>
+                <p>Casa Blanca &copy; ${new Date().getFullYear()}</p>
+              </div>
+            </div>`
+        })
+      )
 
-        const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Entrada - ${success.eventName}</title>
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Entradas - ${success.eventName}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Courier New',monospace;width:302px;margin:0 auto;padding:16px 12px;color:#000;background:#fff}
+  .ticket{margin-bottom:20px}
   .header{text-align:center;border-bottom:2px dashed #000;padding-bottom:12px;margin-bottom:12px}
   .header img{width:120px;height:120px;object-fit:contain}
   .title{text-align:center;font-size:14px;font-weight:bold;padding:8px 0;border-bottom:1px dashed #999;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
@@ -322,35 +349,15 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
   .qr-section p{font-size:10px;color:#666;margin-top:6px}
   .footer{text-align:center;border-top:2px dashed #000;padding-top:12px;margin-top:12px;font-size:11px;color:#555}
   .footer .thanks{font-size:13px;font-weight:bold;color:#000;margin-bottom:4px}
-  @media print{body{width:100%;padding:0 8px}}
+  .page-break{border-top:3px dashed #000;padding-top:20px;margin-top:20px}
+  @media print{.page-break{page-break-before:always;border-top:none;margin-top:0;padding-top:16px} body{width:100%;padding:0 8px}}
 </style></head>
-<body>
-  <div class="header"><img src="${logoUrl}" alt="Casa Blanca"/><p>Comprobante de Entrada</p></div>
-  <div class="title">${success.eventName}</div>
-  <div class="event-date">${eventDateStr}</div>
-  <div class="divider"></div>
-  <div class="info-row"><span class="label">Cliente:</span><span class="value">${entry.clientName}</span></div>
-  <div class="info-row"><span class="label">Email:</span><span class="value" style="font-size:10px">${success.clientEmail}</span></div>
-  <div class="divider"></div>
-  <div class="total-section">
-    <div class="total-row"><span>TOTAL</span><span>$${(success.totalPriceUsd / success.entries.length).toFixed(2)} USD</span></div>
-  </div>
-  <div class="qr-section">
-    <img src="${qrDataUrl}" alt="QR Code"/>
-    <p>Presenta este QR en la entrada</p>
-  </div>
-  <div class="footer">
-    <p class="thanks">Gracias por tu compra!</p>
-    <p>PayPal Order: ${success.paypalOrderId}</p>
-    <p>Casa Blanca &copy; ${new Date().getFullYear()}</p>
-  </div>
-</body></html>`
+<body>${ticketSections.join('')}</body></html>`
 
-        const printWindow = window.open('', '_blank', 'width=400,height=700')
-        if (printWindow) {
-          printWindow.document.write(html)
-          printWindow.document.close()
-        }
+      const printWindow = window.open('', '_blank', 'width=400,height=700')
+      if (printWindow) {
+        printWindow.document.write(html)
+        printWindow.document.close()
       }
     } finally {
       setDownloading(false)
