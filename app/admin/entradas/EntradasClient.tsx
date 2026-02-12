@@ -949,8 +949,31 @@ function EventosTab({ events }: { events: EventItem[] }) {
   const [coverImage, setCoverImage] = useState('')
   const [paypalPrice, setPaypalPrice] = useState('')
   const [error, setError] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   const resetForm = () => { setName(''); setDate(''); setCoverPrice(''); setDescription(''); setCoverImage(''); setPaypalPrice(''); setEditingId(null); setShowForm(false); setError('') }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setError('Solo se permiten imagenes'); return }
+    if (file.size > 5 * 1024 * 1024) { setError('La imagen no puede superar 5MB'); return }
+
+    setUploading(true)
+    setError('')
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al subir imagen')
+      setCoverImage(data.url)
+    } catch (err: any) {
+      setError(err.message || 'Error al subir imagen')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const startEdit = (ev: EventItem) => {
     setEditingId(ev.id)
@@ -1037,23 +1060,40 @@ function EventosTab({ events }: { events: EventItem[] }) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-dark-300 mb-2">Imagen / Flyer URL <span className="text-white/30 font-normal">(opcional)</span></label>
-                <input type="url" value={coverImage} onChange={(e) => setCoverImage(e.target.value)} placeholder="https://..." className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                <label className="block text-sm font-medium text-dark-300 mb-2">Imagen / Flyer <span className="text-white/30 font-normal">(opcional)</span></label>
+                {coverImage ? (
+                  <div className="flex items-center gap-3">
+                    <img src={coverImage} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-dark-200" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-dark-300 truncate mb-2">{coverImage.length > 40 ? '...' + coverImage.slice(-35) : coverImage}</p>
+                      <button type="button" onClick={() => setCoverImage('')} className="text-xs text-red-400 hover:text-red-300">Quitar imagen</button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className={`flex items-center justify-center gap-2 w-full py-3 px-4 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${uploading ? 'border-primary-500/50 bg-primary-600/5' : 'border-dark-200 hover:border-primary-500/50 hover:bg-dark-50'}`}>
+                    {uploading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
+                        <span className="text-sm text-primary-400">Subiendo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5 text-dark-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <span className="text-sm text-dark-300">Subir flyer</span>
+                      </>
+                    )}
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+                  </label>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-dark-300 mb-2">Precio PayPal (USD) <span className="text-white/30 font-normal">(opcional - para venta online)</span></label>
                 <input type="number" step="0.01" min="0" value={paypalPrice} onChange={(e) => setPaypalPrice(e.target.value)} placeholder="8.00" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
             </div>
-            {coverImage && (
-              <div className="flex items-center gap-3">
-                <img src={coverImage} alt="Preview" className="w-20 h-20 object-cover rounded-lg border border-dark-200" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                <span className="text-xs text-dark-300">Preview del flyer</span>
-              </div>
-            )}
             {error && <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">{error}</div>}
             <div className="flex gap-3">
-              <button type="submit" disabled={isPending} className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors">{isPending ? 'Guardando...' : editingId ? 'Actualizar' : 'Crear Evento'}</button>
+              <button type="submit" disabled={isPending || uploading} className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors">{isPending ? 'Guardando...' : editingId ? 'Actualizar' : 'Crear Evento'}</button>
               <button type="button" onClick={resetForm} className="bg-dark-50 hover:bg-dark-200 text-white/80 font-medium py-2.5 px-6 rounded-lg transition-colors">Cancelar</button>
             </div>
           </form>
