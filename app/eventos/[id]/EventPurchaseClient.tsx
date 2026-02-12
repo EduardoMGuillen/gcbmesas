@@ -101,7 +101,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
             <span className="text-white/40">Precio por entrada</span>
             <span className="text-2xl font-bold" style={{ color: '#c9a84c' }}>${event.paypalPrice.toFixed(2)} <span className="text-sm text-white/30 font-normal">USD</span></span>
           </div>
-          <p className="text-xs text-white/20">Equivalente a ~L {event.coverPrice.toFixed(2)} HNL</p>
+          <p className="text-xs text-white/20">Precio de Cover + Comisiones de pago en linea</p>
         </div>
       </div>
 
