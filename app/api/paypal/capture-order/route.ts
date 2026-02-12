@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createPublicEntry } from '@/lib/actions'
 import { generateQRCode } from '@/lib/utils'
+import { prisma } from '@/lib/prisma'
 import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
 
 const PAYPAL_API_BASE = process.env.PAYPAL_API_BASE || 'https://api-m.sandbox.paypal.com'
+
+function generateToken(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  let token = ''
+  for (let i = 0; i < 12; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return `E-${token}`
+}
 
 async function getPayPalAccessToken() {
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
@@ -62,13 +71,46 @@ export async function POST(req: NextRequest) {
     }
 
     // Create entries in database
-    const entries = await createPublicEntry({
-      eventId,
-      clientName,
-      clientEmail,
-      clientPhone,
-      numberOfEntries,
-      paypalOrderId: orderId,
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, isActive: true },
+    })
+
+    if (!event || !event.paypalPrice) {
+      return NextResponse.json({ error: 'Evento no encontrado o sin precio PayPal' }, { status: 404 })
+    }
+
+    const entries = []
+    for (let i = 0; i < numberOfEntries; i++) {
+      const qrToken = generateToken()
+      const entry = await prisma.entry.create({
+        data: {
+          eventId,
+          clientName: clientName.trim(),
+          clientEmail: clientEmail.trim(),
+          clientPhone: clientPhone?.trim() || null,
+          numberOfEntries: 1,
+          totalPrice: Number(event.paypalPrice),
+          qrToken,
+        },
+        include: { event: true },
+      })
+      entries.push(entry)
+    }
+
+    // Log the sale
+    await prisma.log.create({
+      data: {
+        action: 'ENTRY_SOLD',
+        details: {
+          eventId,
+          clientName,
+          clientEmail,
+          numberOfEntries,
+          totalPrice: Number(event.paypalPrice) * numberOfEntries,
+          paypalOrderId: orderId,
+          source: 'online_paypal',
+        },
+      },
     })
 
     // Send email automatically
@@ -160,9 +202,11 @@ export async function POST(req: NextRequest) {
       })
 
       // Mark entries as email sent
-      const { markEntryEmailSent } = await import('@/lib/actions')
       for (const entry of entries) {
-        await markEntryEmailSent(entry.id)
+        await prisma.entry.update({
+          where: { id: entry.id },
+          data: { emailSent: true },
+        })
       }
     } catch (emailError: any) {
       console.error('[PayPal] Email send error (payment was successful):', emailError)
