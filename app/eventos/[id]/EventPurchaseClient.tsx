@@ -100,7 +100,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               onChange={(e) => setClientName(e.target.value)}
               placeholder="Tu nombre"
               className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none focus:ring-2 transition-all"
-              style={{ background: inputBg, border: `1px solid ${inputBorder}`, focusRingColor: '#c9a84c' }}
+              style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
               onFocus={(e) => e.target.style.borderColor = 'rgba(201,168,76,0.5)'}
               onBlur={(e) => e.target.style.borderColor = inputBorder}
             />
