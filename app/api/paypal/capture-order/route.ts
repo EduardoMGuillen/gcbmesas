@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateQRCode } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
+import { revalidatePath } from 'next/cache'
 import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
@@ -112,6 +113,8 @@ export async function POST(req: NextRequest) {
         },
       },
     })
+
+    revalidatePath('/admin/entradas')
 
     // Send email automatically
     try {
