@@ -31,6 +31,12 @@ async function generateQRDataUrl(text: string): Promise<string> {
   })
 }
 
+const goldGradient = 'linear-gradient(135deg, #c9a84c, #a88a3d)'
+const cardBg = 'rgba(15, 15, 30, 0.8)'
+const cardBorder = 'rgba(255,255,255,0.06)'
+const inputBg = 'rgba(10,10,25,0.9)'
+const inputBorder = 'rgba(255,255,255,0.1)'
+
 export function EventPurchaseClient({ event }: { event: EventData }) {
   const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
@@ -63,66 +69,77 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
       {/* Event Info */}
       <div>
         {event.coverImage && (
-          <div className="aspect-[16/10] rounded-2xl overflow-hidden mb-6 border border-dark-200">
+          <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-6" style={{ border: `1px solid ${cardBorder}` }}>
             <img src={event.coverImage} alt={event.name} className="w-full h-full object-cover" />
           </div>
         )}
         <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">{event.name}</h2>
-        <p className="text-primary-400 font-medium mb-4 capitalize">{eventDateStr}</p>
+        <p className="font-medium mb-4 capitalize" style={{ color: '#c9a84c' }}>{eventDateStr}</p>
         {event.description && (
-          <p className="text-dark-300 text-sm leading-relaxed mb-6 whitespace-pre-line">{event.description}</p>
+          <p className="text-white/40 text-sm leading-relaxed mb-6 whitespace-pre-line">{event.description}</p>
         )}
-        <div className="bg-dark-100 border border-dark-200 rounded-xl p-5">
+        <div className="rounded-xl p-5" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-dark-300">Precio por entrada</span>
-            <span className="text-2xl font-bold text-white">${event.paypalPrice.toFixed(2)} <span className="text-sm text-dark-300 font-normal">USD</span></span>
+            <span className="text-white/40">Precio por entrada</span>
+            <span className="text-2xl font-bold" style={{ color: '#c9a84c' }}>${event.paypalPrice.toFixed(2)} <span className="text-sm text-white/30 font-normal">USD</span></span>
           </div>
-          <p className="text-xs text-dark-300/60">Equivalente a ~L {event.coverPrice.toFixed(2)} HNL</p>
+          <p className="text-xs text-white/20">Equivalente a ~L {event.coverPrice.toFixed(2)} HNL</p>
         </div>
       </div>
 
       {/* Purchase Form */}
-      <div className="bg-dark-100 border border-dark-200 rounded-2xl p-5 sm:p-6 h-fit">
-        <h3 className="text-lg font-bold text-white mb-5">Comprar Entrada</h3>
+      <div className="rounded-2xl p-5 sm:p-6 h-fit" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+        <h3 className="text-lg font-bold text-white mb-1">Comprar Entrada</h3>
+        <div className="w-12 h-0.5 mb-5" style={{ background: goldGradient }} />
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-dark-300 mb-2">Nombre completo *</label>
+            <label className="block text-sm font-medium text-white/50 mb-2">Nombre completo *</label>
             <input
               type="text"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               placeholder="Tu nombre"
-              className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none focus:ring-2 transition-all"
+              style={{ background: inputBg, border: `1px solid ${inputBorder}`, focusRingColor: '#c9a84c' }}
+              onFocus={(e) => e.target.style.borderColor = 'rgba(201,168,76,0.5)'}
+              onBlur={(e) => e.target.style.borderColor = inputBorder}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-dark-300 mb-2">Email *</label>
+            <label className="block text-sm font-medium text-white/50 mb-2">Email *</label>
             <input
               type="email"
               value={clientEmail}
               onChange={(e) => setClientEmail(e.target.value)}
               placeholder="correo@ejemplo.com"
-              className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none focus:ring-2 transition-all"
+              style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+              onFocus={(e) => e.target.style.borderColor = 'rgba(201,168,76,0.5)'}
+              onBlur={(e) => e.target.style.borderColor = inputBorder}
             />
-            <p className="text-xs text-dark-300/60 mt-1">Recibiras tu entrada y QR aqui</p>
+            <p className="text-xs text-white/20 mt-1">Recibiras tu entrada y QR aqui</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-dark-300 mb-2">WhatsApp <span className="text-white/30 font-normal">(opcional)</span></label>
+            <label className="block text-sm font-medium text-white/50 mb-2">WhatsApp <span className="text-white/20 font-normal">(opcional)</span></label>
             <input
               type="tel"
               value={clientPhone}
               onChange={(e) => setClientPhone(e.target.value)}
               placeholder="9999-9999"
-              className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none focus:ring-2 transition-all"
+              style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+              onFocus={(e) => e.target.style.borderColor = 'rgba(201,168,76,0.5)'}
+              onBlur={(e) => e.target.style.borderColor = inputBorder}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-dark-300 mb-2">Cantidad de entradas</label>
+            <label className="block text-sm font-medium text-white/50 mb-2">Cantidad de entradas</label>
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setNumberOfEntries(Math.max(1, numberOfEntries - 1))}
-                className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors"
+                className="w-10 h-10 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors"
+                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
               >-</button>
               <input
                 type="number"
@@ -130,31 +147,33 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                 max={10}
                 value={numberOfEntries}
                 onChange={(e) => setNumberOfEntries(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
-                className="w-20 text-center px-3 py-2.5 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-20 text-center px-3 py-2.5 rounded-lg text-white focus:outline-none"
+                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
               />
               <button
                 type="button"
                 onClick={() => setNumberOfEntries(Math.min(10, numberOfEntries + 1))}
-                className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors"
+                className="w-10 h-10 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors"
+                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
               >+</button>
             </div>
           </div>
 
           {/* Total */}
-          <div className="bg-primary-600/10 border border-primary-500/30 rounded-lg p-4">
+          <div className="rounded-lg p-4" style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)' }}>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-dark-300">Total a pagar</span>
-              <span className="text-2xl font-bold text-primary-400">${totalPrice.toFixed(2)} USD</span>
+              <span className="text-sm text-white/40">Total a pagar</span>
+              <span className="text-2xl font-bold" style={{ color: '#c9a84c' }}>${totalPrice.toFixed(2)} USD</span>
             </div>
-            <p className="text-xs text-dark-300/60 mt-1">{numberOfEntries} entrada{numberOfEntries > 1 ? 's' : ''} x ${event.paypalPrice.toFixed(2)}</p>
+            <p className="text-xs text-white/20 mt-1">{numberOfEntries} entrada{numberOfEntries > 1 ? 's' : ''} x ${event.paypalPrice.toFixed(2)}</p>
           </div>
 
-          {error && <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">{error}</div>}
+          {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">{error}</div>}
 
           {processing && (
             <div className="text-center py-4">
-              <div className="inline-block w-8 h-8 border-2 border-primary-400 border-t-transparent rounded-full animate-spin mb-2" />
-              <p className="text-sm text-dark-300">Procesando pago...</p>
+              <div className="inline-block w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mb-2" style={{ borderColor: '#c9a84c', borderTopColor: 'transparent' }} />
+              <p className="text-sm text-white/40">Procesando pago...</p>
             </div>
           )}
 
@@ -174,10 +193,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                   const res = await fetch('/api/paypal/create-order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      eventId: event.id,
-                      numberOfEntries,
-                    }),
+                    body: JSON.stringify({ eventId: event.id, numberOfEntries }),
                   })
                   const data = await res.json()
                   if (!res.ok) throw new Error(data.error || 'Error al crear orden')
@@ -220,16 +236,16 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               />
             </PayPalScriptProvider>
           ) : !formValid ? (
-            <div className="bg-dark-50 border border-dark-200 rounded-lg p-4 text-center">
-              <p className="text-sm text-dark-300">Completa tu nombre y email para ver el boton de pago</p>
+            <div className="rounded-lg p-4 text-center" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
+              <p className="text-sm text-white/30">Completa tu nombre y email para ver el boton de pago</p>
             </div>
           ) : !paypalClientId ? (
-            <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-4 text-center">
-              <p className="text-sm text-amber-400">Pagos en linea no disponibles en este momento</p>
+            <div className="rounded-lg p-4 text-center" style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)' }}>
+              <p className="text-sm text-amber-400/80">Pagos en linea no disponibles en este momento</p>
             </div>
           ) : null}
 
-          <p className="text-xs text-dark-300/40 text-center">
+          <p className="text-xs text-white/15 text-center">
             Pago seguro a traves de PayPal. Al pagar, recibiras tu entrada por email automaticamente.
           </p>
         </div>
@@ -331,37 +347,39 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
 
   return (
     <div className="max-w-lg mx-auto">
-      <div className="bg-dark-100 border border-dark-200 rounded-2xl overflow-hidden">
+      <div className="rounded-2xl overflow-hidden" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
         {/* Success header */}
-        <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 text-center">
-          <svg className="w-16 h-16 mx-auto text-white mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h2 className="text-2xl font-bold text-white">Compra Exitosa!</h2>
-          <p className="text-white/80 text-sm mt-1">Tu entrada ha sido enviada por email</p>
+        <div className="p-8 text-center" style={{ background: 'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(201,168,76,0.05))' }}>
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: 'rgba(201,168,76,0.2)', border: '2px solid rgba(201,168,76,0.4)' }}>
+            <svg className="w-8 h-8" style={{ color: '#c9a84c' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-1">Compra Exitosa!</h2>
+          <p className="text-white/50 text-sm">Tu entrada ha sido enviada por email</p>
         </div>
 
         <div className="p-6 space-y-4">
           {/* Details */}
-          <div className="bg-dark-50 border border-dark-200 rounded-xl p-4 space-y-3">
-            <div className="flex justify-between"><span className="text-sm text-dark-300">Evento</span><span className="text-white font-medium">{success.eventName}</span></div>
-            <div className="border-t border-dark-200" />
-            <div className="flex justify-between"><span className="text-sm text-dark-300">Fecha</span><span className="text-primary-400 font-medium capitalize">{eventDateStr}</span></div>
-            <div className="border-t border-dark-200" />
-            <div className="flex justify-between"><span className="text-sm text-dark-300">Entradas</span><span className="text-white font-bold">{success.entries.length}</span></div>
-            <div className="border-t border-dark-200" />
-            <div className="flex justify-between"><span className="text-sm text-dark-300">Total Pagado</span><span className="text-primary-400 font-bold text-lg">${success.totalPrice.toFixed(2)} USD</span></div>
-            <div className="border-t border-dark-200" />
-            <div className="flex justify-between"><span className="text-sm text-dark-300">Email</span><span className="text-white text-sm">{success.clientEmail}</span></div>
+          <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(10,10,25,0.6)', border: `1px solid ${cardBorder}` }}>
+            <div className="flex justify-between"><span className="text-sm text-white/40">Evento</span><span className="text-white font-medium">{success.eventName}</span></div>
+            <div style={{ borderTop: `1px solid ${cardBorder}` }} />
+            <div className="flex justify-between"><span className="text-sm text-white/40">Fecha</span><span className="font-medium capitalize" style={{ color: '#c9a84c' }}>{eventDateStr}</span></div>
+            <div style={{ borderTop: `1px solid ${cardBorder}` }} />
+            <div className="flex justify-between"><span className="text-sm text-white/40">Entradas</span><span className="text-white font-bold">{success.entries.length}</span></div>
+            <div style={{ borderTop: `1px solid ${cardBorder}` }} />
+            <div className="flex justify-between"><span className="text-sm text-white/40">Total Pagado</span><span className="font-bold text-lg" style={{ color: '#c9a84c' }}>${success.totalPrice.toFixed(2)} USD</span></div>
+            <div style={{ borderTop: `1px solid ${cardBorder}` }} />
+            <div className="flex justify-between"><span className="text-sm text-white/40">Email</span><span className="text-white text-sm">{success.clientEmail}</span></div>
           </div>
 
           {/* Entry names */}
           {success.entries.length > 1 && (
-            <div className="bg-dark-50 border border-dark-200 rounded-xl p-4 space-y-2">
-              <p className="text-xs text-dark-300 font-medium mb-1">Entradas:</p>
+            <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(10,10,25,0.6)', border: `1px solid ${cardBorder}` }}>
+              <p className="text-xs text-white/30 font-medium mb-1">Entradas:</p>
               {success.entries.map((entry, i) => (
                 <div key={entry.entryId} className="flex items-center gap-2">
-                  <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-primary-600/20 text-primary-400 text-[10px] font-bold">{i + 1}</span>
+                  <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold" style={{ background: 'rgba(201,168,76,0.2)', color: '#c9a84c' }}>{i + 1}</span>
                   <span className="text-white text-sm">{entry.clientName}</span>
                 </div>
               ))}
@@ -369,8 +387,8 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
           )}
 
           {/* Email sent notice */}
-          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-center">
-            <p className="text-green-400 text-sm">Email con QR enviado a <strong>{success.clientEmail}</strong></p>
+          <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
+            <p className="text-green-400/80 text-sm">Email con QR enviado a <strong>{success.clientEmail}</strong></p>
           </div>
 
           {/* Action buttons */}
@@ -378,7 +396,8 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
             <button
               onClick={handleDownload}
               disabled={downloading}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full font-semibold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
+              style={{ background: goldGradient, color: '#0a0a15' }}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -399,13 +418,14 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
 
             <a
               href="/eventos"
-              className="block w-full text-center bg-dark-50 hover:bg-dark-200 text-white/80 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+              className="block w-full text-center text-white/50 hover:text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+              style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${cardBorder}` }}
             >
               Ver mas eventos
             </a>
           </div>
 
-          <p className="text-xs text-dark-300/40 text-center">
+          <p className="text-xs text-white/15 text-center">
             PayPal Order ID: {success.paypalOrderId}
           </p>
         </div>
