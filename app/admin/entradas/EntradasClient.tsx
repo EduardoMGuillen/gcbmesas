@@ -22,7 +22,10 @@ type EventItem = {
   id: string
   name: string
   date: string | Date
+  description: string | null
+  coverImage: string | null
   coverPrice: number
+  paypalPrice: number | null
   isActive: boolean
   createdAt: string | Date
   _count: { entries: number }
@@ -942,15 +945,21 @@ function EventosTab({ events }: { events: EventItem[] }) {
   const [name, setName] = useState('')
   const [date, setDate] = useState('')
   const [coverPrice, setCoverPrice] = useState('')
+  const [description, setDescription] = useState('')
+  const [coverImage, setCoverImage] = useState('')
+  const [paypalPrice, setPaypalPrice] = useState('')
   const [error, setError] = useState('')
 
-  const resetForm = () => { setName(''); setDate(''); setCoverPrice(''); setEditingId(null); setShowForm(false); setError('') }
+  const resetForm = () => { setName(''); setDate(''); setCoverPrice(''); setDescription(''); setCoverImage(''); setPaypalPrice(''); setEditingId(null); setShowForm(false); setError('') }
 
   const startEdit = (ev: EventItem) => {
     setEditingId(ev.id)
     setName(ev.name)
     setDate(new Date(ev.date).toISOString().split('T')[0])
     setCoverPrice(ev.coverPrice.toString())
+    setDescription(ev.description || '')
+    setCoverImage(ev.coverImage || '')
+    setPaypalPrice(ev.paypalPrice ? ev.paypalPrice.toString() : '')
     setShowForm(true)
   }
 
@@ -963,10 +972,18 @@ function EventosTab({ events }: { events: EventItem[] }) {
 
     startTransition(async () => {
       try {
+        const eventData = {
+          name: name.trim(),
+          date,
+          coverPrice: parseFloat(coverPrice),
+          description: description.trim() || undefined,
+          coverImage: coverImage.trim() || undefined,
+          paypalPrice: paypalPrice ? parseFloat(paypalPrice) : undefined,
+        }
         if (editingId) {
-          await updateEvent(editingId, { name: name.trim(), date, coverPrice: parseFloat(coverPrice) })
+          await updateEvent(editingId, eventData)
         } else {
-          await createEvent({ name: name.trim(), date, coverPrice: parseFloat(coverPrice) })
+          await createEvent(eventData)
         }
         resetForm()
         router.refresh()
@@ -1014,6 +1031,26 @@ function EventosTab({ events }: { events: EventItem[] }) {
                 <input type="number" step="0.01" min="0" value={coverPrice} onChange={(e) => setCoverPrice(e.target.value)} placeholder="200.00" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-2">Descripcion <span className="text-white/30 font-normal">(opcional - lugar, hora, detalles)</span></label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Ej: Doors open 9PM. Dress code: casual elegante." className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">Imagen / Flyer URL <span className="text-white/30 font-normal">(opcional)</span></label>
+                <input type="url" value={coverImage} onChange={(e) => setCoverImage(e.target.value)} placeholder="https://..." className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">Precio PayPal (USD) <span className="text-white/30 font-normal">(opcional - para venta online)</span></label>
+                <input type="number" step="0.01" min="0" value={paypalPrice} onChange={(e) => setPaypalPrice(e.target.value)} placeholder="8.00" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+            </div>
+            {coverImage && (
+              <div className="flex items-center gap-3">
+                <img src={coverImage} alt="Preview" className="w-20 h-20 object-cover rounded-lg border border-dark-200" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <span className="text-xs text-dark-300">Preview del flyer</span>
+              </div>
+            )}
             {error && <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">{error}</div>}
             <div className="flex gap-3">
               <button type="submit" disabled={isPending} className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors">{isPending ? 'Guardando...' : editingId ? 'Actualizar' : 'Crear Evento'}</button>
@@ -1038,7 +1075,9 @@ function EventosTab({ events }: { events: EventItem[] }) {
               </div>
               <div className="space-y-1 text-sm mb-4">
                 <p className="text-dark-300">Cover: <span className="text-primary-400 font-semibold">L {ev.coverPrice.toFixed(2)}</span></p>
+                {ev.paypalPrice && <p className="text-dark-300">PayPal: <span className="text-blue-400 font-semibold">${ev.paypalPrice.toFixed(2)} USD</span></p>}
                 <p className="text-dark-300">Entradas vendidas: <span className="text-white font-medium">{ev._count.entries}</span></p>
+                {ev.description && <p className="text-dark-300 truncate" title={ev.description}>{ev.description}</p>}
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button onClick={() => startEdit(ev)} disabled={isPending} className="text-xs px-3 py-1.5 bg-dark-50 hover:bg-dark-200 text-white/70 hover:text-white rounded-lg transition-colors">Editar</button>
