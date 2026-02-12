@@ -24,10 +24,10 @@ export function Navbar() {
     { href: '/admin/inventario', label: 'Inventario', match: pathname?.startsWith('/admin/inventario') },
     { href: '/admin/usuarios', label: 'Usuarios', match: pathname?.startsWith('/admin/usuarios') },
     { href: '/admin/logs', label: 'Logs', match: pathname?.startsWith('/admin/logs') },
+    { href: '/admin/entradas', label: 'Entradas', match: pathname?.startsWith('/admin/entradas') },
     { href: '/mesero', label: 'Mesero', match: pathname === '/mesero' },
     { href: '/mesero/mesas-activas', label: 'Mesas Activas', match: pathname?.startsWith('/mesero/mesas-activas') },
     { href: '/cajero', label: 'Cajero', match: pathname === '/cajero' },
-    { href: '/cajero/entradas', label: 'Entradas', match: pathname?.startsWith('/cajero/entradas') },
   ]
 
   const meseroLinks = [
@@ -38,7 +38,6 @@ export function Navbar() {
 
   const cajeroLinks = [
     { href: '/cajero', label: 'Cajero', match: pathname === '/cajero' },
-    { href: '/cajero/entradas', label: 'Entradas', match: pathname?.startsWith('/cajero/entradas') },
     { href: '/admin/cuentas', label: 'Cuentas', match: pathname?.startsWith('/admin/cuentas') },
   ]
 
