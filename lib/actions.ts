@@ -2004,7 +2004,7 @@ export async function createEvent(data: {
     coverPrice: data.coverPrice,
   })
 
-  revalidatePath('/cajero/entradas')
+  revalidatePath('/admin/entradas')
   return event
 }
 
@@ -2043,7 +2043,7 @@ export async function updateEvent(
     changes: data,
   })
 
-  revalidatePath('/cajero/entradas')
+  revalidatePath('/admin/entradas')
   return event
 }
 
@@ -2064,7 +2064,7 @@ export async function deleteEvent(id: string) {
     action: 'deleted',
   })
 
-  revalidatePath('/cajero/entradas')
+  revalidatePath('/admin/entradas')
 }
 
 // ========== ENTRY ACTIONS ==========
@@ -2136,7 +2136,7 @@ export async function createEntry(data: {
     totalPrice,
   })
 
-  revalidatePath('/cajero/entradas')
+  revalidatePath('/admin/entradas')
   return entry
 }
 
@@ -2200,7 +2200,7 @@ export async function createBulkEntries(data: {
     entryIds: entries.map((e) => e.id),
   })
 
-  revalidatePath('/cajero/entradas')
+  revalidatePath('/admin/entradas')
   return entries
 }
 
@@ -2305,7 +2305,7 @@ export async function markEntryUsed(entryId: string) {
     clientName: entry.clientName,
   })
 
-  revalidatePath('/cajero/entradas')
+  revalidatePath('/admin/entradas')
 }
 
 export async function revertEntryToActive(entryId: string) {
@@ -2330,7 +2330,7 @@ export async function revertEntryToActive(entryId: string) {
     action: 'reverted_to_active',
   })
 
-  revalidatePath('/cajero/entradas')
+  revalidatePath('/admin/entradas')
 }
 
 export async function cancelEntry(entryId: string) {
@@ -2349,7 +2349,7 @@ export async function cancelEntry(entryId: string) {
     data: { status: 'CANCELLED' },
   })
 
-  revalidatePath('/cajero/entradas')
+  revalidatePath('/admin/entradas')
 }
 
 export async function validateEntryByToken(token: string) {
