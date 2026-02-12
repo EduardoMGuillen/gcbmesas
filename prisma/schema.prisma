@@ -181,7 +181,10 @@ model Event {
   id              String   @id @default(cuid())
   name            String
   date            DateTime
+  description     String?
+  coverImage      String?
   coverPrice      Decimal  @db.Decimal(10, 2)
+  paypalPrice     Decimal? @db.Decimal(10, 2)
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

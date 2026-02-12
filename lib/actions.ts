@@ -1984,6 +1984,9 @@ export async function createEvent(data: {
   name: string
   date: string
   coverPrice: number
+  description?: string
+  coverImage?: string
+  paypalPrice?: number
 }) {
   const user = await getCurrentUser()
   ensureCashierAccess(user.role)
@@ -1993,6 +1996,9 @@ export async function createEvent(data: {
       name: data.name,
       date: new Date(data.date + 'T12:00:00'),
       coverPrice: data.coverPrice,
+      description: data.description || null,
+      coverImage: data.coverImage || null,
+      paypalPrice: data.paypalPrice || null,
       createdByUserId: user.id,
     },
   })
@@ -2022,7 +2028,7 @@ export async function getEvents(onlyActive = false) {
 
 export async function updateEvent(
   id: string,
-  data: { name?: string; date?: string; coverPrice?: number; isActive?: boolean }
+  data: { name?: string; date?: string; coverPrice?: number; isActive?: boolean; description?: string; coverImage?: string; paypalPrice?: number }
 ) {
   const user = await getCurrentUser()
   ensureCashierAccess(user.role)
@@ -2032,6 +2038,9 @@ export async function updateEvent(
   if (data.date !== undefined) updateData.date = new Date(data.date + 'T12:00:00')
   if (data.coverPrice !== undefined) updateData.coverPrice = data.coverPrice
   if (data.isActive !== undefined) updateData.isActive = data.isActive
+  if (data.description !== undefined) updateData.description = data.description || null
+  if (data.coverImage !== undefined) updateData.coverImage = data.coverImage || null
+  if (data.paypalPrice !== undefined) updateData.paypalPrice = data.paypalPrice || null
 
   const event = await prisma.event.update({
     where: { id },
@@ -2266,6 +2275,7 @@ export async function getEntradasDashboardData() {
     events: events.map((e: any) => ({
       ...e,
       coverPrice: Number(e.coverPrice),
+      paypalPrice: e.paypalPrice ? Number(e.paypalPrice) : null,
     })),
     recentEntries: recentEntries.map((e: any) => ({
       ...e,
@@ -2391,5 +2401,105 @@ export async function markEntryWhatsappSent(entryId: string) {
     where: { id: entryId },
     data: { whatsappSent: true },
   })
+}
+
+// ========== PUBLIC EVENT ACTIONS ==========
+
+export async function getPublicEvents() {
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  return prisma.event.findMany({
+    where: {
+      isActive: true,
+      paypalPrice: { not: null },
+      date: { gte: now },
+    },
+    orderBy: { date: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      date: true,
+      description: true,
+      coverImage: true,
+      coverPrice: true,
+      paypalPrice: true,
+      _count: { select: { entries: true } },
+    },
+  })
+}
+
+export async function getPublicEventById(id: string) {
+  return prisma.event.findFirst({
+    where: { id, isActive: true },
+    select: {
+      id: true,
+      name: true,
+      date: true,
+      description: true,
+      coverImage: true,
+      coverPrice: true,
+      paypalPrice: true,
+    },
+  })
+}
+
+export async function createPublicEntry(data: {
+  eventId: string
+  clientName: string
+  clientEmail: string
+  clientPhone?: string
+  numberOfEntries: number
+  paypalOrderId: string
+}) {
+  const event = await prisma.event.findUnique({ where: { id: data.eventId } })
+  if (!event) throw new Error('Evento no encontrado')
+  if (!event.isActive) throw new Error('Este evento no está activo')
+  if (!event.paypalPrice) throw new Error('Este evento no acepta pagos en línea')
+
+  const totalPrice = Number(event.paypalPrice) * data.numberOfEntries
+  const entries = []
+
+  for (let i = 0; i < data.numberOfEntries; i++) {
+    let qrToken = generateQRToken()
+    let attempts = 0
+    while (attempts < 10) {
+      const existing = await prisma.entry.findUnique({ where: { qrToken }, select: { id: true } })
+      if (!existing) break
+      qrToken = generateQRToken()
+      attempts++
+    }
+
+    const entry = await prisma.entry.create({
+      data: {
+        eventId: data.eventId,
+        clientName: data.clientName.trim(),
+        clientEmail: data.clientEmail.trim(),
+        clientPhone: data.clientPhone?.trim() || null,
+        numberOfEntries: 1,
+        totalPrice: Number(event.paypalPrice),
+        qrToken,
+      },
+      include: { event: true },
+    })
+    entries.push(entry)
+  }
+
+  await prisma.log.create({
+    data: {
+      action: 'ENTRY_SOLD',
+      details: {
+        eventId: data.eventId,
+        clientName: data.clientName,
+        clientEmail: data.clientEmail,
+        numberOfEntries: data.numberOfEntries,
+        totalPrice,
+        paypalOrderId: data.paypalOrderId,
+        source: 'online_paypal',
+      },
+    },
+  })
+
+  revalidatePath('/admin/entradas')
+  return entries
 }
 
