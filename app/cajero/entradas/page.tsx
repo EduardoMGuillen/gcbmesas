@@ -26,7 +26,7 @@ export default async function EntradasPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">Entradas</h1>
           <p className="text-sm sm:text-base text-dark-300">
-            Vende entradas, administra eventos y envía QR por email.
+            Vende entradas, administra eventos y envía QR por email o WhatsApp.
           </p>
         </div>
 

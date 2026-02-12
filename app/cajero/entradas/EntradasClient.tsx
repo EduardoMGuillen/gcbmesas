@@ -13,6 +13,7 @@ import {
   revertEntryToActive,
   cancelEntry,
   validateEntryByToken,
+  markEntryWhatsappSent,
 } from '@/lib/actions'
 
 // ==================== TYPES ====================
@@ -32,11 +33,13 @@ type EntryItem = {
   id: string
   clientName: string
   clientEmail: string
+  clientPhone: string | null
   numberOfEntries: number
   totalPrice: number
   qrToken: string
   status: 'ACTIVE' | 'USED' | 'CANCELLED'
   emailSent: boolean
+  whatsappSent: boolean
   createdAt: string | Date
   event: { name: string; date: string | Date; coverPrice: number }
   createdBy?: { name: string | null; username: string } | null
@@ -226,6 +229,50 @@ async function handleSendEntryEmail(data: {
   return result
 }
 
+function buildWhatsAppUrl(data: {
+  phone: string
+  entries: { qrToken: string; clientName: string }[]
+  eventName: string
+  eventDate: string
+  totalPrice: number
+}): string {
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
+  const eventDateStr = new Date(data.eventDate).toLocaleDateString('es-HN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+
+  let message = `🎟️ *Tu entrada para ${data.eventName}*\n`
+  message += `📅 ${eventDateStr}\n`
+  message += `💰 Total: L ${data.totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })}\n\n`
+
+  if (data.entries.length === 1) {
+    const entry = data.entries[0]
+    message += `👤 ${entry.clientName}\n`
+    message += `🔗 Tu entrada y QR:\n${appUrl}/entradas/validar/${entry.qrToken}\n`
+  } else {
+    message += `👥 ${data.entries.length} entradas:\n`
+    data.entries.forEach((entry, i) => {
+      message += `\n${i + 1}. *${entry.clientName}*\n`
+      message += `🔗 ${appUrl}/entradas/validar/${entry.qrToken}\n`
+    })
+  }
+
+  message += `\nPresenta el QR en la entrada. ¡Te esperamos! 🎉`
+
+  // Clean phone: remove spaces, dashes, parentheses
+  let phone = data.phone.replace(/[\s\-\(\)]/g, '')
+  // If starts with +, remove it (wa.me expects number without +)
+  if (phone.startsWith('+')) phone = phone.slice(1)
+  // If it's 8 digits (Honduras local), prepend 504
+  if (/^\d{8}$/.test(phone)) phone = '504' + phone
+
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+}
+
 // ==================== MAIN COMPONENT ====================
 
 export function EntradasClient({ events, recentEntries }: EntradasClientProps) {
@@ -274,18 +321,21 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
   const [isPending, startTransition] = useTransition()
   const [eventId, setEventId] = useState('')
   const [clientEmail, setClientEmail] = useState('')
+  const [clientPhone, setClientPhone] = useState('')
   const [numberOfEntries, setNumberOfEntries] = useState(1)
   const [guestNames, setGuestNames] = useState<string[]>([''])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<{
     entries: { entryId: string; qrToken: string; clientName: string }[]
     clientEmail: string
+    clientPhone: string
     totalPrice: number
     eventName: string
     eventDate: string
   } | null>(null)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+  const [whatsappSent, setWhatsappSent] = useState(false)
   const [printing, setPrinting] = useState(false)
 
   const selectedEvent = events.find((e) => e.id === eventId)
@@ -336,6 +386,7 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
             eventId,
             clientName: guestNames[0].trim(),
             clientEmail: clientEmail.trim(),
+            clientPhone: clientPhone.trim() || undefined,
             numberOfEntries: 1,
           })
           setSuccess({
@@ -345,6 +396,7 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
               clientName: entry.clientName,
             }],
             clientEmail: entry.clientEmail,
+            clientPhone: clientPhone.trim(),
             totalPrice: Number(entry.totalPrice),
             eventName: entry.event.name,
             eventDate: String(entry.event.date),
@@ -354,6 +406,7 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
           const entries = await createBulkEntries({
             eventId,
             clientEmail: clientEmail.trim(),
+            clientPhone: clientPhone.trim() || undefined,
             guestNames: guestNames.slice(0, numberOfEntries).map((n) => n.trim()),
           })
           const first = entries[0]
@@ -364,12 +417,14 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
               clientName: e.clientName,
             })),
             clientEmail: first.clientEmail,
+            clientPhone: clientPhone.trim(),
             totalPrice: entries.reduce((sum: number, e: any) => sum + Number(e.totalPrice), 0),
             eventName: first.event.name,
             eventDate: String(first.event.date),
           })
         }
         setClientEmail('')
+        setClientPhone('')
         setNumberOfEntries(1)
         setGuestNames([''])
         router.refresh()
@@ -404,6 +459,26 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
     } finally {
       setSendingEmail(false)
     }
+  }
+
+  const handleWhatsApp = async () => {
+    if (!success || !success.clientPhone) return
+    const url = buildWhatsAppUrl({
+      phone: success.clientPhone,
+      entries: success.entries,
+      eventName: success.eventName,
+      eventDate: success.eventDate,
+      totalPrice: success.totalPrice,
+    })
+    window.open(url, '_blank')
+    // Mark as sent
+    try {
+      for (const entry of success.entries) {
+        await markEntryWhatsappSent(entry.entryId)
+      }
+      setWhatsappSent(true)
+      router.refresh()
+    } catch {}
   }
 
   const handlePrint = async () => {
@@ -477,6 +552,10 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
           <div>
             <label className="block text-sm font-medium text-dark-300 mb-2">Email del Cliente</label>
             <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="correo@ejemplo.com" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">WhatsApp del Cliente <span className="text-white/30 font-normal">(opcional)</span></label>
+            <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="9999-9999" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-300 mb-2">Número de Entradas</label>
@@ -558,11 +637,24 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
                   {sendingEmail ? 'Enviando...' : `Enviar ${success.entries.length > 1 ? `${success.entries.length} QRs` : 'QR'} por Email`}
                 </button>
               )}
+              {success.clientPhone ? (
+                whatsappSent ? (
+                  <div className="bg-green-500/20 border border-green-500/50 text-green-400 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.344 0-4.507-.81-6.214-2.163l-.436-.345-2.648.888.888-2.648-.345-.436A9.956 9.956 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+                    WhatsApp enviado
+                  </div>
+                ) : (
+                  <button onClick={handleWhatsApp} className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.344 0-4.507-.81-6.214-2.163l-.436-.345-2.648.888.888-2.648-.345-.436A9.956 9.956 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+                    {`Enviar ${success.entries.length > 1 ? `${success.entries.length} Entradas` : 'Entrada'} por WhatsApp`}
+                  </button>
+                )
+              ) : null}
               <button onClick={handlePrint} disabled={printing} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                 {printing ? 'Generando...' : `Imprimir ${success.entries.length > 1 ? `${success.entries.length} Entradas` : 'Entrada'}`}
               </button>
-              <button onClick={() => { setSuccess(null); setEmailSent(false); setError('') }} className="w-full bg-dark-50 hover:bg-dark-200 text-white/80 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm">
+              <button onClick={() => { setSuccess(null); setEmailSent(false); setWhatsappSent(false); setError('') }} className="w-full bg-dark-50 hover:bg-dark-200 text-white/80 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm">
                 Vender otra entrada
               </button>
             </div>
@@ -1044,6 +1136,23 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
     } finally { setPrintingId(null) }
   }
 
+  const handleWhatsApp = async (entry: EntryItem) => {
+    if (!entry.clientPhone) return
+    const url = buildWhatsAppUrl({
+      phone: entry.clientPhone,
+      entries: [{ qrToken: entry.qrToken, clientName: entry.clientName }],
+      eventName: entry.event.name,
+      eventDate: String(entry.event.date),
+      totalPrice: entry.totalPrice,
+    })
+    window.open(url, '_blank')
+    try {
+      await markEntryWhatsappSent(entry.id)
+      setActionMsg(`WhatsApp abierto para ${entry.clientPhone}`)
+      router.refresh()
+    } catch {}
+  }
+
   const statusConfig = {
     ACTIVE: { label: 'Activa', bg: 'bg-green-500/20', text: 'text-green-400' },
     USED: { label: 'Usada', bg: 'bg-blue-500/20', text: 'text-blue-400' },
@@ -1112,18 +1221,25 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
                       {new Date(entry.createdAt).toLocaleString('es-HN')}
                       {entry.createdBy && ` · ${entry.createdBy.name || entry.createdBy.username}`}
                       {entry.emailSent && ' · Email enviado'}
+                      {entry.whatsappSent && ' · WhatsApp enviado'}
                     </p>
                   </div>
 
                   {/* Action buttons */}
                   <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-                    {/* Email & Print - always available for non-cancelled */}
+                    {/* Email, WhatsApp & Print - always available for non-cancelled */}
                     {entry.status !== 'CANCELLED' && (
                       <>
                         <button onClick={() => handleEmail(entry)} disabled={sendingEmailId === entry.id} className="text-xs px-2.5 sm:px-3 py-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                           {sendingEmailId === entry.id ? 'Enviando...' : 'Email'}
                         </button>
+                        {entry.clientPhone && (
+                          <button onClick={() => handleWhatsApp(entry)} className="text-xs px-2.5 sm:px-3 py-1.5 bg-[#25D366]/20 text-[#25D366] hover:bg-[#25D366]/30 rounded-lg transition-colors flex items-center gap-1">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.344 0-4.507-.81-6.214-2.163l-.436-.345-2.648.888.888-2.648-.345-.436A9.956 9.956 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+                            WhatsApp
+                          </button>
+                        )}
                         <button onClick={() => handlePrint(entry)} disabled={printingId === entry.id} className="text-xs px-2.5 sm:px-3 py-1.5 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                           Imprimir
