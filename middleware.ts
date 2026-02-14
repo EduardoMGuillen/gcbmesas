@@ -29,11 +29,12 @@ const authMiddleware = withAuth(
       
     // Only verify roles if token is available
     if (token) {
-      // Admin routes - ADMIN always, MESERO/CAJERO only for /admin/cuentas
+      // Admin routes - ADMIN always, MESERO/CAJERO for /admin/cuentas, CAJERO also for /admin/entradas
       if (path.startsWith('/admin')) {
         const allowed =
           token.role === 'ADMIN' ||
-          ((token.role === 'MESERO' || token.role === 'CAJERO') && path.startsWith('/admin/cuentas'))
+          ((token.role === 'MESERO' || token.role === 'CAJERO') && path.startsWith('/admin/cuentas')) ||
+          (token.role === 'CAJERO' && path.startsWith('/admin/entradas'))
         if (!allowed) {
           return NextResponse.redirect(new URL('/login', req.url))
         }
