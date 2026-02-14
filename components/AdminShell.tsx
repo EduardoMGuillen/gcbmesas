@@ -146,7 +146,7 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
 
       {/* Sidebar - desktop only */}
       <aside
-        className={`hidden md:flex flex-col bg-dark-100 border-r border-dark-200 fixed left-0 top-14 z-30 h-[calc(100vh-3.5rem)] transition-all duration-200 ${
+        className={`hidden md:flex flex-col bg-dark-100 border-r border-dark-200 fixed left-0 top-header-safe z-30 h-below-header-safe transition-all duration-200 ${
           sidebarOpen ? 'w-56' : 'w-16'
         }`}
       >
@@ -176,7 +176,7 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
 
       {/* Main content */}
       <main
-        className={`flex-1 flex flex-col min-h-screen pt-14 md:pt-14 transition-all duration-200 ${
+        className={`flex-1 flex flex-col min-h-screen pt-header-safe transition-all duration-200 ${
           sidebarOpen ? 'md:pl-56' : 'md:pl-16'
         }`}
       >
