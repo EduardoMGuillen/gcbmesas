@@ -33,7 +33,7 @@ export default async function EventoPage({
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #050510 0%, #0a0a1a 40%, #0d0d20 100%)' }}>
+    <div className="min-h-screen relative overflow-hidden pt-safe" style={{ background: 'linear-gradient(180deg, #050510 0%, #0a0a1a 40%, #0d0d20 100%)' }}>
       {/* Stars */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute w-[2px] h-[2px] bg-white/20 rounded-full" style={{ top: '8%', left: '15%' }} />

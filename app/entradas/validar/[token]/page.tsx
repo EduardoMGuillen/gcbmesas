@@ -50,7 +50,7 @@ export default async function ValidarEntradaPage({
   const eventHasPassed = now > oneDayAfterEvent
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-300 via-dark-200 to-dark-300 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-dark-300 via-dark-200 to-dark-300 flex items-center justify-center p-4 pt-safe">
       <div className="w-full max-w-md">
         <div className="bg-dark-100 border border-dark-200 rounded-2xl overflow-hidden shadow-2xl">
           {/* Flyer */}
