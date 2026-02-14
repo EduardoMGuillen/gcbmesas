@@ -39,6 +39,7 @@ export function Navbar() {
   const cajeroLinks = [
     { href: '/cajero', label: 'Cajero', match: pathname === '/cajero' },
     { href: '/admin/cuentas', label: 'Cuentas', match: pathname?.startsWith('/admin/cuentas') },
+    { href: '/admin/entradas', label: 'Entradas', match: pathname?.startsWith('/admin/entradas') },
   ]
 
   const links =
