@@ -35,26 +35,28 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // Mesero/Cajero solo pueden ver cuentas; redirigir si está en otra ruta admin
+  // Mesero/Cajero solo pueden ver ciertas rutas admin; redirigir si está en otra
   useEffect(() => {
     if (
       (userRole === 'MESERO' || userRole === 'CAJERO') &&
       pathname?.startsWith('/admin') &&
-      !pathname?.startsWith('/admin/cuentas')
+      !pathname?.startsWith('/admin/cuentas') &&
+      !(userRole === 'CAJERO' && pathname?.startsWith('/admin/entradas'))
     ) {
       router.replace(userRole === 'CAJERO' ? '/cajero' : '/mesero')
     }
   }, [userRole, pathname, router])
 
-  const isNonAdminOnCuentas =
-    (userRole === 'MESERO' || userRole === 'CAJERO') && pathname?.startsWith('/admin/cuentas')
+  const isNonAdminOnAllowedRoute =
+    (userRole === 'MESERO' || userRole === 'CAJERO') &&
+    (pathname?.startsWith('/admin/cuentas') || (userRole === 'CAJERO' && pathname?.startsWith('/admin/entradas')))
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/login' })
   }
 
   // Mesero/Cajero en cuentas: usar Navbar estándar para misma experiencia que Panel/Mesas Activas
-  if (isNonAdminOnCuentas) {
+  if (isNonAdminOnAllowedRoute) {
     return (
       <div className="min-h-screen flex flex-col">
         <CleanUrlParams />
