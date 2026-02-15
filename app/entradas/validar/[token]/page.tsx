@@ -1,5 +1,7 @@
 import { validateEntryByToken } from '@/lib/actions'
+import { generateQRCode } from '@/lib/utils'
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +15,13 @@ export default async function ValidarEntradaPage({
   if (!entry) {
     notFound()
   }
+
+  // Generate QR code for this entry's validation URL
+  const headersList = headers()
+  const host = headersList.get('host') || 'gcbmesas.vercel.app'
+  const protocol = headersList.get('x-forwarded-proto') || 'https'
+  const validationUrl = `${protocol}://${host}/entradas/validar/${params.token}`
+  const qrDataUrl = await generateQRCode(validationUrl)
 
   const statusConfig = {
     ACTIVE: {
@@ -119,6 +128,16 @@ export default async function ValidarEntradaPage({
                 </span>
               </div>
             </div>
+
+            {/* QR Code */}
+            {!eventHasPassed && entry.status === 'ACTIVE' && (
+              <div className="text-center">
+                <p className="text-white/50 text-xs mb-3">Presenta este QR en la entrada</p>
+                <div className="inline-block bg-white p-4 rounded-xl">
+                  <img src={qrDataUrl} alt="QR Code" className="w-52 h-52" />
+                </div>
+              </div>
+            )}
 
             {/* Status badge */}
             {eventHasPassed ? (
