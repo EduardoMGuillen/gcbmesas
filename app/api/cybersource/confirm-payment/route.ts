@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
+import { cyberSourcePost } from '@/lib/cybersource'
 
 function generateToken(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -18,7 +19,13 @@ function generateToken(): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { paymentReference, eventId, clientNames, clientName, clientEmail, clientPhone, numberOfEntries } = body
+    const {
+      paymentReference,
+      eventId,
+      clientEmail,
+      numberOfEntries,
+      transientToken,
+    } = body
 
     if (!paymentReference || !eventId || !clientEmail || !numberOfEntries) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
@@ -32,29 +39,115 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const names: string[] = clientNames || (clientName ? Array(numberOfEntries).fill(clientName) : [])
+    if (!transientToken) {
+      return NextResponse.json({ error: 'Falta transient token de Unified Checkout.' }, { status: 400 })
+    }
+
+    const recentLogs = await prisma.log.findMany({
+      where: {
+        action: 'EVENT_UPDATED',
+        createdAt: {
+          gte: new Date(Date.now() - 1000 * 60 * 60 * 48),
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    })
+    const pendingLog = recentLogs.find((log: any) => {
+      const details = log.details as any
+      return (
+        details?.type === 'CYBERSOURCE_PENDING' &&
+        details?.paymentReference === paymentReference &&
+        details?.eventId === eventId
+      )
+    })
+
+    if (!pendingLog) {
+      return NextResponse.json({ error: 'No se encontró la orden pendiente de CyberSource' }, { status: 404 })
+    }
+
+    const pendingDetails = pendingLog.details as any
+    if (pendingDetails?.status === 'PROCESSED') {
+      return NextResponse.json(
+        { error: 'Esta transacción ya fue procesada anteriormente.' },
+        { status: 409 }
+      )
+    }
+
+    const names: string[] = pendingDetails?.clientNames || []
     if (!names.length) {
       return NextResponse.json({ error: 'Nombres de entradas requeridos' }, { status: 400 })
     }
 
     const event = await prisma.event.findFirst({
-      where: { id: eventId, isActive: true },
+      where: { id: pendingDetails?.eventId || eventId, isActive: true },
     })
 
     if (!event || !event.paypalPrice) {
       return NextResponse.json({ error: 'Evento no encontrado o sin precio online' }, { status: 404 })
     }
 
+    const paymentResponse = await cyberSourcePost<any>('/pts/v2/payments', {
+      clientReferenceInformation: { code: paymentReference },
+      processingInformation: {
+        commerceIndicator: 'internet',
+        capture: true,
+      },
+      tokenInformation: {
+        transientTokenJwt: String(transientToken),
+      },
+      orderInformation: {
+        amountDetails: {
+          totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
+          currency: 'HNL',
+        },
+        billTo: {
+          firstName: names[0]?.split(' ')[0] || 'Cliente',
+          lastName: names[0]?.split(' ').slice(1).join(' ') || 'General',
+          email: String(pendingDetails?.clientEmail || clientEmail).trim(),
+          country: 'HN',
+          locality: 'Tegucigalpa',
+          address1: 'N/A',
+          administrativeArea: 'FM',
+          postalCode: '11101',
+          phoneNumber: '00000000',
+        },
+      },
+    })
+
+    const status = String(paymentResponse?.status || '').toUpperCase()
+    const transactionId = String(paymentResponse?.id || '')
+    const reasonCode = String(paymentResponse?.processorInformation?.responseCode || paymentResponse?.errorInformation?.reason || '')
+    if (!['AUTHORIZED', 'PENDING', 'AUTHORIZED_PENDING_REVIEW'].includes(status)) {
+      await prisma.log.update({
+        where: { id: pendingLog.id },
+        data: {
+          details: {
+            ...pendingDetails,
+            status: 'REJECTED',
+            decision: status || 'REJECTED',
+            reasonCode,
+            transactionId,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      })
+      return NextResponse.json(
+        { error: `Pago rechazado por CyberSource (${reasonCode || status || 'sin-codigo'}).` },
+        { status: 402 }
+      )
+    }
+
     const entries = []
-    for (let i = 0; i < numberOfEntries; i++) {
+    for (let i = 0; i < Number(pendingDetails?.numberOfEntries || numberOfEntries); i++) {
       const qrToken = generateToken()
       const entryName = (names[i] || names[0]).trim()
       const entry = await prisma.entry.create({
         data: {
-          eventId,
+          eventId: event.id,
           clientName: entryName,
-          clientEmail: clientEmail.trim(),
-          clientPhone: clientPhone?.trim() || null,
+          clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+          clientPhone: String(pendingDetails?.clientPhone || '').trim() || null,
           numberOfEntries: 1,
           totalPrice: Number(event.coverPrice),
           qrToken,
@@ -68,14 +161,31 @@ export async function POST(req: NextRequest) {
       data: {
         action: 'ENTRY_SOLD',
         details: {
-          eventId,
+          eventId: event.id,
           clientNames: names,
-          clientEmail,
-          numberOfEntries,
-          totalPrice: Number(event.paypalPrice) * numberOfEntries,
+          clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+          numberOfEntries: Number(pendingDetails?.numberOfEntries || numberOfEntries),
+          totalPrice: Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries),
           paymentReference,
           source: 'online_cybersource',
           currency: 'HNL',
+          cybersourceDecision: status,
+          cybersourceReasonCode: reasonCode,
+          cybersourceTransactionId: transactionId || null,
+        },
+      },
+    })
+
+    await prisma.log.update({
+      where: { id: pendingLog.id },
+      data: {
+        details: {
+          ...pendingDetails,
+          status: 'PROCESSED',
+          decision: status,
+          reasonCode,
+          transactionId: transactionId || null,
+          updatedAt: new Date().toISOString(),
         },
       },
     })
@@ -126,7 +236,7 @@ export async function POST(req: NextRequest) {
 
       await transporter.sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER,
-        to: clientEmail,
+        to: String(pendingDetails?.clientEmail || clientEmail).trim(),
         subject: `${isBulk ? `Tus ${entries.length} entradas` : 'Tu entrada'} para ${eventName} - Casa Blanca`,
         html: `
           <!DOCTYPE html><html><head><meta charset="utf-8"></head>
@@ -188,7 +298,7 @@ export async function POST(req: NextRequest) {
         qrToken: e.qrToken,
         clientName: e.clientName,
       })),
-      clientEmail,
+      clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
       eventName: entries[0].event.name,
       eventDate: String(entries[0].event.date),
       totalPriceLps: Number(event.paypalPrice) * entries.length,

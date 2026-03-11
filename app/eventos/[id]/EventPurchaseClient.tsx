@@ -44,6 +44,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   const [error, setError] = useState('')
   const [processing, setProcessing] = useState(false)
   const [success, setSuccess] = useState<PurchaseSuccess | null>(null)
+  const [showUnified, setShowUnified] = useState(false)
 
   const totalPrice = event.onlinePrice * numberOfEntries
 
@@ -74,6 +75,56 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
 
   const allNamesValid = clientNames.every((n) => n.trim().length > 0)
   const formValid = allNamesValid && clientEmail.trim() && numberOfEntries >= 1
+
+  const loadUnifiedScript = async (src: string, integrity?: string | null) => {
+    if ((window as any).Accept) return
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = src
+      script.async = true
+      script.crossOrigin = 'anonymous'
+      if (integrity) script.integrity = integrity
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error('No se pudo cargar la librería de Unified Checkout'))
+      document.body.appendChild(script)
+    })
+  }
+
+  const startUnifiedCheckout = async (params: {
+    paymentReference: string
+    captureContext: string
+    clientLibrary: string
+    clientLibraryIntegrity?: string | null
+  }) => {
+    setShowUnified(true)
+    await loadUnifiedScript(params.clientLibrary, params.clientLibraryIntegrity)
+    const acceptFactory = (window as any).Accept
+    if (!acceptFactory) throw new Error('Unified Checkout no está disponible en este navegador.')
+
+    const accept = await acceptFactory(params.captureContext)
+    const unified = await accept.unifiedPayments(false)
+    const transientToken = await unified.show({
+      containers: {
+        paymentSelection: '#cybs-payment-selection',
+        paymentScreen: '#cybs-payment-screen',
+      },
+    })
+
+    const confirmRes = await fetch('/api/cybersource/confirm-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paymentReference: params.paymentReference,
+        eventId: event.id,
+        clientEmail: clientEmail.trim(),
+        numberOfEntries,
+        transientToken,
+      }),
+    })
+    const result = await confirmRes.json()
+    if (!confirmRes.ok) throw new Error(result.error || 'Error al confirmar el pago')
+    setSuccess(result)
+  }
 
   const startCheckout = async () => {
     setProcessing(true)
@@ -112,12 +163,17 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
         return
       }
 
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl as string
+      if (data.captureContext && data.paymentReference && data.clientLibrary) {
+        await startUnifiedCheckout({
+          paymentReference: String(data.paymentReference),
+          captureContext: String(data.captureContext),
+          clientLibrary: String(data.clientLibrary),
+          clientLibraryIntegrity: data.clientLibraryIntegrity ? String(data.clientLibraryIntegrity) : null,
+        })
         return
       }
 
-      throw new Error('La pasarela de pago no respondió con una URL válida')
+      throw new Error('CyberSource no devolvió datos válidos de Unified Checkout')
     } catch (err: any) {
       setError(err.message || 'Error al procesar el pago')
     } finally {
@@ -232,6 +288,14 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
             </div>
             <p className="text-xs text-white/20 mt-1">{numberOfEntries} entrada{numberOfEntries > 1 ? 's' : ''} x L {event.onlinePrice.toFixed(2)}</p>
           </div>
+
+          {showUnified && (
+            <div className="rounded-lg p-4 space-y-3" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
+              <p className="text-sm text-white/60">Completa el pago en CyberSource:</p>
+              <div id="cybs-payment-selection" className="min-h-[56px]" />
+              <div id="cybs-payment-screen" className="min-h-[220px]" />
+            </div>
+          )}
 
           {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">{error}</div>}
 
