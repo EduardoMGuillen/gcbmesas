@@ -27,7 +27,7 @@ TableControl es una plataforma web progresiva (PWA) diseñada para centralizar l
 | Autenticación | NextAuth.js (JWT + Credentials) |
 | Estilos | Tailwind CSS |
 | UI Components | Radix UI |
-| Pagos | PayPal REST API v2 |
+| Pagos | CyberSource (en implementación) |
 | Email | Nodemailer (SMTP) |
 | Almacenamiento | Vercel Blob |
 | Push Notifications | Web Push (VAPID) + Firebase Cloud Messaging |
@@ -102,7 +102,7 @@ Acceso al panel de cajero, gestión de cuentas (servir/rechazar pedidos, cerrar 
 
 - **Crear y administrar eventos** con nombre, fecha, descripción y precio de cover.
 - **Subir flyer/imagen** del evento (almacenamiento en Vercel Blob, máximo 5MB).
-- **Precio PayPal (USD)** opcional para habilitar venta de entradas en línea.
+- **Precio online (LPS)** opcional para habilitar venta de entradas en línea.
 - **Activar/desactivar eventos** para controlar su visibilidad pública.
 - **Página pública de eventos** (`/eventos`) con diseño visual atractivo mostrando todos los eventos activos.
 
@@ -116,9 +116,9 @@ Acceso al panel de cajero, gestión de cuentas (servir/rechazar pedidos, cerrar 
 - **Envío por WhatsApp** con mensaje pre-formateado y enlaces de validación.
 - **Impresión de comprobante** formato recibo térmico (302px) con QR, detalles y totales.
 
-#### Venta en línea (PayPal)
-- **Página de compra pública** (`/eventos/[id]`) con formulario de datos y botón de PayPal.
-- **Integración PayPal REST API v2**: creación de orden → aprobación del usuario → captura del pago.
+#### Venta en línea (CyberSource)
+- **Página de compra pública** (`/eventos/[id]`) con formulario de datos y botón de pago.
+- **Integración CyberSource** en proceso: create payment + confirm payment con validación de servidor.
 - **Creación automática de entradas** al completarse el pago.
 - **Email automático** con QR codes enviado inmediatamente tras la compra.
 - **Vista de confirmación** con opción de descargar/imprimir entrada y compartir por WhatsApp.
@@ -202,10 +202,12 @@ DATABASE_URL=postgresql://...
 NEXTAUTH_SECRET=...
 NEXTAUTH_URL=https://tu-dominio.com
 
-# PayPal
-NEXT_PUBLIC_PAYPAL_CLIENT_ID=...
-PAYPAL_CLIENT_SECRET=...
-PAYPAL_API_BASE=https://api-m.paypal.com  # o https://api-m.sandbox.paypal.com para testing
+# CyberSource
+CYBERSOURCE_MERCHANT_ID=...
+CYBERSOURCE_ACCESS_KEY=...
+CYBERSOURCE_PROFILE_ID=...
+CYBERSOURCE_SECRET_KEY=...
+CYBERSOURCE_MOCK=false
 
 # Email (SMTP)
 SMTP_HOST=smtp.gmail.com
@@ -282,8 +284,8 @@ app/
 ├── eventos/         # Páginas públicas de eventos y compra de entradas
 ├── entradas/        # Validación pública de entradas por token
 ├── login/           # Autenticación
-├── api/             # API routes (PayPal, email, uploads, reportes, push, auth)
-│   ├── paypal/      # Crear y capturar órdenes PayPal
+├── api/             # API routes (cybersource, email, uploads, reportes, push, auth)
+│   ├── cybersource/ # Inicio y confirmación de pago online
 │   ├── send-entry-email/  # Envío de entradas por email
 │   ├── upload/      # Subida de imágenes
 │   ├── reportes/    # Exportar reportes Excel

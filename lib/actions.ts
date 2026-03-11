@@ -2450,7 +2450,7 @@ export async function createPublicEntry(data: {
   clientEmail: string
   clientPhone?: string
   numberOfEntries: number
-  paypalOrderId: string
+  paymentReference: string
 }) {
   const event = await prisma.event.findUnique({ where: { id: data.eventId } })
   if (!event) throw new Error('Evento no encontrado')
@@ -2494,8 +2494,8 @@ export async function createPublicEntry(data: {
         clientEmail: data.clientEmail,
         numberOfEntries: data.numberOfEntries,
         totalPrice,
-        paypalOrderId: data.paypalOrderId,
-        source: 'online_paypal',
+        paymentReference: data.paymentReference,
+        source: 'online_cybersource',
       },
     },
   })

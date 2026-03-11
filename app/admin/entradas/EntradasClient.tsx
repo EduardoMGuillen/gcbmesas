@@ -953,11 +953,11 @@ function EventosTab({ events }: { events: EventItem[] }) {
   const [coverPrice, setCoverPrice] = useState('')
   const [description, setDescription] = useState('')
   const [coverImage, setCoverImage] = useState('')
-  const [paypalPrice, setPaypalPrice] = useState('')
+  const [onlinePrice, setOnlinePrice] = useState('')
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
 
-  const resetForm = () => { setName(''); setDate(''); setCoverPrice(''); setDescription(''); setCoverImage(''); setPaypalPrice(''); setEditingId(null); setShowForm(false); setError('') }
+  const resetForm = () => { setName(''); setDate(''); setCoverPrice(''); setDescription(''); setCoverImage(''); setOnlinePrice(''); setEditingId(null); setShowForm(false); setError('') }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -988,7 +988,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
     setCoverPrice(ev.coverPrice.toString())
     setDescription(ev.description || '')
     setCoverImage(ev.coverImage || '')
-    setPaypalPrice(ev.paypalPrice ? ev.paypalPrice.toString() : '')
+    setOnlinePrice(ev.paypalPrice ? ev.paypalPrice.toString() : '')
     setShowForm(true)
   }
 
@@ -1007,7 +1007,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
           coverPrice: parseFloat(coverPrice),
           description: description.trim() || undefined,
           coverImage: coverImage.trim() || undefined,
-          paypalPrice: paypalPrice ? parseFloat(paypalPrice) : undefined,
+          paypalPrice: onlinePrice ? parseFloat(onlinePrice) : undefined,
         }
         if (editingId) {
           await updateEvent(editingId, eventData)
@@ -1093,8 +1093,8 @@ function EventosTab({ events }: { events: EventItem[] }) {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark-300 mb-2">Precio PayPal (USD) <span className="text-white/30 font-normal">(opcional - para venta online)</span></label>
-                <input type="number" step="0.01" min="0" value={paypalPrice} onChange={(e) => setPaypalPrice(e.target.value)} placeholder="8.00" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                <label className="block text-sm font-medium text-dark-300 mb-2">Precio Online (LPS) <span className="text-white/30 font-normal">(opcional - para venta en linea)</span></label>
+                <input type="number" step="0.01" min="0" value={onlinePrice} onChange={(e) => setOnlinePrice(e.target.value)} placeholder="200.00" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
             </div>
             {error && <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">{error}</div>}
@@ -1121,7 +1121,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
               </div>
               <div className="space-y-1 text-sm mb-4">
                 <p className="text-dark-300">Cover: <span className="text-primary-400 font-semibold">L {ev.coverPrice.toFixed(2)}</span></p>
-                {ev.paypalPrice && <p className="text-dark-300">PayPal: <span className="text-blue-400 font-semibold">${ev.paypalPrice.toFixed(2)} USD</span></p>}
+                {ev.paypalPrice && <p className="text-dark-300">Online: <span className="text-blue-400 font-semibold">L {ev.paypalPrice.toFixed(2)}</span></p>}
                 <p className="text-dark-300">Entradas vendidas: <span className="text-white font-medium">{ev._count.entries}</span></p>
                 {ev.description && <p className="text-dark-300 truncate" title={ev.description}>{ev.description}</p>}
               </div>

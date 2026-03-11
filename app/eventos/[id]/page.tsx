@@ -29,7 +29,7 @@ export default async function EventoPage({
     description: event.description,
     coverImage: event.coverImage,
     coverPrice: Number(event.coverPrice),
-    paypalPrice: Number(event.paypalPrice),
+    onlinePrice: Number(event.paypalPrice),
   }
 
   return (
