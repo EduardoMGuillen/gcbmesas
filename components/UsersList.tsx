@@ -18,7 +18,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
-    role: 'MESERO' as 'ADMIN' | 'MESERO' | 'CAJERO',
+    role: 'MESERO' as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA',
     name: '',
   })
   const router = useRouter()
@@ -156,6 +156,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
                         ? 'bg-purple-500/20 text-purple-400'
                         : user.role === 'MESERO'
                         ? 'bg-blue-500/20 text-blue-400'
+                        : user.role === 'TAQUILLA'
+                        ? 'bg-amber-500/20 text-amber-400'
                         : 'bg-green-500/20 text-green-400'
                     }`}
                   >
@@ -237,6 +239,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
                           ? 'bg-purple-500/20 text-purple-400'
                           : user.role === 'MESERO'
                           ? 'bg-blue-500/20 text-blue-400'
+                          : user.role === 'TAQUILLA'
+                          ? 'bg-amber-500/20 text-amber-400'
                           : 'bg-green-500/20 text-green-400'
                       }`}
                     >
@@ -334,7 +338,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO',
+                      role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA',
                     })
                   }
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
@@ -342,6 +346,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   <option value="MESERO">Mesero</option>
                   <option value="ADMIN">Administrador</option>
                   <option value="CAJERO">Cajero</option>
+                  <option value="TAQUILLA">Taquilla</option>
                 </select>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -435,7 +440,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO',
+                      role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA',
                     })
                   }
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
@@ -443,6 +448,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   <option value="MESERO">Mesero</option>
                   <option value="ADMIN">Administrador</option>
                   <option value="CAJERO">Cajero</option>
+                  <option value="TAQUILLA">Taquilla</option>
                 </select>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 pt-2">

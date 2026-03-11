@@ -21,7 +21,8 @@ export default function LoginPage() {
       const url =
         session.user.role === 'ADMIN' ? '/admin' :
         session.user.role === 'MESERO' ? '/mesero' :
-        session.user.role === 'CAJERO' ? '/cajero' : '/'
+        session.user.role === 'CAJERO' ? '/cajero' :
+        session.user.role === 'TAQUILLA' ? '/taquilla' : '/'
       router.replace(`${url}?from=callback`)
       return
     }
@@ -30,7 +31,16 @@ export default function LoginPage() {
       const refetchT = setTimeout(async () => {
         const s = await getSession()
         if (s?.user?.role) {
-          const url = s.user.role === 'ADMIN' ? '/admin' : s.user.role === 'MESERO' ? '/mesero' : s.user.role === 'CAJERO' ? '/cajero' : '/'
+          const url =
+            s.user.role === 'ADMIN'
+              ? '/admin'
+              : s.user.role === 'MESERO'
+              ? '/mesero'
+              : s.user.role === 'CAJERO'
+              ? '/cajero'
+              : s.user.role === 'TAQUILLA'
+              ? '/taquilla'
+              : '/'
           router.replace(`${url}?from=callback`)
         }
       }, 1000)

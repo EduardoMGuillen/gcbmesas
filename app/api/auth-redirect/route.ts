@@ -35,6 +35,10 @@ export async function GET(request: Request) {
       ? '/admin' 
       : session.user.role === 'MESERO' 
       ? '/mesero' 
+      : session.user.role === 'CAJERO'
+      ? '/cajero'
+      : session.user.role === 'TAQUILLA'
+      ? '/taquilla'
       : '/'
     
     console.log('[AuthRedirect API] Returning redirect URL:', redirectUrl)

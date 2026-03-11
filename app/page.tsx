@@ -31,6 +31,16 @@ export default async function Home() {
       return
     }
 
+    if (session.user.role === 'CAJERO') {
+      redirect('/cajero')
+      return
+    }
+
+    if (session.user.role === 'TAQUILLA') {
+      redirect('/taquilla')
+      return
+    }
+
     // Unknown role, redirect to login
     redirect('/login')
   } catch (error: any) {

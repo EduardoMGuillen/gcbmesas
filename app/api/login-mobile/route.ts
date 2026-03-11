@@ -68,7 +68,16 @@ export async function POST(request: Request) {
     })
 
     // Determine redirect URL
-    const redirectUrl = user.role === 'ADMIN' ? '/admin' : user.role === 'MESERO' ? '/mesero' : '/'
+    const redirectUrl =
+      user.role === 'ADMIN'
+        ? '/admin'
+        : user.role === 'MESERO'
+        ? '/mesero'
+        : user.role === 'CAJERO'
+        ? '/cajero'
+        : user.role === 'TAQUILLA'
+        ? '/taquilla'
+        : '/'
 
     // Create response
     const response = NextResponse.json({

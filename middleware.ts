@@ -47,6 +47,13 @@ const authMiddleware = withAuth(
         }
       }
 
+      // Taquilla routes - allow TAQUILLA and ADMIN roles
+      if (path.startsWith('/taquilla')) {
+        if (!['TAQUILLA', 'ADMIN'].includes(token.role as string)) {
+          return NextResponse.redirect(new URL('/login', req.url))
+        }
+      }
+
       // Mesero routes - allow MESERO and ADMIN roles
       if (path.startsWith('/mesero')) {
         if (!['MESERO', 'ADMIN'].includes(token.role as string)) {
