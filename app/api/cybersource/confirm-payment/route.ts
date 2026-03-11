@@ -31,14 +31,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
     }
 
-    // Until credentials are delivered, only mock confirmations are accepted.
-    if (!(process.env.CYBERSOURCE_MOCK === 'true' && String(paymentReference).startsWith('mock_'))) {
-      return NextResponse.json(
-        { error: 'Confirmación real de CyberSource aún no habilitada. Pendiente de credenciales y firma.' },
-        { status: 501 }
-      )
-    }
-
     if (!transientToken) {
       return NextResponse.json({ error: 'Falta transient token de Unified Checkout.' }, { status: 400 })
     }
