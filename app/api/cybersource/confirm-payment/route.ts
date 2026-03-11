@@ -6,8 +6,6 @@ import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
 
-const PAYPAL_API_BASE = process.env.PAYPAL_API_BASE || 'https://api-m.sandbox.paypal.com'
-
 function generateToken(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   let token = ''
@@ -17,70 +15,34 @@ function generateToken(): string {
   return `E-${token}`
 }
 
-async function getPayPalAccessToken() {
-  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
-  const secret = process.env.PAYPAL_CLIENT_SECRET
-
-  if (!clientId || !secret) {
-    throw new Error('PayPal credentials not configured')
-  }
-
-  const auth = Buffer.from(`${clientId}:${secret}`).toString('base64')
-  const res = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${auth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  })
-
-  if (!res.ok) throw new Error('PayPal auth failed')
-  const data = await res.json()
-  return data.access_token as string
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { orderId, eventId, clientNames, clientName, clientEmail, clientPhone, numberOfEntries } = body
+    const { paymentReference, eventId, clientNames, clientName, clientEmail, clientPhone, numberOfEntries } = body
 
-    // Support both clientNames array and legacy clientName string
-    const names: string[] = clientNames || (clientName ? Array(numberOfEntries).fill(clientName) : [])
-
-    if (!orderId || !eventId || !names.length || !clientEmail || !numberOfEntries) {
+    if (!paymentReference || !eventId || !clientEmail || !numberOfEntries) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
     }
 
-    // Capture PayPal order
-    const accessToken = await getPayPalAccessToken()
-    const captureRes = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${orderId}/capture`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!captureRes.ok) {
-      const error = await captureRes.text()
-      console.error('[PayPal] Capture error:', error)
-      return NextResponse.json({ error: 'Error al capturar el pago de PayPal' }, { status: 500 })
+    // Until credentials are delivered, only mock confirmations are accepted.
+    if (!(process.env.CYBERSOURCE_MOCK === 'true' && String(paymentReference).startsWith('mock_'))) {
+      return NextResponse.json(
+        { error: 'Confirmación real de CyberSource aún no habilitada. Pendiente de credenciales y firma.' },
+        { status: 501 }
+      )
     }
 
-    const captureData = await captureRes.json()
-
-    if (captureData.status !== 'COMPLETED') {
-      return NextResponse.json({ error: 'El pago no fue completado' }, { status: 400 })
+    const names: string[] = clientNames || (clientName ? Array(numberOfEntries).fill(clientName) : [])
+    if (!names.length) {
+      return NextResponse.json({ error: 'Nombres de entradas requeridos' }, { status: 400 })
     }
 
-    // Create entries in database
     const event = await prisma.event.findFirst({
       where: { id: eventId, isActive: true },
     })
 
     if (!event || !event.paypalPrice) {
-      return NextResponse.json({ error: 'Evento no encontrado o sin precio PayPal' }, { status: 404 })
+      return NextResponse.json({ error: 'Evento no encontrado o sin precio online' }, { status: 404 })
     }
 
     const entries = []
@@ -102,7 +64,6 @@ export async function POST(req: NextRequest) {
       entries.push(entry)
     }
 
-    // Log the sale
     await prisma.log.create({
       data: {
         action: 'ENTRY_SOLD',
@@ -112,21 +73,21 @@ export async function POST(req: NextRequest) {
           clientEmail,
           numberOfEntries,
           totalPrice: Number(event.paypalPrice) * numberOfEntries,
-          paypalOrderId: orderId,
-          source: 'online_paypal',
+          paymentReference,
+          source: 'online_cybersource',
+          currency: 'HNL',
         },
       },
     })
 
     revalidatePath('/admin/entradas')
 
-    // Send email automatically
     try {
       const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://gcbmesas.vercel.app'
       const eventName = entries[0].event.name
       const eventDate = String(entries[0].event.date)
       const eventCoverImage = event.coverImage
-      const totalPriceUsd = Number(event.paypalPrice) * entries.length
+      const totalPriceLps = Number(event.paypalPrice) * entries.length
 
       const qrData = await Promise.all(
         entries.map(async (entry: any, i: number) => {
@@ -187,8 +148,8 @@ export async function POST(req: NextRequest) {
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Evento</td><td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${eventName}</td></tr>
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Fecha</td><td style="padding:8px 0;color:#c9a84c;font-size:14px;text-align:right;font-weight:bold;text-transform:capitalize;">${eventDateStr}</td></tr>
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Entradas</td><td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${entries.length}</td></tr>
-                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Total Pagado</td><td style="padding:8px 0;color:#3b82f6;font-size:18px;text-align:right;font-weight:bold;">$${totalPriceUsd.toFixed(2)} USD</td></tr>
-                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">PayPal Order</td><td style="padding:8px 0;color:#64748b;font-size:12px;text-align:right;">${orderId}</td></tr>
+                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Total Pagado</td><td style="padding:8px 0;color:#3b82f6;font-size:18px;text-align:right;font-weight:bold;">L ${totalPriceLps.toFixed(2)} HNL</td></tr>
+                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Referencia</td><td style="padding:8px 0;color:#64748b;font-size:12px;text-align:right;">${paymentReference}</td></tr>
                     </table>
                   </div>
                   ${qrSectionsHtml}
@@ -210,7 +171,6 @@ export async function POST(req: NextRequest) {
         ],
       })
 
-      // Mark entries as email sent
       for (const entry of entries) {
         await prisma.entry.update({
           where: { id: entry.id },
@@ -218,10 +178,9 @@ export async function POST(req: NextRequest) {
         })
       }
     } catch (emailError: any) {
-      console.error('[PayPal] Email send error (payment was successful):', emailError)
+      console.error('[CyberSource] Email send error (payment was successful):', emailError)
     }
 
-    // Return entry data for confirmation UI
     return NextResponse.json({
       success: true,
       entries: entries.map((e: any) => ({
@@ -232,11 +191,11 @@ export async function POST(req: NextRequest) {
       clientEmail,
       eventName: entries[0].event.name,
       eventDate: String(entries[0].event.date),
-      totalPriceUsd: Number(event.paypalPrice) * entries.length,
-      paypalOrderId: orderId,
+      totalPriceLps: Number(event.paypalPrice) * entries.length,
+      paymentReference,
     })
   } catch (error: any) {
-    console.error('[PayPal] Capture order error:', error)
+    console.error('[CyberSource] Confirm payment error:', error)
     return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 })
   }
 }
