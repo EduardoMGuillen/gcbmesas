@@ -78,13 +78,23 @@ export async function cyberSourcePost<TResponse>(
     cache: 'no-store',
   })
 
-  const responseBody = await response.json().catch(() => ({}))
+  const rawBody = await response.text()
+  let responseBody: any = {}
+  if (rawBody) {
+    try {
+      responseBody = JSON.parse(rawBody)
+    } catch {
+      // Capture Context API can return a raw JWT string (not JSON)
+      responseBody = rawBody
+    }
+  }
   if (!response.ok) {
-    const msg =
-      (responseBody as any)?.message ||
-      (responseBody as any)?.details ||
-      (responseBody as any)?.errorInformation?.message ||
-      `CyberSource error ${response.status}`
+    const msg = typeof responseBody === 'string'
+      ? responseBody
+      : (responseBody as any)?.message ||
+        (responseBody as any)?.details ||
+        (responseBody as any)?.errorInformation?.message ||
+        `CyberSource error ${response.status}`
     throw new Error(String(msg))
   }
 
