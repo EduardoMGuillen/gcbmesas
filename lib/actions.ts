@@ -63,12 +63,18 @@ function ensureCashierAccess(role: string) {
   }
 }
 
+function ensureEntryScanAccess(role: string) {
+  if (!['ADMIN', 'CAJERO', 'TAQUILLA'].includes(role)) {
+    throw new Error('Solo taquilla, cajeros o administradores pueden escanear entradas')
+  }
+}
+
 // ========== USER ACTIONS ==========
 
 export async function createUser(data: {
   username: string
   password: string
-  role: 'ADMIN' | 'MESERO' | 'CAJERO'
+  role: 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA'
   name?: string
 }) {
   const currentUser = await getCurrentUser()
@@ -104,7 +110,7 @@ export async function updateUser(
   data: {
     username?: string
     password?: string
-    role?: 'ADMIN' | 'MESERO' | 'CAJERO'
+    role?: 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA'
     name?: string | null
   }
 ) {
@@ -2295,7 +2301,7 @@ export async function getEntradasDashboardData() {
 
 export async function markEntryUsed(entryId: string) {
   const user = await getCurrentUser()
-  ensureCashierAccess(user.role)
+  ensureEntryScanAccess(user.role)
 
   const entry = await prisma.entry.findUnique({
     where: { id: entryId },
@@ -2382,6 +2388,7 @@ export async function validateEntryByToken(token: string) {
     status: entry.status,
     createdAt: entry.createdAt,
     event: {
+      id: entry.eventId,
       name: entry.event.name,
       date: entry.event.date,
       coverPrice: Number(entry.event.coverPrice),

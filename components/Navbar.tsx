@@ -42,11 +42,17 @@ export function Navbar() {
     { href: '/admin/entradas', label: 'Entradas', match: pathname?.startsWith('/admin/entradas') },
   ]
 
+  const taquillaLinks = [
+    { href: '/taquilla', label: 'Taquilla', match: pathname?.startsWith('/taquilla') },
+  ]
+
   const links =
     session?.user.role === 'ADMIN'
       ? adminLinks
       : session?.user.role === 'CAJERO'
       ? cajeroLinks
+      : session?.user.role === 'TAQUILLA'
+      ? taquillaLinks
       : meseroLinks
 
   return (
