@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { signIn, useSession, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function LoginPage() {
   const { data: session, status } = useSession()
@@ -168,12 +169,28 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 bg-dark-50 pt-safe safe-area-inset py-8 sm:py-4">
-      <div className="w-full max-w-md mx-auto my-auto">
+    <div className="min-h-screen bg-dark-50 pt-safe safe-area-inset px-3 sm:px-4 py-6 sm:py-8">
+      <div className="w-full max-w-md mx-auto">
+        <div className="text-center mb-5 sm:mb-6">
+          <img
+            src="/LogoCasaBlanca.png"
+            alt="Casa Blanca"
+            className="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto mb-3"
+          />
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">Casa Blanca Tickets</h1>
+          <p className="text-xs sm:text-sm text-dark-400">Compra entradas en linea y recibe tu QR al instante</p>
+          <Link
+            href="/eventos"
+            className="inline-flex items-center justify-center mt-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors"
+          >
+            Ver Eventos
+          </Link>
+        </div>
+
         <div className="bg-dark-100 rounded-xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 border border-dark-200">
           <div className="text-center mb-5 sm:mb-6 md:mb-8">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1 sm:mb-2">TableControl</h1>
-            <p className="text-xs sm:text-sm md:text-base text-dark-400">Sistema de Gestión de Mesas</p>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1 sm:mb-2">Iniciar Sesion</h2>
+            <p className="text-xs sm:text-sm md:text-base text-dark-400">Acceso de personal</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
