@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [sessionCheckDone, setSessionCheckDone] = useState(false)
+  const [isLoginOpen, setIsLoginOpen] = useState(false)
 
   // iOS: las cookies pueden tardar en estar disponibles al reabrir la PWA. Esperar y reintentar.
   useEffect(() => {
@@ -169,102 +170,142 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-50 pt-safe safe-area-inset px-3 sm:px-4 py-6 sm:py-8">
-      <div className="w-full max-w-md mx-auto">
-        <div className="text-center mb-5 sm:mb-6">
+    <div className="min-h-screen relative overflow-hidden pt-safe safe-area-inset" style={{ background: 'linear-gradient(180deg, #050510 0%, #0a0a1a 40%, #0d0d20 100%)' }}>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute w-[2px] h-[2px] bg-white/20 rounded-full" style={{ top: '8%', left: '15%' }} />
+        <div className="absolute w-[1px] h-[1px] bg-white/30 rounded-full" style={{ top: '12%', left: '45%' }} />
+        <div className="absolute w-[2px] h-[2px] bg-white/15 rounded-full" style={{ top: '20%', left: '80%' }} />
+        <div className="absolute w-[1px] h-[1px] bg-white/25 rounded-full" style={{ top: '35%', left: '25%' }} />
+        <div className="absolute w-[1px] h-[1px] bg-white/20 rounded-full" style={{ top: '55%', left: '10%' }} />
+        <div className="absolute w-[2px] h-[2px] bg-white/15 rounded-full" style={{ top: '65%', left: '90%' }} />
+        <div className="absolute w-[1px] h-[1px] bg-white/25 rounded-full" style={{ top: '75%', left: '50%' }} />
+      </div>
+
+      <header className="relative z-10 border-b border-white/5">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src="/LogoCasaBlanca.png" alt="Casa Blanca" className="w-9 h-9 object-contain" />
+            <span className="text-white font-semibold text-sm sm:text-base">Casa Blanca Tickets</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsLoginOpen(true)}
+            className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            Iniciar Sesión
+          </button>
+        </div>
+      </header>
+
+      <main className="relative z-10 min-h-[calc(100vh-74px)] flex items-center justify-center px-4 sm:px-6">
+        <div className="text-center max-w-xl">
           <img
             src="/LogoCasaBlanca.png"
             alt="Casa Blanca"
-            className="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto mb-3"
+            className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto mb-4"
           />
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">Casa Blanca Tickets</h1>
-          <p className="text-xs sm:text-sm text-dark-400">Compra entradas en linea y recibe tu QR al instante</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Casa Blanca Tickets</h1>
+          <p className="text-white/60 text-sm sm:text-base mb-6">Compra tus entradas en linea y recibe tu QR al instante.</p>
           <Link
             href="/eventos"
-            className="inline-flex items-center justify-center mt-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors"
+            className="inline-flex items-center justify-center bg-primary-600 hover:bg-primary-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
           >
             Ver Eventos
           </Link>
         </div>
+      </main>
 
-        <div className="bg-dark-100 rounded-xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 border border-dark-200">
-          <div className="text-center mb-5 sm:mb-6 md:mb-8">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1 sm:mb-2">Iniciar Sesion</h2>
-            <p className="text-xs sm:text-sm md:text-base text-dark-400">Acceso de personal</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
-            <div>
-              <label
-                htmlFor="username"
-                className="block text-sm sm:text-base font-medium text-dark-300 mb-2"
-              >
-                Usuario
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                autoComplete="username"
-                inputMode="text"
-                autoCapitalize="none"
-                autoCorrect="off"
-                className="w-full px-4 py-3.5 sm:py-4 text-base bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                placeholder="Ingresa tu usuario"
-                style={{ fontSize: '16px' }}
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm sm:text-base font-medium text-dark-300 mb-2"
-              >
-                Contraseña
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                inputMode="text"
-                className="w-full px-4 py-3.5 sm:py-4 text-base bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                placeholder="Ingresa tu contraseña"
-                style={{ fontSize: '16px' }}
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm sm:text-base">
-                {error}
+      {isLoginOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-3 sm:p-4">
+          <div className="w-full max-w-md bg-dark-100 rounded-xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 border border-dark-200">
+            <div className="flex items-center justify-between mb-5 sm:mb-6 md:mb-8">
+              <div>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1">Iniciar Sesion</h2>
+                <p className="text-xs sm:text-sm md:text-base text-dark-400">Acceso de personal</p>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setIsLoginOpen(false)}
+                className="text-white/60 hover:text-white text-2xl leading-none"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
 
-            <p className="text-xs text-dark-400 text-center">
-              Tu sesión se mantendrá activa al cerrar la app
-            </p>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold py-4 sm:py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-lg touch-manipulation min-h-[48px] shadow-lg active:scale-[0.98]"
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-            >
-              {loading ? (
-                <span className="flex items-center justify-center">
-                  <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></span>
-                  <span className="text-sm sm:text-base">Iniciando sesión...</span>
-                </span>
-              ) : (
-                'Iniciar Sesión'
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
+              <div>
+                <label
+                  htmlFor="username"
+                  className="block text-sm sm:text-base font-medium text-dark-300 mb-2"
+                >
+                  Usuario
+                </label>
+                <input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  autoComplete="username"
+                  inputMode="text"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  className="w-full px-4 py-3.5 sm:py-4 text-base bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  placeholder="Ingresa tu usuario"
+                  style={{ fontSize: '16px' }}
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block text-sm sm:text-base font-medium text-dark-300 mb-2"
+                >
+                  Contraseña
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  inputMode="text"
+                  className="w-full px-4 py-3.5 sm:py-4 text-base bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  placeholder="Ingresa tu contraseña"
+                  style={{ fontSize: '16px' }}
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm sm:text-base">
+                  {error}
+                </div>
               )}
-            </button>
-          </form>
+
+              <p className="text-xs text-dark-400 text-center">
+                Tu sesión se mantendrá activa al cerrar la app
+              </p>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold py-4 sm:py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-lg touch-manipulation min-h-[48px] shadow-lg active:scale-[0.98]"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></span>
+                    <span className="text-sm sm:text-base">Iniciando sesión...</span>
+                  </span>
+                ) : (
+                  'Iniciar Sesión'
+                )}
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
