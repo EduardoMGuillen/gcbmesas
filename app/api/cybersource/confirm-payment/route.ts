@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
-import { cyberSourcePost } from '@/lib/cybersource'
+import { CyberSourceApiError, cyberSourcePost } from '@/lib/cybersource'
 
 function generateToken(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -297,6 +297,29 @@ export async function POST(req: NextRequest) {
       paymentReference,
     })
   } catch (error: any) {
+    if (error instanceof CyberSourceApiError) {
+      console.error('[CyberSource] Confirm payment API error:', {
+        endpoint: error.endpoint,
+        status: error.status,
+        requestId: error.requestId,
+        responseBody: error.responseBody,
+      })
+      const reason =
+        typeof error.responseBody === 'string'
+          ? error.responseBody
+          : error.responseBody?.errorInformation?.reason ||
+            error.responseBody?.reason ||
+            error.responseBody?.message ||
+            error.message
+      return NextResponse.json(
+        {
+          error: `CyberSource ${error.status}: ${reason}`,
+          requestId: error.requestId,
+          endpoint: error.endpoint,
+        },
+        { status: 502 }
+      )
+    }
     console.error('[CyberSource] Confirm payment error:', error)
     return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 })
   }

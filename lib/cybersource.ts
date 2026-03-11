@@ -1,5 +1,27 @@
 import crypto from 'crypto'
 
+export class CyberSourceApiError extends Error {
+  status: number
+  requestId: string | null
+  responseBody: any
+  endpoint: string
+
+  constructor(params: {
+    message: string
+    status: number
+    requestId: string | null
+    responseBody: any
+    endpoint: string
+  }) {
+    super(params.message)
+    this.name = 'CyberSourceApiError'
+    this.status = params.status
+    this.requestId = params.requestId
+    this.responseBody = params.responseBody
+    this.endpoint = params.endpoint
+  }
+}
+
 function getCyberSourceBaseUrl() {
   const env = (process.env.CYBERSOURCE_ENV || 'test').toLowerCase()
   return env === 'live' ? 'https://api.cybersource.com' : 'https://apitest.cybersource.com'
@@ -89,13 +111,24 @@ export async function cyberSourcePost<TResponse>(
     }
   }
   if (!response.ok) {
+    const requestId =
+      response.headers.get('v-c-correlation-id') ||
+      response.headers.get('x-request-id') ||
+      null
     const msg = typeof responseBody === 'string'
       ? responseBody
       : (responseBody as any)?.message ||
+        (responseBody as any)?.errorInformation?.reason ||
         (responseBody as any)?.details ||
         (responseBody as any)?.errorInformation?.message ||
         `CyberSource error ${response.status}`
-    throw new Error(String(msg))
+    throw new CyberSourceApiError({
+      message: String(msg),
+      status: response.status,
+      requestId,
+      responseBody,
+      endpoint: resourcePath,
+    })
   }
 
   return responseBody as TResponse

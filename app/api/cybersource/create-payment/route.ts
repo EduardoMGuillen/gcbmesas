@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
-import { cyberSourcePost } from '@/lib/cybersource'
+import { CyberSourceApiError, cyberSourcePost } from '@/lib/cybersource'
 
 export async function POST(req: NextRequest) {
   try {
@@ -115,6 +115,29 @@ export async function POST(req: NextRequest) {
       clientLibraryIntegrity: captureContext?.clientLibraryIntegrity || null,
     })
   } catch (error: any) {
+    if (error instanceof CyberSourceApiError) {
+      console.error('[CyberSource] Create payment API error:', {
+        endpoint: error.endpoint,
+        status: error.status,
+        requestId: error.requestId,
+        responseBody: error.responseBody,
+      })
+      const reason =
+        typeof error.responseBody === 'string'
+          ? error.responseBody
+          : error.responseBody?.errorInformation?.reason ||
+            error.responseBody?.reason ||
+            error.responseBody?.message ||
+            error.message
+      return NextResponse.json(
+        {
+          error: `CyberSource ${error.status}: ${reason}`,
+          requestId: error.requestId,
+          endpoint: error.endpoint,
+        },
+        { status: 502 }
+      )
+    }
     console.error('[CyberSource] Create payment error:', error)
     return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 })
   }
