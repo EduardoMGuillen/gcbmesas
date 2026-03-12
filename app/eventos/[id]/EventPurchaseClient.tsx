@@ -22,6 +22,8 @@ type PurchaseSuccess = {
   paymentReference: string
 }
 
+type PaymentMode = 'unknown' | 'unified' | 'direct'
+
 async function generateQRDataUrl(text: string): Promise<string> {
   return QRCode.toDataURL(text, {
     width: 300,
@@ -50,6 +52,12 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   const [processing, setProcessing] = useState(false)
   const [success, setSuccess] = useState<PurchaseSuccess | null>(null)
   const [showUnified, setShowUnified] = useState(false)
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('unknown')
+  const [cardHolderName, setCardHolderName] = useState('')
+  const [cardNumber, setCardNumber] = useState('')
+  const [cardExpMonth, setCardExpMonth] = useState('')
+  const [cardExpYear, setCardExpYear] = useState('')
+  const [cardCvv, setCardCvv] = useState('')
 
   const totalPrice = event.onlinePrice * numberOfEntries
 
@@ -80,6 +88,13 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
 
   const allNamesValid = clientNames.every((n) => n.trim().length > 0)
   const formValid = allNamesValid && clientEmail.trim() && numberOfEntries >= 1
+
+  const cardNumberDigits = cardNumber.replace(/\D/g, '')
+  const cardValid =
+    cardNumberDigits.length >= 13 &&
+    cardExpMonth.trim().length >= 1 &&
+    cardExpYear.trim().length >= 2 &&
+    cardCvv.trim().length >= 3
 
   const loadUnifiedScript = async (src: string, integrity?: string | null) => {
     if ((window as any).Accept) return
@@ -168,7 +183,34 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
         return
       }
 
+      if (data.directMode && data.paymentReference) {
+        setPaymentMode('direct')
+        if (!cardValid) {
+          throw new Error('Completa los datos de tarjeta para pago directo (sandbox).')
+        }
+        const confirmRes = await fetch('/api/cybersource/confirm-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentReference: data.paymentReference,
+            eventId: event.id,
+            clientEmail: clientEmail.trim(),
+            numberOfEntries,
+            cardHolderName: cardHolderName.trim() || clientNames[0]?.trim() || 'Test Merchant',
+            cardNumber: cardNumberDigits,
+            cardExpMonth: cardExpMonth.trim(),
+            cardExpYear: cardExpYear.trim(),
+            cardCvv: cardCvv.trim(),
+          }),
+        })
+        const result = await confirmRes.json()
+        if (!confirmRes.ok) throw new Error(result.error || 'Error al confirmar el pago directo')
+        setSuccess(result)
+        return
+      }
+
       if (data.captureContext && data.paymentReference && data.clientLibrary) {
+        setPaymentMode('unified')
         await startUnifiedCheckout({
           paymentReference: String(data.paymentReference),
           captureContext: String(data.captureContext),
@@ -295,6 +337,68 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none focus:ring-2 transition-all"
               style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
             />
+          </div>
+
+          <div className="rounded-lg p-4 space-y-3" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-white/80">Tarjeta (modo directo sandbox)</p>
+              <span className="text-[11px] text-white/40">
+                {paymentMode === 'direct' ? 'Activo' : paymentMode === 'unified' ? 'Fallback' : 'Auto'}
+              </span>
+            </div>
+            <input
+              type="text"
+              value={cardHolderName}
+              onChange={(e) => setCardHolderName(e.target.value)}
+              placeholder="Nombre del titular"
+              className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+              style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="cc-number"
+              value={cardNumber}
+              onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, ''))}
+              placeholder="Número de tarjeta"
+              className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+              style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+            />
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="cc-exp-month"
+                value={cardExpMonth}
+                onChange={(e) => setCardExpMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                placeholder="MM"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="cc-exp-year"
+                value={cardExpYear}
+                onChange={(e) => setCardExpYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder="YYYY"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+              />
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="cc-csc"
+                value={cardCvv}
+                onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder="CVV"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+              />
+            </div>
+            <p className="text-[11px] text-white/35">
+              En modo sandbox directo, estos datos se envían al backend para prueba técnica.
+            </p>
           </div>
 
           <div className="rounded-lg p-4" style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)' }}>

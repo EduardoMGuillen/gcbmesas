@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     const cyberEnv = (process.env.CYBERSOURCE_ENV || 'test').toLowerCase()
     const currency = 'USD'
     const isMockMode = process.env.CYBERSOURCE_MOCK === 'true'
+    const paymentMode = (process.env.CYBERSOURCE_PAYMENT_MODE || 'unified').toLowerCase()
 
     // In mock mode we still persist the pending order so confirm-payment can complete the full flow.
     if (isMockMode) {
@@ -75,6 +76,34 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    await prisma.log.create({
+      data: {
+        action: 'EVENT_UPDATED',
+        details: {
+          type: 'CYBERSOURCE_PENDING',
+          status: 'PENDING',
+          paymentReference,
+          eventId: event.id,
+          eventName: event.name,
+          numberOfEntries: Number(numberOfEntries),
+          clientNames: cleanNames,
+          clientEmail: String(clientEmail).trim(),
+          clientPhone: clientPhone ? String(clientPhone).trim() : null,
+          totalPrice: Number(total),
+          currency,
+          environment: cyberEnv,
+          createdAt: new Date().toISOString(),
+        },
+      },
+    })
+
+    if (paymentMode === 'direct') {
+      return NextResponse.json({
+        paymentReference,
+        directMode: true,
+      })
+    }
+
     const captureContext = await cyberSourcePost<any>('/up/v1/capture-contexts', {
       targetOrigins: [appUrl],
       clientVersion: '0.31',
@@ -105,29 +134,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'CyberSource no devolvió capture context.' }, { status: 502 })
     }
 
-    await prisma.log.create({
-      data: {
-        action: 'EVENT_UPDATED',
-        details: {
-          type: 'CYBERSOURCE_PENDING',
-          status: 'PENDING',
-          paymentReference,
-          eventId: event.id,
-          eventName: event.name,
-          numberOfEntries: Number(numberOfEntries),
-          clientNames: cleanNames,
-          clientEmail: String(clientEmail).trim(),
-          clientPhone: clientPhone ? String(clientPhone).trim() : null,
-          totalPrice: Number(total),
-          currency,
-          environment: cyberEnv,
-          createdAt: new Date().toISOString(),
-        },
-      },
-    })
-
     return NextResponse.json({
       paymentReference,
+      directMode: false,
       captureContext: captureContextJwt,
       clientLibrary:
         captureContext?.clientLibrary ||

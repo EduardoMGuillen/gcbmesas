@@ -24,6 +24,14 @@ function summarizeTransientToken(token: unknown) {
   }
 }
 
+function summarizeCardNumber(cardNumber: unknown) {
+  const digits = String(cardNumber || '').replace(/\D/g, '')
+  return {
+    length: digits.length,
+    last4: digits.length >= 4 ? digits.slice(-4) : null,
+  }
+}
+
 function generateToken(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   let token = ''
@@ -40,6 +48,12 @@ export async function POST(req: NextRequest) {
     numberOfEntries?: number
     eventPrice?: number
     transientToken?: unknown
+    paymentMode?: string
+    cardNumber?: string
+    cardExpMonth?: string
+    cardExpYear?: string
+    cardCvv?: string
+    cardHolderName?: string
   } = {}
   const currency = 'USD'
 
@@ -51,19 +65,36 @@ export async function POST(req: NextRequest) {
       clientEmail,
       numberOfEntries,
       transientToken,
+      cardNumber,
+      cardExpMonth,
+      cardExpYear,
+      cardCvv,
+      cardHolderName,
     } = body
     debugContext.paymentReference = paymentReference
     debugContext.eventId = eventId
     debugContext.numberOfEntries = Number(numberOfEntries || 0)
     debugContext.transientToken = transientToken
+    debugContext.cardNumber = cardNumber
+    debugContext.cardExpMonth = cardExpMonth
+    debugContext.cardExpYear = cardExpYear
+    debugContext.cardCvv = cardCvv
+    debugContext.cardHolderName = cardHolderName
 
     if (!paymentReference || !eventId || !clientEmail || !numberOfEntries) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
     }
 
     const isMockMode = process.env.CYBERSOURCE_MOCK === 'true'
-    if (!isMockMode && !transientToken) {
+    const paymentMode = (process.env.CYBERSOURCE_PAYMENT_MODE || 'unified').toLowerCase()
+    debugContext.paymentMode = paymentMode
+    const isDirectMode = paymentMode === 'direct'
+
+    if (!isMockMode && !isDirectMode && !transientToken) {
       return NextResponse.json({ error: 'Falta transient token de Unified Checkout.' }, { status: 400 })
+    }
+    if (!isMockMode && isDirectMode && (!cardNumber || !cardExpMonth || !cardExpYear || !cardCvv)) {
+      return NextResponse.json({ error: 'Faltan datos de tarjeta para pago directo.' }, { status: 400 })
     }
 
     const pendingLog = await prisma.log.findFirst({
@@ -128,33 +159,67 @@ export async function POST(req: NextRequest) {
           id: `mock_${paymentReference}`,
           processorInformation: { responseCode: '100' },
         }
-      : await cyberSourcePost<any>('/pts/v2/payments', {
-          clientReferenceInformation: { code: paymentReference },
-          processingInformation: {
-            commerceIndicator: 'internet',
-            capture: true,
-          },
-          tokenInformation: {
-            transientTokenJwt: String(transientToken),
-          },
-          orderInformation: {
-            amountDetails: {
-              totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
-              currency,
+      : isDirectMode
+        ? await cyberSourcePost<any>('/pts/v2/payments', {
+            clientReferenceInformation: { code: paymentReference },
+            processingInformation: {
+              commerceIndicator: 'internet',
+              capture: true,
             },
-            billTo: {
-              firstName: names[0]?.split(' ')[0] || 'Cliente',
-              lastName: names[0]?.split(' ').slice(1).join(' ') || 'General',
-              email: String(pendingDetails?.clientEmail || clientEmail).trim(),
-              country: 'HN',
-              locality: 'Tegucigalpa',
-              address1: 'N/A',
-              administrativeArea: 'FM',
-              postalCode: '11101',
-              phoneNumber: '00000000',
+            paymentInformation: {
+              card: {
+                number: String(cardNumber).replace(/\s+/g, ''),
+                expirationMonth: String(cardExpMonth).padStart(2, '0'),
+                expirationYear: String(cardExpYear),
+                securityCode: String(cardCvv),
+              },
             },
-          },
-        })
+            orderInformation: {
+              amountDetails: {
+                totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
+                currency,
+              },
+              billTo: {
+                firstName: String(cardHolderName || names[0] || 'Test').trim().split(' ')[0] || 'Test',
+                lastName:
+                  String(cardHolderName || names[0] || 'Merchant').trim().split(' ').slice(1).join(' ') || 'Merchant',
+                email: String(pendingDetails?.clientEmail || clientEmail).trim(),
+                country: 'US',
+                locality: 'San Francisco',
+                address1: '1 Market St',
+                administrativeArea: 'CA',
+                postalCode: '94105',
+                phoneNumber: '4158880000',
+              },
+            },
+          })
+        : await cyberSourcePost<any>('/pts/v2/payments', {
+            clientReferenceInformation: { code: paymentReference },
+            processingInformation: {
+              commerceIndicator: 'internet',
+              capture: true,
+            },
+            tokenInformation: {
+              transientTokenJwt: String(transientToken),
+            },
+            orderInformation: {
+              amountDetails: {
+                totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
+                currency,
+              },
+              billTo: {
+                firstName: names[0]?.split(' ')[0] || 'Cliente',
+                lastName: names[0]?.split(' ').slice(1).join(' ') || 'General',
+                email: String(pendingDetails?.clientEmail || clientEmail).trim(),
+                country: 'HN',
+                locality: 'Tegucigalpa',
+                address1: 'N/A',
+                administrativeArea: 'FM',
+                postalCode: '11101',
+                phoneNumber: '00000000',
+              },
+            },
+          })
 
     const status = String(paymentResponse?.status || '').toUpperCase()
     const transactionId = String(paymentResponse?.id || '')
@@ -358,7 +423,9 @@ export async function POST(req: NextRequest) {
         eventId: debugContext.eventId,
         currency,
         amount,
+        paymentMode: debugContext.paymentMode,
         tokenSummary: summarizeTransientToken(debugContext.transientToken),
+        cardSummary: summarizeCardNumber(debugContext.cardNumber),
       })
       if (error.status === 404 && debugContext.transientToken) {
         try {
