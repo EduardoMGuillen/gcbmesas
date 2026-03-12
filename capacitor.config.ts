@@ -13,7 +13,7 @@ const serverUrl = process.env.CAPACITOR_SERVER_URL || 'https://gcbmesas.vercel.a
 
 const config: CapacitorConfig = {
   appId: 'com.casablanca.gcbmesas',
-  appName: 'GranCasaBlanca Mesas',
+  appName: 'GCB Eventos',
   webDir: 'public',
   server: {
     url: serverUrl,
