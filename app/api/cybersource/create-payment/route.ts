@@ -24,22 +24,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Este evento no acepta pagos en línea' }, { status: 400 })
     }
 
-    // Temporary mock mode so online flow can be tested before credentials arrive.
-    if (process.env.CYBERSOURCE_MOCK === 'true') {
-      return NextResponse.json({
-        mock: true,
-        paymentReference: `mock_${crypto.randomUUID()}`,
-      })
-    }
-
-    const required = [process.env.CYBERSOURCE_MERCHANT_ID, process.env.CYBERSOURCE_KEY_ID, process.env.CYBERSOURCE_SHARED_SECRET]
-    if (required.some((v) => !v)) {
-      return NextResponse.json(
-        { error: 'CyberSource REST no está configurado. Faltan merchant_id, key_id o shared_secret.' },
-        { status: 503 }
-      )
-    }
-
     const cleanNames = clientNames
       .map((n: string) => String(n || '').trim())
       .filter((n: string) => n.length > 0)
@@ -53,6 +37,43 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
     const cyberEnv = (process.env.CYBERSOURCE_ENV || 'test').toLowerCase()
     const currency = 'USD'
+    const isMockMode = process.env.CYBERSOURCE_MOCK === 'true'
+
+    // In mock mode we still persist the pending order so confirm-payment can complete the full flow.
+    if (isMockMode) {
+      await prisma.log.create({
+        data: {
+          action: 'EVENT_UPDATED',
+          details: {
+            type: 'CYBERSOURCE_PENDING',
+            status: 'PENDING',
+            paymentReference,
+            eventId: event.id,
+            eventName: event.name,
+            numberOfEntries: Number(numberOfEntries),
+            clientNames: cleanNames,
+            clientEmail: String(clientEmail).trim(),
+            clientPhone: clientPhone ? String(clientPhone).trim() : null,
+            totalPrice: Number(total),
+            currency,
+            environment: 'mock',
+            createdAt: new Date().toISOString(),
+          },
+        },
+      })
+      return NextResponse.json({
+        mock: true,
+        paymentReference,
+      })
+    }
+
+    const required = [process.env.CYBERSOURCE_MERCHANT_ID, process.env.CYBERSOURCE_KEY_ID, process.env.CYBERSOURCE_SHARED_SECRET]
+    if (required.some((v) => !v)) {
+      return NextResponse.json(
+        { error: 'CyberSource REST no está configurado. Faltan merchant_id, key_id o shared_secret.' },
+        { status: 503 }
+      )
+    }
 
     const captureContext = await cyberSourcePost<any>('/up/v1/capture-contexts', {
       targetOrigins: [appUrl],
