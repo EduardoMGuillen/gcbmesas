@@ -7,6 +7,23 @@ import path from 'path'
 import fs from 'fs'
 import { CyberSourceApiError, cyberSourcePost } from '@/lib/cybersource'
 
+function maskMerchantId(merchantId: string | undefined) {
+  if (!merchantId) return null
+  if (merchantId.length <= 6) return `${merchantId.slice(0, 1)}***`
+  return `${merchantId.slice(0, 4)}***${merchantId.slice(-3)}`
+}
+
+function summarizeTransientToken(token: unknown) {
+  const value = typeof token === 'string' ? token : String(token || '')
+  const trimmed = value.trim()
+  return {
+    type: typeof token,
+    length: trimmed.length,
+    startsWith: trimmed.slice(0, 12),
+    hasJwtDots: trimmed.includes('.'),
+  }
+}
+
 function generateToken(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   let token = ''
@@ -17,6 +34,14 @@ function generateToken(): string {
 }
 
 export async function POST(req: NextRequest) {
+  const debugContext: {
+    paymentReference?: string
+    eventId?: string
+    numberOfEntries?: number
+    eventPrice?: number
+    transientToken?: unknown
+  } = {}
+
   try {
     const body = await req.json()
     const {
@@ -26,6 +51,10 @@ export async function POST(req: NextRequest) {
       numberOfEntries,
       transientToken,
     } = body
+    debugContext.paymentReference = paymentReference
+    debugContext.eventId = eventId
+    debugContext.numberOfEntries = Number(numberOfEntries || 0)
+    debugContext.transientToken = transientToken
 
     if (!paymentReference || !eventId || !clientEmail || !numberOfEntries) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
@@ -74,6 +103,7 @@ export async function POST(req: NextRequest) {
     const event = await prisma.event.findFirst({
       where: { id: pendingDetails?.eventId || eventId, isActive: true },
     })
+    debugContext.eventPrice = Number(event?.paypalPrice || 0)
 
     if (!event || !event.paypalPrice) {
       return NextResponse.json({ error: 'Evento no encontrado o sin precio online' }, { status: 404 })
@@ -298,6 +328,19 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     if (error instanceof CyberSourceApiError) {
+      const environment = (process.env.CYBERSOURCE_ENV || 'test').toLowerCase()
+      const merchantMasked = maskMerchantId(process.env.CYBERSOURCE_MERCHANT_ID)
+      const amount = (Number(debugContext.numberOfEntries || 0) * Number(debugContext.eventPrice || 0)).toFixed(2)
+      console.error('[CyberSource] Confirm payment request diagnostics:', {
+        environment,
+        merchantMasked,
+        endpointTried: '/pts/v2/payments',
+        paymentReference: debugContext.paymentReference,
+        eventId: debugContext.eventId,
+        currency: 'HNL',
+        amount,
+        tokenSummary: summarizeTransientToken(debugContext.transientToken),
+      })
       console.error('[CyberSource] Confirm payment API error:', {
         endpoint: error.endpoint,
         status: error.status,
