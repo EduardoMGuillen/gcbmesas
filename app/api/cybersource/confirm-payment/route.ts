@@ -61,7 +61,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
     }
 
-    if (!transientToken) {
+    const isMockMode = process.env.CYBERSOURCE_MOCK === 'true'
+    if (!isMockMode && !transientToken) {
       return NextResponse.json({ error: 'Falta transient token de Unified Checkout.' }, { status: 400 })
     }
 
@@ -121,33 +122,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Evento no encontrado o sin precio online' }, { status: 404 })
     }
 
-    const paymentResponse = await cyberSourcePost<any>('/pts/v2/payments', {
-      clientReferenceInformation: { code: paymentReference },
-      processingInformation: {
-        commerceIndicator: 'internet',
-        capture: true,
-      },
-      tokenInformation: {
-        transientTokenJwt: String(transientToken),
-      },
-      orderInformation: {
-        amountDetails: {
-          totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
-          currency,
-        },
-        billTo: {
-          firstName: names[0]?.split(' ')[0] || 'Cliente',
-          lastName: names[0]?.split(' ').slice(1).join(' ') || 'General',
-          email: String(pendingDetails?.clientEmail || clientEmail).trim(),
-          country: 'HN',
-          locality: 'Tegucigalpa',
-          address1: 'N/A',
-          administrativeArea: 'FM',
-          postalCode: '11101',
-          phoneNumber: '00000000',
-        },
-      },
-    })
+    const paymentResponse = isMockMode
+      ? {
+          status: 'AUTHORIZED',
+          id: `mock_${paymentReference}`,
+          processorInformation: { responseCode: '100' },
+        }
+      : await cyberSourcePost<any>('/pts/v2/payments', {
+          clientReferenceInformation: { code: paymentReference },
+          processingInformation: {
+            commerceIndicator: 'internet',
+            capture: true,
+          },
+          tokenInformation: {
+            transientTokenJwt: String(transientToken),
+          },
+          orderInformation: {
+            amountDetails: {
+              totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
+              currency,
+            },
+            billTo: {
+              firstName: names[0]?.split(' ')[0] || 'Cliente',
+              lastName: names[0]?.split(' ').slice(1).join(' ') || 'General',
+              email: String(pendingDetails?.clientEmail || clientEmail).trim(),
+              country: 'HN',
+              locality: 'Tegucigalpa',
+              address1: 'N/A',
+              administrativeArea: 'FM',
+              postalCode: '11101',
+              phoneNumber: '00000000',
+            },
+          },
+        })
 
     const status = String(paymentResponse?.status || '').toUpperCase()
     const transactionId = String(paymentResponse?.id || '')
