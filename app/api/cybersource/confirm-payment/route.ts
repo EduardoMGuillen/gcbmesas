@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
-import { CyberSourceApiError, cyberSourcePost } from '@/lib/cybersource'
+import { CyberSourceApiError, cyberSourceGet, cyberSourcePost } from '@/lib/cybersource'
 
 function maskMerchantId(merchantId: string | undefined) {
   if (!merchantId) return null
@@ -353,6 +353,31 @@ export async function POST(req: NextRequest) {
         amount,
         tokenSummary: summarizeTransientToken(debugContext.transientToken),
       })
+      if (error.status === 404 && debugContext.transientToken) {
+        try {
+          const tokenForPath = encodeURIComponent(String(debugContext.transientToken).trim())
+          const paymentDetails = await cyberSourceGet<any>(`/up/v1/payment-details/${tokenForPath}`)
+          console.error('[CyberSource] Payment details lookup succeeded for transient token:', {
+            paymentReference: debugContext.paymentReference,
+            endpoint: '/up/v1/payment-details/{id}',
+            cardType: paymentDetails?.paymentInformation?.card?.type || null,
+            cardLast4: paymentDetails?.paymentInformation?.card?.number || null,
+            tokenAmount: paymentDetails?.orderInformation?.amountDetails?.totalAmount || null,
+            tokenCurrency: paymentDetails?.orderInformation?.amountDetails?.currency || null,
+          })
+        } catch (lookupError: any) {
+          if (lookupError instanceof CyberSourceApiError) {
+            console.error('[CyberSource] Payment details lookup failed:', {
+              endpoint: lookupError.endpoint,
+              status: lookupError.status,
+              requestId: lookupError.requestId,
+              responseBody: lookupError.responseBody,
+            })
+          } else {
+            console.error('[CyberSource] Payment details lookup unexpected error:', lookupError)
+          }
+        }
+      }
       console.error('[CyberSource] Confirm payment API error:', {
         endpoint: error.endpoint,
         status: error.status,
