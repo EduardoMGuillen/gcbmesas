@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
 
     const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
     const cyberEnv = (process.env.CYBERSOURCE_ENV || 'test').toLowerCase()
+    const currency = 'USD'
 
     const captureContext = await cyberSourcePost<any>('/up/v1/capture-contexts', {
       targetOrigins: [appUrl],
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
         orderInformation: {
           amountDetails: {
             totalAmount: total,
-            currency: 'HNL',
+            currency,
           },
         },
       },
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
           clientEmail: String(clientEmail).trim(),
           clientPhone: clientPhone ? String(clientPhone).trim() : null,
           totalPrice: Number(total),
-          currency: 'HNL',
+          currency,
           environment: cyberEnv,
           createdAt: new Date().toISOString(),
         },
