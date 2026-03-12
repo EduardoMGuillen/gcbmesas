@@ -65,23 +65,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Falta transient token de Unified Checkout.' }, { status: 400 })
     }
 
-    const recentLogs = await prisma.log.findMany({
+    const pendingLog = await prisma.log.findFirst({
       where: {
         action: 'EVENT_UPDATED',
         createdAt: {
           gte: new Date(Date.now() - 1000 * 60 * 60 * 48),
         },
+        AND: [
+          {
+            details: {
+              path: ['type'],
+              equals: 'CYBERSOURCE_PENDING',
+            },
+          },
+          {
+            details: {
+              path: ['paymentReference'],
+              equals: paymentReference,
+            },
+          },
+          {
+            details: {
+              path: ['eventId'],
+              equals: eventId,
+            },
+          },
+        ],
       },
       orderBy: { createdAt: 'desc' },
-      take: 200,
-    })
-    const pendingLog = recentLogs.find((log: any) => {
-      const details = log.details as any
-      return (
-        details?.type === 'CYBERSOURCE_PENDING' &&
-        details?.paymentReference === paymentReference &&
-        details?.eventId === eventId
-      )
     })
 
     if (!pendingLog) {
