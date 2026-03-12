@@ -35,6 +35,11 @@ const cardBg = 'rgba(15, 15, 30, 0.8)'
 const cardBorder = 'rgba(255,255,255,0.06)'
 const inputBg = 'rgba(10,10,25,0.9)'
 const inputBorder = 'rgba(255,255,255,0.1)'
+const mutedText = 'rgba(255,255,255,0.55)'
+
+function formatLps(value: number) {
+  return `L ${value.toFixed(2)}`
+}
 
 export function EventPurchaseClient({ event }: { event: EventData }) {
   const [clientNames, setClientNames] = useState<string[]>([''])
@@ -201,14 +206,25 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
         <div className="rounded-xl p-5" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-white/40">Precio por entrada</span>
-            <span className="text-2xl font-bold" style={{ color: '#c9a84c' }}>L {event.onlinePrice.toFixed(2)}</span>
+            <span className="text-2xl font-bold" style={{ color: '#c9a84c' }}>{formatLps(event.onlinePrice)}</span>
           </div>
           <p className="text-xs text-white/20">Precio online en Lempiras (HNL)</p>
         </div>
       </div>
 
       <div className="rounded-2xl p-5 sm:p-6 h-fit" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
-        <h3 className="text-lg font-bold text-white mb-1">Comprar Entrada</h3>
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-white mb-1">Comprar Entrada</h3>
+            <p className="text-xs" style={{ color: mutedText }}>Completa tus datos y paga de forma segura</p>
+          </div>
+          <div
+            className="text-xs font-semibold px-3 py-1.5 rounded-full"
+            style={{ background: 'rgba(201,168,76,0.18)', color: '#e8d18d', border: '1px solid rgba(201,168,76,0.35)' }}
+          >
+            Paso 1 de 2
+          </div>
+        </div>
         <div className="w-12 h-0.5 mb-5" style={{ background: goldGradient }} />
         <div className="space-y-4">
           <div>
@@ -217,7 +233,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               <button
                 type="button"
                 onClick={() => handleQtyChange(Math.max(1, numberOfEntries - 1))}
-                className="w-10 h-10 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors"
+                className="w-11 h-11 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors text-lg font-semibold"
                 style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
               >-</button>
               <input
@@ -226,13 +242,13 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                 max={10}
                 value={numberOfEntries}
                 onChange={(e) => handleQtyChange(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
-                className="w-20 text-center px-3 py-2.5 rounded-lg text-white focus:outline-none"
+                className="w-24 text-center px-3 py-2.5 rounded-lg text-white focus:outline-none text-base font-semibold"
                 style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
               />
               <button
                 type="button"
                 onClick={() => handleQtyChange(Math.min(10, numberOfEntries + 1))}
-                className="w-10 h-10 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors"
+                className="w-11 h-11 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors text-lg font-semibold"
                 style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
               >+</button>
             </div>
@@ -284,14 +300,30 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
           <div className="rounded-lg p-4" style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)' }}>
             <div className="flex justify-between items-center">
               <span className="text-sm text-white/40">Total a pagar</span>
-              <span className="text-2xl font-bold" style={{ color: '#c9a84c' }}>L {totalPrice.toFixed(2)}</span>
+              <span className="text-2xl font-bold" style={{ color: '#c9a84c' }}>{formatLps(totalPrice)}</span>
             </div>
-            <p className="text-xs text-white/20 mt-1">{numberOfEntries} entrada{numberOfEntries > 1 ? 's' : ''} x L {event.onlinePrice.toFixed(2)}</p>
+            <p className="text-xs text-white/20 mt-1">{numberOfEntries} entrada{numberOfEntries > 1 ? 's' : ''} x {formatLps(event.onlinePrice)}</p>
+            <div className="mt-3 w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.min(100, Math.max(35, (numberOfEntries / 10) * 100))}%`,
+                  background: goldGradient,
+                }}
+              />
+            </div>
           </div>
 
           {showUnified && (
-            <div className="rounded-lg p-4 space-y-3" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
-              <p className="text-sm text-white/60">Completa el pago en CyberSource:</p>
+            <div
+              className="rounded-xl p-4 space-y-3"
+              style={{
+                background: 'rgba(16, 27, 48, 0.8)',
+                border: '1px solid rgba(59,130,246,0.35)',
+                boxShadow: '0 0 0 1px rgba(59,130,246,0.1) inset',
+              }}
+            >
+              <p className="text-sm font-medium text-blue-200">Paso 2 de 2: Completa el pago en CyberSource</p>
               <div id="cybs-payment-selection" className="min-h-[56px]" />
               <div id="cybs-payment-screen" className="min-h-[220px]" />
             </div>
@@ -308,7 +340,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
             <button
               type="button"
               onClick={startCheckout}
-              className="w-full font-semibold py-3 px-4 rounded-lg transition-all hover:opacity-90"
+              className="w-full font-semibold py-3 px-4 rounded-lg transition-all hover:opacity-90 shadow-[0_10px_30px_rgba(201,168,76,0.25)]"
               style={{ background: goldGradient, color: '#0a0a15' }}
             >
               Pagar con CyberSource
@@ -319,7 +351,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
             </div>
           )}
 
-          <p className="text-xs text-white/15 text-center">
+          <p className="text-xs text-white/25 text-center">
             Pago seguro a traves de CyberSource. Al pagar, recibiras tu entrada por email automaticamente.
           </p>
         </div>
@@ -431,10 +463,24 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
             <div style={{ borderTop: `1px solid ${cardBorder}` }} />
             <div className="flex justify-between"><span className="text-sm text-white/40">Entradas</span><span className="text-white font-bold">{success.entries.length}</span></div>
             <div style={{ borderTop: `1px solid ${cardBorder}` }} />
-            <div className="flex justify-between"><span className="text-sm text-white/40">Total Pagado</span><span className="font-bold text-lg" style={{ color: '#c9a84c' }}>L {success.totalPriceLps.toFixed(2)}</span></div>
+            <div className="flex justify-between"><span className="text-sm text-white/40">Total Pagado</span><span className="font-bold text-lg" style={{ color: '#c9a84c' }}>{formatLps(success.totalPriceLps)}</span></div>
             <div style={{ borderTop: `1px solid ${cardBorder}` }} />
             <div className="flex justify-between"><span className="text-sm text-white/40">Email</span><span className="text-white text-sm">{success.clientEmail}</span></div>
           </div>
+
+          {success.entries.length > 1 && (
+            <div className="rounded-xl p-4" style={{ background: 'rgba(10,10,25,0.6)', border: `1px solid ${cardBorder}` }}>
+              <p className="text-sm font-semibold text-white mb-2">Entradas emitidas</p>
+              <div className="space-y-2">
+                {success.entries.map((entry, index) => (
+                  <div key={entry.entryId} className="flex items-center justify-between text-sm">
+                    <span className="text-white/45">Entrada {index + 1}</span>
+                    <span className="text-white font-medium truncate max-w-[70%] text-right">{entry.clientName}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3">
             <button
