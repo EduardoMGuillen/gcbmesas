@@ -55,17 +55,20 @@ function buildSignature(params: {
   resourcePath: string
   host: string
   date: string
-  digest: string
+  digest?: string
+  includeDigest: boolean
   merchantId: string
   keyId: string
   sharedSecret: string
 }) {
-  const signatureHeaders = 'host date (request-target) digest v-c-merchant-id'
+  const signatureHeaders = params.includeDigest
+    ? 'host date (request-target) digest v-c-merchant-id'
+    : 'host date (request-target) v-c-merchant-id'
   const signaturePayload =
     `host: ${params.host}\n` +
     `date: ${params.date}\n` +
     `(request-target): ${params.method.toLowerCase()} ${params.resourcePath}\n` +
-    `digest: ${params.digest}\n` +
+    `${params.includeDigest ? `digest: ${params.digest}\n` : ''}` +
     `v-c-merchant-id: ${params.merchantId}`
 
   const hmac = crypto.createHmac('sha256', getSharedSecretBuffer(params.sharedSecret))
@@ -74,9 +77,10 @@ function buildSignature(params: {
   return `keyid="${params.keyId}", algorithm="HmacSHA256", headers="${signatureHeaders}", signature="${signature}"`
 }
 
-export async function cyberSourcePost<TResponse>(
+async function cyberSourceRequest<TResponse>(
+  method: 'GET' | 'POST',
   resourcePath: string,
-  payload: unknown
+  payload?: unknown
 ): Promise<TResponse> {
   const merchantId = process.env.CYBERSOURCE_MERCHANT_ID?.trim()
   const keyId = process.env.CYBERSOURCE_KEY_ID?.trim()
@@ -88,33 +92,42 @@ export async function cyberSourcePost<TResponse>(
 
   const baseUrl = getCyberSourceBaseUrl()
   const url = `${baseUrl}${resourcePath}`
-  const body = JSON.stringify(payload)
+  const body = method === 'POST' ? JSON.stringify(payload ?? {}) : undefined
   const host = new URL(baseUrl).host
   const date = new Date().toUTCString()
-  const digest = `SHA-256=${crypto.createHash('sha256').update(body, 'utf8').digest('base64')}`
+  const includeDigest = method === 'POST'
+  const digest = includeDigest && body
+    ? `SHA-256=${crypto.createHash('sha256').update(body, 'utf8').digest('base64')}`
+    : undefined
   const signature = buildSignature({
-    method: 'POST',
+    method,
     resourcePath,
     host,
     date,
+    includeDigest,
     digest,
     merchantId,
     keyId,
     sharedSecret,
   })
 
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    Host: host,
+    Date: date,
+    'v-c-date': date,
+    Signature: signature,
+    'v-c-merchant-id': merchantId,
+  }
+
+  if (includeDigest && digest) {
+    headers.Digest = digest
+    headers['Content-Type'] = 'application/json'
+  }
+
   const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      Host: host,
-      Date: date,
-      'v-c-date': date,
-      Digest: digest,
-      Signature: signature,
-      'v-c-merchant-id': merchantId,
-    },
+    method,
+    headers,
     body,
     cache: 'no-store',
   })
@@ -132,6 +145,7 @@ export async function cyberSourcePost<TResponse>(
   if (!response.ok) {
     const requestId =
       response.headers.get('v-c-correlation-id') ||
+      response.headers.get('x-requestid') ||
       response.headers.get('x-request-id') ||
       null
     const msg = typeof responseBody === 'string'
@@ -151,5 +165,18 @@ export async function cyberSourcePost<TResponse>(
   }
 
   return responseBody as TResponse
+}
+
+export async function cyberSourcePost<TResponse>(
+  resourcePath: string,
+  payload: unknown
+): Promise<TResponse> {
+  return cyberSourceRequest<TResponse>('POST', resourcePath, payload)
+}
+
+export async function cyberSourceGet<TResponse>(
+  resourcePath: string
+): Promise<TResponse> {
+  return cyberSourceRequest<TResponse>('GET', resourcePath)
 }
 
