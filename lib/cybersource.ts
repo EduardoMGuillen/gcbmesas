@@ -27,6 +27,29 @@ function getCyberSourceBaseUrl() {
   return env === 'live' ? 'https://api.cybersource.com' : 'https://apitest.cybersource.com'
 }
 
+function isBase64(value: string) {
+  if (!value) return false
+  const normalized = value.replace(/\s+/g, '')
+  // Base64 strings should be divisible by 4 after removing padding.
+  if (normalized.length % 4 !== 0) return false
+  if (!/^[A-Za-z0-9+/=]+$/.test(normalized)) return false
+  try {
+    return Buffer.from(normalized, 'base64').toString('base64') === normalized
+  } catch {
+    return false
+  }
+}
+
+function getSharedSecretBuffer(sharedSecretRaw: string) {
+  const sharedSecret = sharedSecretRaw.trim()
+  if (!sharedSecret) {
+    throw new Error('CYBERSOURCE_SHARED_SECRET está vacío.')
+  }
+  return isBase64(sharedSecret)
+    ? Buffer.from(sharedSecret, 'base64')
+    : Buffer.from(sharedSecret, 'utf8')
+}
+
 function buildSignature(params: {
   method: string
   resourcePath: string
@@ -45,12 +68,7 @@ function buildSignature(params: {
     `digest: ${params.digest}\n` +
     `v-c-merchant-id: ${params.merchantId}`
 
-  const hmac = crypto.createHmac(
-    'sha256',
-    Buffer.from(params.sharedSecret, 'base64').toString('utf8').length > 0
-      ? Buffer.from(params.sharedSecret, 'base64')
-      : Buffer.from(params.sharedSecret)
-  )
+  const hmac = crypto.createHmac('sha256', getSharedSecretBuffer(params.sharedSecret))
   const signature = hmac.update(signaturePayload).digest('base64')
 
   return `keyid="${params.keyId}", algorithm="HmacSHA256", headers="${signatureHeaders}", signature="${signature}"`
@@ -60,9 +78,9 @@ export async function cyberSourcePost<TResponse>(
   resourcePath: string,
   payload: unknown
 ): Promise<TResponse> {
-  const merchantId = process.env.CYBERSOURCE_MERCHANT_ID
-  const keyId = process.env.CYBERSOURCE_KEY_ID
-  const sharedSecret = process.env.CYBERSOURCE_SHARED_SECRET
+  const merchantId = process.env.CYBERSOURCE_MERCHANT_ID?.trim()
+  const keyId = process.env.CYBERSOURCE_KEY_ID?.trim()
+  const sharedSecret = process.env.CYBERSOURCE_SHARED_SECRET?.trim()
 
   if (!merchantId || !keyId || !sharedSecret) {
     throw new Error('Faltan credenciales REST de CyberSource (merchant_id, key_id o shared_secret)')
@@ -92,6 +110,7 @@ export async function cyberSourcePost<TResponse>(
       Accept: 'application/json',
       Host: host,
       Date: date,
+      'v-c-date': date,
       Digest: digest,
       Signature: signature,
       'v-c-merchant-id': merchantId,
