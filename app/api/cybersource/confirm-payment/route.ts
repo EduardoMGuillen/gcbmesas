@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     eventPrice?: number
     transientToken?: unknown
   } = {}
+  const currency = 'USD'
 
   try {
     const body = await req.json()
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
       orderInformation: {
         amountDetails: {
           totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
-          currency: 'HNL',
+          currency,
         },
         billTo: {
           firstName: names[0]?.split(' ')[0] || 'Cliente',
@@ -190,7 +191,7 @@ export async function POST(req: NextRequest) {
           totalPrice: Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries),
           paymentReference,
           source: 'online_cybersource',
-          currency: 'HNL',
+          currency,
           cybersourceDecision: status,
           cybersourceReasonCode: reasonCode,
           cybersourceTransactionId: transactionId || null,
@@ -337,7 +338,7 @@ export async function POST(req: NextRequest) {
         endpointTried: '/pts/v2/payments',
         paymentReference: debugContext.paymentReference,
         eventId: debugContext.eventId,
-        currency: 'HNL',
+        currency,
         amount,
         tokenSummary: summarizeTransientToken(debugContext.transientToken),
       })
