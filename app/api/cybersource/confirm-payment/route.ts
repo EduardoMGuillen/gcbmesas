@@ -164,7 +164,8 @@ export async function POST(req: NextRequest) {
             clientReferenceInformation: { code: paymentReference },
             processingInformation: {
               commerceIndicator: 'internet',
-              capture: true,
+              // Match the successful SDK smoke test path (authorization first).
+              capture: false,
             },
             paymentInformation: {
               card: {
