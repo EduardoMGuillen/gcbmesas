@@ -23,6 +23,7 @@ type PurchaseSuccess = {
 }
 
 type PaymentMode = 'unknown' | 'unified' | 'direct'
+type CardBrand = 'amex' | 'visa' | 'mastercard' | 'unknown'
 
 async function generateQRDataUrl(text: string): Promise<string> {
   return QRCode.toDataURL(text, {
@@ -43,8 +44,21 @@ function formatLps(value: number) {
   return `L ${value.toFixed(2)}`
 }
 
-function formatCardNumber(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 19)
+function detectCardBrand(digits: string): CardBrand {
+  if (/^3[47]/.test(digits)) return 'amex'
+  if (/^4/.test(digits)) return 'visa'
+  if (/^(5[1-5]|2[2-7])/.test(digits)) return 'mastercard'
+  return 'unknown'
+}
+
+function formatCardNumber(value: string, brand: CardBrand) {
+  const digits = value.replace(/\D/g, '')
+  if (brand === 'amex') {
+    const p1 = digits.slice(0, 4)
+    const p2 = digits.slice(4, 10)
+    const p3 = digits.slice(10, 15)
+    return [p1, p2, p3].filter(Boolean).join(' ')
+  }
   return digits.replace(/(.{4})/g, '$1 ').trim()
 }
 
@@ -100,11 +114,13 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   const formValid = allNamesValid && clientEmail.trim() && numberOfEntries >= 1
 
   const cardNumberDigits = cardNumber.replace(/\D/g, '')
+  const cardBrand = detectCardBrand(cardNumberDigits)
+  const isAmex = cardBrand === 'amex'
   const cardValid =
-    (cardNumberDigits.length === 15 || cardNumberDigits.length === 16) &&
+    (isAmex ? cardNumberDigits.length === 15 : cardNumberDigits.length === 16) &&
     cardExpMonth.trim().length >= 1 &&
     cardExpYear.trim().length >= 2 &&
-    cardCvv.trim().length >= 3
+    cardCvv.trim().length >= (isAmex ? 4 : 3)
   const billingValid =
     billingAddress1.trim().length > 0 &&
     billingCity.trim().length > 0 &&
@@ -373,13 +389,21 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
             <div className="flex items-center gap-2">
               <div
                 className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide"
-                style={{ background: 'rgba(26, 87, 220, 0.2)', color: '#9ec2ff', border: '1px solid rgba(26,87,220,0.45)' }}
+                style={{
+                  background: cardBrand === 'visa' ? 'rgba(26, 87, 220, 0.32)' : 'rgba(26, 87, 220, 0.2)',
+                  color: '#9ec2ff',
+                  border: cardBrand === 'visa' ? '1px solid rgba(145,190,255,0.8)' : '1px solid rgba(26,87,220,0.45)',
+                }}
               >
                 VISA
               </div>
               <div
                 className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide flex items-center gap-1.5"
-                style={{ background: 'rgba(255,255,255,0.04)', color: '#f4f4f5', border: '1px solid rgba(255,255,255,0.12)' }}
+                style={{
+                  background: cardBrand === 'mastercard' ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
+                  color: '#f4f4f5',
+                  border: cardBrand === 'mastercard' ? '1px solid rgba(255,255,255,0.4)' : '1px solid rgba(255,255,255,0.12)',
+                }}
               >
                 <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#eb001b' }} />
                 <span className="inline-block w-2.5 h-2.5 rounded-full -ml-1.5" style={{ background: '#f79e1b' }} />
@@ -387,7 +411,11 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               </div>
               <div
                 className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide"
-                style={{ background: 'rgba(0, 153, 204, 0.2)', color: '#93e5ff', border: '1px solid rgba(0,153,204,0.45)' }}
+                style={{
+                  background: cardBrand === 'amex' ? 'rgba(0, 153, 204, 0.32)' : 'rgba(0, 153, 204, 0.2)',
+                  color: '#93e5ff',
+                  border: cardBrand === 'amex' ? '1px solid rgba(147,229,255,0.8)' : '1px solid rgba(0,153,204,0.45)',
+                }}
               >
                 AMEX
               </div>
@@ -404,8 +432,13 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               type="text"
               inputMode="numeric"
               autoComplete="cc-number"
-              value={formatCardNumber(cardNumber)}
-              onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 16))}
+              value={formatCardNumber(cardNumber, cardBrand)}
+              onChange={(e) => {
+                const rawDigits = e.target.value.replace(/\D/g, '')
+                const nextBrand = detectCardBrand(rawDigits)
+                const maxLen = nextBrand === 'amex' ? 15 : 16
+                setCardNumber(rawDigits.slice(0, maxLen))
+              }}
               placeholder="Número de tarjeta"
               className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
               style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
@@ -436,8 +469,8 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                 inputMode="numeric"
                 autoComplete="cc-csc"
                 value={cardCvv}
-                onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="CVV"
+                onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, isAmex ? 4 : 3))}
+                placeholder={isAmex ? 'CID' : 'CVV'}
                 className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
                 style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
               />
