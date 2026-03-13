@@ -2,6 +2,12 @@
 const nextConfig = {
   // Disable strict mode to avoid double rendering issues
   reactStrictMode: false,
+  // Keep CyberSource SDK as external package on server build.
+  // Its internal module layout is not compatible with Next.js bundling.
+  serverExternalPackages: ['cybersource-rest-client'],
+  experimental: {
+    serverComponentsExternalPackages: ['cybersource-rest-client'],
+  },
   async headers() {
     return [
       {
