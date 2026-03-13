@@ -10,6 +10,11 @@ type DirectPaymentParams = {
   cardCvv: string
   cardHolderName: string
   email: string
+  billToAddress1: string
+  billToLocality: string
+  billToAdministrativeArea: string
+  billToPostalCode: string
+  billToCountry: string
 }
 
 function getRunEnvironmentHost() {
@@ -61,14 +66,14 @@ export async function cyberSourceDirectPaymentViaSdk(params: DirectPaymentParams
       currency: params.currency,
     },
     billTo: {
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'test@cybs.com',
-      country: 'US',
-      locality: 'san francisco',
-      address1: '1 Market St',
-      administrativeArea: 'CA',
-      postalCode: '94105',
+      firstName: params.cardHolderName.trim().split(' ')[0] || 'John',
+      lastName: params.cardHolderName.trim().split(' ').slice(1).join(' ') || 'Doe',
+      email: params.email,
+      country: params.billToCountry,
+      locality: params.billToLocality,
+      address1: params.billToAddress1,
+      administrativeArea: params.billToAdministrativeArea,
+      postalCode: params.billToPostalCode,
       phoneNumber: '4158880000',
     },
   }
