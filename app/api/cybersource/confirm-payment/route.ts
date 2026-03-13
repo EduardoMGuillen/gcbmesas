@@ -89,12 +89,16 @@ export async function POST(req: NextRequest) {
     const paymentMode = (process.env.CYBERSOURCE_PAYMENT_MODE || 'unified').toLowerCase()
     debugContext.paymentMode = paymentMode
     const isDirectMode = paymentMode === 'direct'
+    const cardDigits = String(cardNumber || '').replace(/\D/g, '')
 
     if (!isMockMode && !isDirectMode && !transientToken) {
       return NextResponse.json({ error: 'Falta transient token de Unified Checkout.' }, { status: 400 })
     }
     if (!isMockMode && isDirectMode && (!cardNumber || !cardExpMonth || !cardExpYear || !cardCvv)) {
       return NextResponse.json({ error: 'Faltan datos de tarjeta para pago directo.' }, { status: 400 })
+    }
+    if (!isMockMode && isDirectMode && !(cardDigits.length === 15 || cardDigits.length === 16)) {
+      return NextResponse.json({ error: 'Número de tarjeta inválido para prueba (usa 15 o 16 dígitos).' }, { status: 400 })
     }
 
     const pendingLog = await prisma.log.findFirst({
@@ -169,7 +173,7 @@ export async function POST(req: NextRequest) {
             },
             paymentInformation: {
               card: {
-                number: String(cardNumber).replace(/\s+/g, ''),
+                number: cardDigits,
                 expirationMonth: String(cardExpMonth).padStart(2, '0'),
                 expirationYear: String(cardExpYear),
                 securityCode: String(cardCvv),
