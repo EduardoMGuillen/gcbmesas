@@ -96,7 +96,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
 
   const cardNumberDigits = cardNumber.replace(/\D/g, '')
   const cardValid =
-    cardNumberDigits.length >= 13 &&
+    (cardNumberDigits.length === 15 || cardNumberDigits.length === 16) &&
     cardExpMonth.trim().length >= 1 &&
     cardExpYear.trim().length >= 2 &&
     cardCvv.trim().length >= 3
@@ -364,7 +364,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               inputMode="numeric"
               autoComplete="cc-number"
               value={formatCardNumber(cardNumber)}
-              onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 19))}
+              onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 16))}
               placeholder="Número de tarjeta"
               className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
               style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
