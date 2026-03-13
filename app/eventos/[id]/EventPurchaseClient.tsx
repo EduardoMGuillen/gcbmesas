@@ -370,6 +370,28 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                 {paymentMode === 'direct' ? 'Activo' : paymentMode === 'unified' ? 'Fallback' : 'Auto'}
               </span>
             </div>
+            <div className="flex items-center gap-2">
+              <div
+                className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide"
+                style={{ background: 'rgba(26, 87, 220, 0.2)', color: '#9ec2ff', border: '1px solid rgba(26,87,220,0.45)' }}
+              >
+                VISA
+              </div>
+              <div
+                className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide flex items-center gap-1.5"
+                style={{ background: 'rgba(255,255,255,0.04)', color: '#f4f4f5', border: '1px solid rgba(255,255,255,0.12)' }}
+              >
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#eb001b' }} />
+                <span className="inline-block w-2.5 h-2.5 rounded-full -ml-1.5" style={{ background: '#f79e1b' }} />
+                MASTERCARD
+              </div>
+              <div
+                className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide"
+                style={{ background: 'rgba(0, 153, 204, 0.2)', color: '#93e5ff', border: '1px solid rgba(0,153,204,0.45)' }}
+              >
+                AMEX
+              </div>
+            </div>
             <input
               type="text"
               value={cardHolderName}
