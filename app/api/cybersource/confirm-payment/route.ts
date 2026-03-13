@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     cardCvv?: string
     cardHolderName?: string
   } = {}
-  const currency = 'USD'
+  const currency = 'HNL'
 
   try {
     const body = await req.json()
