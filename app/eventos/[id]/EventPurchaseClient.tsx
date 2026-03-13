@@ -43,6 +43,11 @@ function formatLps(value: number) {
   return `L ${value.toFixed(2)}`
 }
 
+function formatCardNumber(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 19)
+  return digits.replace(/(.{4})/g, '$1 ').trim()
+}
+
 export function EventPurchaseClient({ event }: { event: EventData }) {
   const [clientNames, setClientNames] = useState<string[]>([''])
   const [clientEmail, setClientEmail] = useState('')
@@ -358,8 +363,8 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               type="text"
               inputMode="numeric"
               autoComplete="cc-number"
-              value={cardNumber}
-              onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, ''))}
+              value={formatCardNumber(cardNumber)}
+              onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 19))}
               placeholder="Número de tarjeta"
               className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
               style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
