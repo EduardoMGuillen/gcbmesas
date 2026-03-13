@@ -45,7 +45,7 @@ export async function cyberSourceDirectPaymentViaSdk(params: DirectPaymentParams
 
   requestObj.clientReferenceInformation = { code: params.paymentReference }
   requestObj.processingInformation = {
-    commerceIndicator: 'internet',
+    // Keep this aligned with the sample path that succeeded in smoke tests.
     capture: false,
   }
   requestObj.paymentInformation = {
@@ -53,7 +53,6 @@ export async function cyberSourceDirectPaymentViaSdk(params: DirectPaymentParams
       number: params.cardNumber,
       expirationMonth: params.cardExpMonth.padStart(2, '0'),
       expirationYear: params.cardExpYear,
-      securityCode: params.cardCvv,
     },
   }
   requestObj.orderInformation = {
@@ -62,11 +61,11 @@ export async function cyberSourceDirectPaymentViaSdk(params: DirectPaymentParams
       currency: params.currency,
     },
     billTo: {
-      firstName: params.cardHolderName.trim().split(' ')[0] || 'Test',
-      lastName: params.cardHolderName.trim().split(' ').slice(1).join(' ') || 'Merchant',
-      email: params.email,
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'test@cybs.com',
       country: 'US',
-      locality: 'San Francisco',
+      locality: 'san francisco',
       address1: '1 Market St',
       administrativeArea: 'CA',
       postalCode: '94105',

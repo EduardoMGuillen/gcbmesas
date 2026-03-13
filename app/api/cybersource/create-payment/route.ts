@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
     const cyberEnv = (process.env.CYBERSOURCE_ENV || 'test').toLowerCase()
-    const currency = 'USD'
+    const currency = 'HNL'
     const isMockMode = process.env.CYBERSOURCE_MOCK === 'true'
     const paymentMode = (process.env.CYBERSOURCE_PAYMENT_MODE || 'unified').toLowerCase()
 
