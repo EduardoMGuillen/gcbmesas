@@ -6,6 +6,7 @@ import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
 import { CyberSourceApiError, cyberSourceGet, cyberSourcePost } from '@/lib/cybersource'
+import { cyberSourceDirectPaymentViaSdk } from '@/lib/cybersource-sdk-direct'
 
 function maskMerchantId(merchantId: string | undefined) {
   if (!merchantId) return null
@@ -164,39 +165,16 @@ export async function POST(req: NextRequest) {
           processorInformation: { responseCode: '100' },
         }
       : isDirectMode
-        ? await cyberSourcePost<any>('/pts/v2/payments', {
-            clientReferenceInformation: { code: paymentReference },
-            processingInformation: {
-              commerceIndicator: 'internet',
-              // Match the successful SDK smoke test path (authorization first).
-              capture: false,
-            },
-            paymentInformation: {
-              card: {
-                number: cardDigits,
-                expirationMonth: String(cardExpMonth).padStart(2, '0'),
-                expirationYear: String(cardExpYear),
-                securityCode: String(cardCvv),
-              },
-            },
-            orderInformation: {
-              amountDetails: {
-                totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
-                currency,
-              },
-              billTo: {
-                firstName: String(cardHolderName || names[0] || 'Test').trim().split(' ')[0] || 'Test',
-                lastName:
-                  String(cardHolderName || names[0] || 'Merchant').trim().split(' ').slice(1).join(' ') || 'Merchant',
-                email: String(pendingDetails?.clientEmail || clientEmail).trim(),
-                country: 'US',
-                locality: 'San Francisco',
-                address1: '1 Market St',
-                administrativeArea: 'CA',
-                postalCode: '94105',
-                phoneNumber: '4158880000',
-              },
-            },
+        ? await cyberSourceDirectPaymentViaSdk({
+            paymentReference,
+            amount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
+            currency,
+            cardNumber: cardDigits,
+            cardExpMonth: String(cardExpMonth),
+            cardExpYear: String(cardExpYear),
+            cardCvv: String(cardCvv),
+            cardHolderName: String(cardHolderName || names[0] || 'Test Merchant'),
+            email: String(pendingDetails?.clientEmail || clientEmail).trim(),
           })
         : await cyberSourcePost<any>('/pts/v2/payments', {
             clientReferenceInformation: { code: paymentReference },
