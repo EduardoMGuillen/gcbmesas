@@ -63,6 +63,11 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   const [cardExpMonth, setCardExpMonth] = useState('')
   const [cardExpYear, setCardExpYear] = useState('')
   const [cardCvv, setCardCvv] = useState('')
+  const [billingAddress1, setBillingAddress1] = useState('')
+  const [billingCity, setBillingCity] = useState('')
+  const [billingState, setBillingState] = useState('')
+  const [billingPostalCode, setBillingPostalCode] = useState('')
+  const [billingCountry, setBillingCountry] = useState('HN')
 
   const totalPrice = event.onlinePrice * numberOfEntries
 
@@ -100,6 +105,12 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     cardExpMonth.trim().length >= 1 &&
     cardExpYear.trim().length >= 2 &&
     cardCvv.trim().length >= 3
+  const billingValid =
+    billingAddress1.trim().length > 0 &&
+    billingCity.trim().length > 0 &&
+    billingState.trim().length > 0 &&
+    billingPostalCode.trim().length > 0 &&
+    billingCountry.trim().length === 2
 
   const loadUnifiedScript = async (src: string, integrity?: string | null) => {
     if ((window as any).Accept) return
@@ -193,6 +204,9 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
         if (!cardValid) {
           throw new Error('Completa los datos de tarjeta para pago directo (sandbox).')
         }
+        if (!billingValid) {
+          throw new Error('Completa los datos mínimos de facturación para pago directo.')
+        }
         const confirmRes = await fetch('/api/cybersource/confirm-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -206,6 +220,11 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
             cardExpMonth: cardExpMonth.trim(),
             cardExpYear: cardExpYear.trim(),
             cardCvv: cardCvv.trim(),
+            billToAddress1: billingAddress1.trim(),
+            billToLocality: billingCity.trim(),
+            billToAdministrativeArea: billingState.trim(),
+            billToPostalCode: billingPostalCode.trim(),
+            billToCountry: billingCountry.trim().toUpperCase(),
           }),
         })
         const result = await confirmRes.json()
@@ -404,6 +423,48 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
             <p className="text-[11px] text-white/35">
               En modo sandbox directo, estos datos se envían al backend para prueba técnica.
             </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input
+                type="text"
+                value={billingAddress1}
+                onChange={(e) => setBillingAddress1(e.target.value)}
+                placeholder="Dirección *"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none sm:col-span-2"
+                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+              />
+              <input
+                type="text"
+                value={billingCity}
+                onChange={(e) => setBillingCity(e.target.value)}
+                placeholder="Ciudad *"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+              />
+              <input
+                type="text"
+                value={billingState}
+                onChange={(e) => setBillingState(e.target.value)}
+                placeholder="Departamento/Estado *"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+              />
+              <input
+                type="text"
+                value={billingPostalCode}
+                onChange={(e) => setBillingPostalCode(e.target.value)}
+                placeholder="Código postal *"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+              />
+              <input
+                type="text"
+                value={billingCountry}
+                onChange={(e) => setBillingCountry(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2))}
+                placeholder="País ISO2 (ej. HN) *"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+              />
+            </div>
           </div>
 
           <div className="rounded-lg p-4" style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)' }}>

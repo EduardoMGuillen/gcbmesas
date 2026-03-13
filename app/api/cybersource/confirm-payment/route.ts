@@ -55,6 +55,11 @@ export async function POST(req: NextRequest) {
     cardExpYear?: string
     cardCvv?: string
     cardHolderName?: string
+    billToAddress1?: string
+    billToLocality?: string
+    billToAdministrativeArea?: string
+    billToPostalCode?: string
+    billToCountry?: string
   } = {}
   const currency = 'HNL'
 
@@ -71,6 +76,11 @@ export async function POST(req: NextRequest) {
       cardExpYear,
       cardCvv,
       cardHolderName,
+      billToAddress1,
+      billToLocality,
+      billToAdministrativeArea,
+      billToPostalCode,
+      billToCountry,
     } = body
     debugContext.paymentReference = paymentReference
     debugContext.eventId = eventId
@@ -81,6 +91,11 @@ export async function POST(req: NextRequest) {
     debugContext.cardExpYear = cardExpYear
     debugContext.cardCvv = cardCvv
     debugContext.cardHolderName = cardHolderName
+    debugContext.billToAddress1 = billToAddress1
+    debugContext.billToLocality = billToLocality
+    debugContext.billToAdministrativeArea = billToAdministrativeArea
+    debugContext.billToPostalCode = billToPostalCode
+    debugContext.billToCountry = billToCountry
 
     if (!paymentReference || !eventId || !clientEmail || !numberOfEntries) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
@@ -97,6 +112,13 @@ export async function POST(req: NextRequest) {
     }
     if (!isMockMode && isDirectMode && (!cardNumber || !cardExpMonth || !cardExpYear || !cardCvv)) {
       return NextResponse.json({ error: 'Faltan datos de tarjeta para pago directo.' }, { status: 400 })
+    }
+    if (
+      !isMockMode &&
+      isDirectMode &&
+      (!billToAddress1 || !billToLocality || !billToAdministrativeArea || !billToPostalCode || !billToCountry)
+    ) {
+      return NextResponse.json({ error: 'Faltan datos mínimos de facturación para pago directo.' }, { status: 400 })
     }
     if (!isMockMode && isDirectMode && !(cardDigits.length === 15 || cardDigits.length === 16)) {
       return NextResponse.json({ error: 'Número de tarjeta inválido para prueba (usa 15 o 16 dígitos).' }, { status: 400 })
@@ -175,6 +197,11 @@ export async function POST(req: NextRequest) {
             cardCvv: String(cardCvv),
             cardHolderName: String(cardHolderName || names[0] || 'Test Merchant'),
             email: String(pendingDetails?.clientEmail || clientEmail).trim(),
+            billToAddress1: String(billToAddress1),
+            billToLocality: String(billToLocality),
+            billToAdministrativeArea: String(billToAdministrativeArea),
+            billToPostalCode: String(billToPostalCode),
+            billToCountry: String(billToCountry).toUpperCase(),
           })
         : await cyberSourcePost<any>('/pts/v2/payments', {
             clientReferenceInformation: { code: paymentReference },
