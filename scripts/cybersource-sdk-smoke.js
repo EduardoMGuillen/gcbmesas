@@ -34,11 +34,11 @@ function buildConfig() {
   }
 }
 
-function createTestRequest() {
+function createTestRequest(cardProfile) {
   const req = new cybersourceRestApi.CreatePaymentRequest()
 
   const clientReferenceInformation = new cybersourceRestApi.Ptsv2paymentsClientReferenceInformation()
-  clientReferenceInformation.code = `SDK-SMOKE-${Date.now()}`
+  clientReferenceInformation.code = `SDK-${cardProfile.label.toUpperCase()}-${Date.now()}`
   req.clientReferenceInformation = clientReferenceInformation
 
   const processingInformation = new cybersourceRestApi.Ptsv2paymentsProcessingInformation()
@@ -48,9 +48,10 @@ function createTestRequest() {
 
   const paymentInformation = new cybersourceRestApi.Ptsv2paymentsPaymentInformation()
   const card = new cybersourceRestApi.Ptsv2paymentsPaymentInformationCard()
-  card.number = '4111111111111111'
-  card.expirationMonth = '12'
-  card.expirationYear = '2031'
+  card.number = cardProfile.number
+  card.expirationMonth = cardProfile.expMonth
+  card.expirationYear = cardProfile.expYear
+  card.securityCode = cardProfile.cvv
   paymentInformation.card = card
   req.paymentInformation = paymentInformation
 
@@ -76,39 +77,98 @@ function createTestRequest() {
   return req
 }
 
-function runSmokeTest() {
-  const config = buildConfig()
+const TEST_CARDS = [
+  {
+    label: 'visa',
+    number: '4111111111111111',
+    expMonth: '12',
+    expYear: '2031',
+    cvv: '123',
+  },
+  {
+    label: 'mastercard',
+    number: '5555555555554444',
+    expMonth: '12',
+    expYear: '2031',
+    cvv: '123',
+  },
+  {
+    label: 'amex',
+    number: '378282246310005',
+    expMonth: '12',
+    expYear: '2031',
+    cvv: '1234',
+  },
+]
+
+function runSingleSmokeTest(config, cardProfile) {
   const apiClient = new cybersourceRestApi.ApiClient()
   const paymentsApi = new cybersourceRestApi.PaymentsApi(config, apiClient)
-  const request = createTestRequest()
+  const request = createTestRequest(cardProfile)
 
-  console.log('Running CyberSource SDK smoke test...')
-  console.log(`- Host: ${config.runEnvironment}`)
-  console.log(`- Merchant ID: ${config.merchantID}`)
-  console.log('- Endpoint: /pts/v2/payments')
+  console.log(`\n=== Card: ${cardProfile.label.toUpperCase()} ===`)
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     paymentsApi.createPayment(request, (error, data, response) => {
       const statusCode = response?.status || error?.status || 'unknown'
       const headers = response?.headers || error?.response?.headers || {}
-      const requestId = headers['v-c-correlation-id'] || headers['x-request-id'] || null
+      const requestId =
+        headers['v-c-correlation-id'] ||
+        headers['x-requestid'] ||
+        headers['x-request-id'] ||
+        null
       const body = response?.body || error?.response?.body || error?.response || error
 
       console.log(`- HTTP Status: ${statusCode}`)
       console.log(`- Request ID: ${requestId || 'n/a'}`)
-      if (body) {
-        console.log('- Response body:')
-        console.log(JSON.stringify(body, null, 2))
+      if (data?.status) {
+        console.log(`- Payment status: ${data.status}`)
       }
 
       if (error) {
-        return reject(new Error(`Smoke test failed with status ${statusCode}`))
+        console.log('- Result: FAIL')
+        if (body) {
+          console.log('- Response body:')
+          console.log(JSON.stringify(body, null, 2))
+        }
+        resolve({ ok: false, card: cardProfile.label, statusCode })
+        return
       }
 
-      console.log('- Payment status:', data?.status || 'n/a')
-      resolve()
+      console.log('- Result: OK')
+      resolve({ ok: true, card: cardProfile.label, statusCode, paymentStatus: data?.status || null })
     })
   })
+}
+
+async function runSmokeTest() {
+  const config = buildConfig()
+
+  console.log('Running CyberSource SDK smoke test (3 cards)...')
+  console.log(`- Host: ${config.runEnvironment}`)
+  console.log(`- Merchant ID: ${config.merchantID}`)
+  console.log('- Endpoint: /pts/v2/payments')
+  console.log(`- Amount: ${process.env.CYBS_SMOKE_AMOUNT || '10.00'}`)
+  console.log(`- Currency: ${process.env.CYBS_SMOKE_CURRENCY || 'USD'}`)
+
+  const results = []
+  for (const cardProfile of TEST_CARDS) {
+    const result = await runSingleSmokeTest(config, cardProfile)
+    results.push(result)
+  }
+
+  console.log('\n=== Summary ===')
+  for (const result of results) {
+    console.log(
+      `- ${result.card.toUpperCase()}: ${result.ok ? 'OK' : 'FAIL'} (HTTP ${result.statusCode})` +
+        `${result.paymentStatus ? ` status=${result.paymentStatus}` : ''}`
+    )
+  }
+
+  const failed = results.filter((r) => !r.ok)
+  if (failed.length > 0) {
+    throw new Error(`Smoke test failed for ${failed.length} card(s).`)
+  }
 }
 
 runSmokeTest()
