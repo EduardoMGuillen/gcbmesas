@@ -132,6 +132,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     billingState.trim().length > 0 &&
     billingPostalCode.trim().length > 0 &&
     billingCountry.trim().length === 2
+  const microformProfileValid = cardHolderName.trim().length > 0 && billingValid
 
   const loadUnifiedScript = async (src: string, integrity?: string | null) => {
     if ((window as any).Flex) return
@@ -196,6 +197,9 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     if (!microformRef.current || !microformReady) {
       throw new Error('Microform no está listo todavía.')
     }
+    if (!microformProfileValid) {
+      throw new Error('Completa nombre del titular y datos de facturación.')
+    }
     const expMonth = microformExpMonth.trim().replace(/\D/g, '').slice(0, 2)
     const expYear = microformExpYear.trim().replace(/\D/g, '').slice(0, 4)
     if (!expMonth || !expYear) {
@@ -232,6 +236,12 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
         clientEmail: clientEmail.trim(),
         numberOfEntries,
         transientToken,
+        cardHolderName: cardHolderName.trim(),
+        billToAddress1: billingAddress1.trim(),
+        billToLocality: billingCity.trim(),
+        billToAdministrativeArea: billingState.trim(),
+        billToPostalCode: billingPostalCode.trim(),
+        billToCountry: billingCountry.trim().toUpperCase(),
       }),
     })
     const result = await confirmRes.json()
@@ -626,6 +636,14 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               }}
             >
               <p className="text-sm font-medium text-blue-200">Paso 2 de 2: Ingresa tarjeta en Microform (3DS)</p>
+              <input
+                type="text"
+                value={cardHolderName}
+                onChange={(e) => setCardHolderName(e.target.value)}
+                placeholder="Nombre del titular *"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+              />
               <div className="space-y-2">
                 <label className="block text-xs text-blue-100/80">Número de tarjeta</label>
                 <div
@@ -656,6 +674,48 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                 <div
                   id="cybs-card-cvv"
                   className="w-full px-4 py-3 rounded-lg min-h-[50px]"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={billingAddress1}
+                  onChange={(e) => setBillingAddress1(e.target.value)}
+                  placeholder="Dirección *"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none sm:col-span-2"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="text"
+                  value={billingCity}
+                  onChange={(e) => setBillingCity(e.target.value)}
+                  placeholder="Ciudad *"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="text"
+                  value={billingState}
+                  onChange={(e) => setBillingState(e.target.value)}
+                  placeholder="Departamento/Estado *"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="text"
+                  value={billingPostalCode}
+                  onChange={(e) => setBillingPostalCode(e.target.value)}
+                  placeholder="Código postal *"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="text"
+                  value={billingCountry}
+                  onChange={(e) => setBillingCountry(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2))}
+                  placeholder="País ISO2 (ej. HN) *"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
                   style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
                 />
               </div>

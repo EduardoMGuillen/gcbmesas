@@ -180,6 +180,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Evento no encontrado o sin precio online' }, { status: 404 })
     }
 
+    const fallbackFullName = String(cardHolderName || names[0] || 'Cliente General').trim()
+    const fallbackFirstName = fallbackFullName.split(' ')[0] || 'Cliente'
+    const fallbackLastName = fallbackFullName.split(' ').slice(1).join(' ') || 'General'
+    const resolvedBillTo = {
+      firstName: String(fallbackFirstName).trim() || 'Cliente',
+      lastName: String(fallbackLastName).trim() || 'General',
+      email: String(pendingDetails?.clientEmail || clientEmail).trim(),
+      country: String(billToCountry || 'HN').trim().toUpperCase() || 'HN',
+      locality: String(billToLocality || 'Tegucigalpa').trim() || 'Tegucigalpa',
+      address1: String(billToAddress1 || 'N/A').trim() || 'N/A',
+      administrativeArea: String(billToAdministrativeArea || 'FM').trim() || 'FM',
+      postalCode: String(billToPostalCode || '11101').trim() || '11101',
+      phoneNumber: String(pendingDetails?.clientPhone || '00000000').trim() || '00000000',
+    }
+
     const paymentResponse = isMockMode
       ? {
           status: 'AUTHORIZED',
@@ -217,17 +232,7 @@ export async function POST(req: NextRequest) {
                 totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
                 currency,
               },
-              billTo: {
-                firstName: names[0]?.split(' ')[0] || 'Cliente',
-                lastName: names[0]?.split(' ').slice(1).join(' ') || 'General',
-                email: String(pendingDetails?.clientEmail || clientEmail).trim(),
-                country: 'HN',
-                locality: 'Tegucigalpa',
-                address1: 'N/A',
-                administrativeArea: 'FM',
-                postalCode: '11101',
-                phoneNumber: '00000000',
-              },
+              billTo: resolvedBillTo,
             },
           })
 
