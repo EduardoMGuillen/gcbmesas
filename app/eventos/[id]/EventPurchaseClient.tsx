@@ -134,7 +134,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     billingCountry.trim().length === 2
 
   const loadUnifiedScript = async (src: string, integrity?: string | null) => {
-    if ((window as any).Accept) return
+    if ((window as any).Flex) return
     await new Promise<void>((resolve, reject) => {
       const script = document.createElement('script')
       script.src = src
@@ -142,7 +142,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
       script.crossOrigin = 'anonymous'
       if (integrity) script.integrity = integrity
       script.onload = () => resolve()
-      script.onerror = () => reject(new Error('No se pudo cargar la librería de Unified Checkout'))
+      script.onerror = () => reject(new Error('No se pudo cargar la librería de Microform'))
       document.body.appendChild(script)
     })
   }
@@ -157,15 +157,12 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     setMicroformReady(false)
     setMicroformPaymentReference(params.paymentReference)
     await loadUnifiedScript(params.clientLibrary, params.clientLibraryIntegrity)
-    const acceptFactory = (window as any).Accept
-    if (!acceptFactory) throw new Error('Unified Checkout no está disponible en este navegador.')
+    const FlexCtor = (window as any).Flex
+    if (!FlexCtor) throw new Error('La librería de CyberSource Microform no está disponible en este navegador.')
 
-    const accept = await acceptFactory(params.captureContext)
-    if (typeof accept?.microform !== 'function') {
-      throw new Error('La librería de CyberSource no soporta Microform en este navegador.')
-    }
+    const flex = new FlexCtor(params.captureContext)
     await new Promise((resolve) => setTimeout(resolve, 0))
-    const microform = await accept.microform({
+    const microform = flex.microform({
       styles: {
         input: {
           color: '#ffffff',
