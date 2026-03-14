@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import QRCode from 'qrcode'
 
 type EventData = {
@@ -71,6 +71,10 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   const [processing, setProcessing] = useState(false)
   const [success, setSuccess] = useState<PurchaseSuccess | null>(null)
   const [showUnified, setShowUnified] = useState(false)
+  const [microformReady, setMicroformReady] = useState(false)
+  const [microformPaymentReference, setMicroformPaymentReference] = useState('')
+  const [microformExpMonth, setMicroformExpMonth] = useState('')
+  const [microformExpYear, setMicroformExpYear] = useState('')
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('unknown')
   const [cardHolderName, setCardHolderName] = useState('')
   const [cardNumber, setCardNumber] = useState('')
@@ -82,6 +86,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   const [billingState, setBillingState] = useState('')
   const [billingPostalCode, setBillingPostalCode] = useState('')
   const [billingCountry, setBillingCountry] = useState('HN')
+  const microformRef = useRef<any>(null)
 
   const totalPrice = event.onlinePrice * numberOfEntries
 
@@ -149,24 +154,83 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     clientLibraryIntegrity?: string | null
   }) => {
     setShowUnified(true)
+    setMicroformReady(false)
+    setMicroformPaymentReference(params.paymentReference)
     await loadUnifiedScript(params.clientLibrary, params.clientLibraryIntegrity)
     const acceptFactory = (window as any).Accept
     if (!acceptFactory) throw new Error('Unified Checkout no está disponible en este navegador.')
 
     const accept = await acceptFactory(params.captureContext)
-    const unified = await accept.unifiedPayments(false)
-    const transientToken = await unified.show({
-      containers: {
-        paymentSelection: '#cybs-payment-selection',
-        paymentScreen: '#cybs-payment-screen',
+    if (typeof accept?.microform !== 'function') {
+      throw new Error('La librería de CyberSource no soporta Microform en este navegador.')
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const microform = await accept.microform({
+      styles: {
+        input: {
+          color: '#ffffff',
+          'font-size': '16px',
+          'font-family': 'Arial, sans-serif',
+        },
+        ':focus': {
+          color: '#ffffff',
+        },
+        valid: {
+          color: '#86efac',
+        },
+        invalid: {
+          color: '#fca5a5',
+        },
       },
+    })
+    const numberField = microform.createField('number', {
+      placeholder: 'Número de tarjeta',
+    })
+    const securityCodeField = microform.createField('securityCode', {
+      placeholder: 'CVV',
+    })
+    numberField.load('#cybs-card-number')
+    securityCodeField.load('#cybs-card-cvv')
+    microformRef.current = microform
+    setMicroformReady(true)
+  }
+
+  const confirmUnifiedMicroformPayment = async () => {
+    if (!microformRef.current || !microformReady) {
+      throw new Error('Microform no está listo todavía.')
+    }
+    const expMonth = microformExpMonth.trim().replace(/\D/g, '').slice(0, 2)
+    const expYear = microformExpYear.trim().replace(/\D/g, '').slice(0, 4)
+    if (!expMonth || !expYear) {
+      throw new Error('Completa mes y año de expiración de la tarjeta.')
+    }
+
+    const transientToken = await new Promise<string>((resolve, reject) => {
+      const maybePromise = microformRef.current.createToken(
+        {
+          expirationMonth: expMonth,
+          expirationYear: expYear,
+        },
+        (error: any, token: string) => {
+          if (error) {
+            reject(new Error(error?.message || 'No se pudo tokenizar la tarjeta.'))
+            return
+          }
+          resolve(String(token))
+        }
+      )
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        maybePromise.then((token: string) => resolve(String(token))).catch((err: any) => {
+          reject(new Error(err?.message || 'No se pudo tokenizar la tarjeta.'))
+        })
+      }
     })
 
     const confirmRes = await fetch('/api/cybersource/confirm-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        paymentReference: params.paymentReference,
+        paymentReference: microformPaymentReference,
         eventId: event.id,
         clientEmail: clientEmail.trim(),
         numberOfEntries,
@@ -261,6 +325,22 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
       }
 
       throw new Error('CyberSource no devolvió datos válidos de Unified Checkout')
+    } catch (err: any) {
+      setError(err.message || 'Error al procesar el pago')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const handlePayClick = async () => {
+    setProcessing(true)
+    setError('')
+    try {
+      if (paymentMode === 'unified' && showUnified && microformReady && microformPaymentReference) {
+        await confirmUnifiedMicroformPayment()
+        return
+      }
+      await startCheckout()
     } catch (err: any) {
       setError(err.message || 'Error al procesar el pago')
     } finally {
@@ -379,148 +459,148 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
             />
           </div>
 
-          <div className="rounded-lg p-4 space-y-3" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-white/80">Tarjeta (modo directo sandbox)</p>
-              <span className="text-[11px] text-white/40">
-                {paymentMode === 'direct' ? 'Activo' : paymentMode === 'unified' ? 'Fallback' : 'Auto'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide"
-                style={{
-                  background: cardBrand === 'visa' ? 'rgba(26, 87, 220, 0.32)' : 'rgba(26, 87, 220, 0.2)',
-                  color: '#9ec2ff',
-                  border: cardBrand === 'visa' ? '1px solid rgba(145,190,255,0.8)' : '1px solid rgba(26,87,220,0.45)',
-                }}
-              >
-                VISA
+          {paymentMode === 'direct' && (
+            <div className="rounded-lg p-4 space-y-3" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-white/80">Tarjeta (modo directo sandbox)</p>
+                <span className="text-[11px] text-white/40">Activo</span>
               </div>
-              <div
-                className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide flex items-center gap-1.5"
-                style={{
-                  background: cardBrand === 'mastercard' ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
-                  color: '#f4f4f5',
-                  border: cardBrand === 'mastercard' ? '1px solid rgba(255,255,255,0.4)' : '1px solid rgba(255,255,255,0.12)',
-                }}
-              >
-                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#eb001b' }} />
-                <span className="inline-block w-2.5 h-2.5 rounded-full -ml-1.5" style={{ background: '#f79e1b' }} />
-                MASTERCARD
+              <div className="flex items-center gap-2">
+                <div
+                  className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide"
+                  style={{
+                    background: cardBrand === 'visa' ? 'rgba(26, 87, 220, 0.32)' : 'rgba(26, 87, 220, 0.2)',
+                    color: '#9ec2ff',
+                    border: cardBrand === 'visa' ? '1px solid rgba(145,190,255,0.8)' : '1px solid rgba(26,87,220,0.45)',
+                  }}
+                >
+                  VISA
+                </div>
+                <div
+                  className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide flex items-center gap-1.5"
+                  style={{
+                    background: cardBrand === 'mastercard' ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
+                    color: '#f4f4f5',
+                    border: cardBrand === 'mastercard' ? '1px solid rgba(255,255,255,0.4)' : '1px solid rgba(255,255,255,0.12)',
+                  }}
+                >
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#eb001b' }} />
+                  <span className="inline-block w-2.5 h-2.5 rounded-full -ml-1.5" style={{ background: '#f79e1b' }} />
+                  MASTERCARD
+                </div>
+                <div
+                  className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide"
+                  style={{
+                    background: cardBrand === 'amex' ? 'rgba(0, 153, 204, 0.32)' : 'rgba(0, 153, 204, 0.2)',
+                    color: '#93e5ff',
+                    border: cardBrand === 'amex' ? '1px solid rgba(147,229,255,0.8)' : '1px solid rgba(0,153,204,0.45)',
+                  }}
+                >
+                  AMEX
+                </div>
               </div>
-              <div
-                className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide"
-                style={{
-                  background: cardBrand === 'amex' ? 'rgba(0, 153, 204, 0.32)' : 'rgba(0, 153, 204, 0.2)',
-                  color: '#93e5ff',
-                  border: cardBrand === 'amex' ? '1px solid rgba(147,229,255,0.8)' : '1px solid rgba(0,153,204,0.45)',
-                }}
-              >
-                AMEX
-              </div>
-            </div>
-            <input
-              type="text"
-              value={cardHolderName}
-              onChange={(e) => setCardHolderName(e.target.value)}
-              placeholder="Nombre del titular"
-              className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
-            />
-            <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="cc-number"
-              value={formatCardNumber(cardNumber, cardBrand)}
-              onChange={(e) => {
-                const rawDigits = e.target.value.replace(/\D/g, '')
-                const nextBrand = detectCardBrand(rawDigits)
-                const maxLen = nextBrand === 'amex' ? 15 : 16
-                setCardNumber(rawDigits.slice(0, maxLen))
-              }}
-              placeholder="Número de tarjeta"
-              className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
-            />
-            <div className="grid grid-cols-3 gap-2">
               <input
                 type="text"
-                inputMode="numeric"
-                autoComplete="cc-exp-month"
-                value={cardExpMonth}
-                onChange={(e) => setCardExpMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                placeholder="MM"
+                value={cardHolderName}
+                onChange={(e) => setCardHolderName(e.target.value)}
+                placeholder="Nombre del titular"
                 className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
                 style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
               />
               <input
                 type="text"
                 inputMode="numeric"
-                autoComplete="cc-exp-year"
-                value={cardExpYear}
-                onChange={(e) => setCardExpYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="YYYY"
+                autoComplete="cc-number"
+                value={formatCardNumber(cardNumber, cardBrand)}
+                onChange={(e) => {
+                  const rawDigits = e.target.value.replace(/\D/g, '')
+                  const nextBrand = detectCardBrand(rawDigits)
+                  const maxLen = nextBrand === 'amex' ? 15 : 16
+                  setCardNumber(rawDigits.slice(0, maxLen))
+                }}
+                placeholder="Número de tarjeta"
                 className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
                 style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
               />
-              <input
-                type="password"
-                inputMode="numeric"
-                autoComplete="cc-csc"
-                value={cardCvv}
-                onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, isAmex ? 4 : 3))}
-                placeholder={isAmex ? 'CID' : 'CVV'}
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
-              />
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="cc-exp-month"
+                  value={cardExpMonth}
+                  onChange={(e) => setCardExpMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  placeholder="MM"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="cc-exp-year"
+                  value={cardExpYear}
+                  onChange={(e) => setCardExpYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="YYYY"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="cc-csc"
+                  value={cardCvv}
+                  onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, isAmex ? 4 : 3))}
+                  placeholder={isAmex ? 'CID' : 'CVV'}
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+              </div>
+              <p className="text-[11px] text-white/35">
+                En modo sandbox directo, estos datos se envían al backend para prueba técnica.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={billingAddress1}
+                  onChange={(e) => setBillingAddress1(e.target.value)}
+                  placeholder="Dirección *"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none sm:col-span-2"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="text"
+                  value={billingCity}
+                  onChange={(e) => setBillingCity(e.target.value)}
+                  placeholder="Ciudad *"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="text"
+                  value={billingState}
+                  onChange={(e) => setBillingState(e.target.value)}
+                  placeholder="Departamento/Estado *"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="text"
+                  value={billingPostalCode}
+                  onChange={(e) => setBillingPostalCode(e.target.value)}
+                  placeholder="Código postal *"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="text"
+                  value={billingCountry}
+                  onChange={(e) => setBillingCountry(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2))}
+                  placeholder="País ISO2 (ej. HN) *"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+              </div>
             </div>
-            <p className="text-[11px] text-white/35">
-              En modo sandbox directo, estos datos se envían al backend para prueba técnica.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input
-                type="text"
-                value={billingAddress1}
-                onChange={(e) => setBillingAddress1(e.target.value)}
-                placeholder="Dirección *"
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none sm:col-span-2"
-                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
-              />
-              <input
-                type="text"
-                value={billingCity}
-                onChange={(e) => setBillingCity(e.target.value)}
-                placeholder="Ciudad *"
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
-              />
-              <input
-                type="text"
-                value={billingState}
-                onChange={(e) => setBillingState(e.target.value)}
-                placeholder="Departamento/Estado *"
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
-              />
-              <input
-                type="text"
-                value={billingPostalCode}
-                onChange={(e) => setBillingPostalCode(e.target.value)}
-                placeholder="Código postal *"
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
-              />
-              <input
-                type="text"
-                value={billingCountry}
-                onChange={(e) => setBillingCountry(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2))}
-                placeholder="País ISO2 (ej. HN) *"
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
-              />
-            </div>
-          </div>
+          )}
 
           <div className="rounded-lg p-4" style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)' }}>
             <div className="flex justify-between items-center">
@@ -539,7 +619,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
             </div>
           </div>
 
-          {showUnified && (
+          {showUnified && paymentMode === 'unified' && (
             <div
               className="rounded-xl p-4 space-y-3"
               style={{
@@ -548,9 +628,43 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                 boxShadow: '0 0 0 1px rgba(59,130,246,0.1) inset',
               }}
             >
-              <p className="text-sm font-medium text-blue-200">Paso 2 de 2: Completa el pago en CyberSource</p>
-              <div id="cybs-payment-selection" className="min-h-[56px]" />
-              <div id="cybs-payment-screen" className="min-h-[220px]" />
+              <p className="text-sm font-medium text-blue-200">Paso 2 de 2: Ingresa tarjeta en Microform (3DS)</p>
+              <div className="space-y-2">
+                <label className="block text-xs text-blue-100/80">Número de tarjeta</label>
+                <div
+                  id="cybs-card-number"
+                  className="w-full px-4 py-3 rounded-lg min-h-[50px]"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={microformExpMonth}
+                  onChange={(e) => setMicroformExpMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  placeholder="MM"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={microformExpYear}
+                  onChange={(e) => setMicroformExpYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="YYYY"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+                <div
+                  id="cybs-card-cvv"
+                  className="w-full px-4 py-3 rounded-lg min-h-[50px]"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                />
+              </div>
+              <p className="text-xs text-blue-100/70">
+                Los datos sensibles se capturan en iframes seguros de CyberSource.
+              </p>
             </div>
           )}
 
@@ -564,11 +678,11 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
           ) : formValid ? (
             <button
               type="button"
-              onClick={startCheckout}
+              onClick={handlePayClick}
               className="w-full font-semibold py-3 px-4 rounded-lg transition-all hover:opacity-90 shadow-[0_10px_30px_rgba(201,168,76,0.25)]"
               style={{ background: goldGradient, color: '#0a0a15' }}
             >
-              Pagar con CyberSource
+              {paymentMode === 'unified' && showUnified && microformReady ? 'Confirmar pago con Microform' : 'Pagar con CyberSource'}
             </button>
           ) : (
             <div className="rounded-lg p-4 text-center" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>

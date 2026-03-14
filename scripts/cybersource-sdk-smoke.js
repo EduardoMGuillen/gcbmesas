@@ -77,6 +77,32 @@ function createTestRequest(cardProfile) {
   return req
 }
 
+function createCaptureRequest(cardProfile) {
+  const req = new cybersourceRestApi.CapturePaymentRequest()
+
+  const clientReferenceInformation = new cybersourceRestApi.Ptsv2paymentsClientReferenceInformation()
+  clientReferenceInformation.code = `SDK-${cardProfile.label.toUpperCase()}-CAPTURE-${Date.now()}`
+  req.clientReferenceInformation = clientReferenceInformation
+
+  const orderInformation = new cybersourceRestApi.Ptsv2paymentsidcapturesOrderInformation()
+  const amountDetails = new cybersourceRestApi.Ptsv2paymentsidcapturesOrderInformationAmountDetails()
+  amountDetails.totalAmount = process.env.CYBS_SMOKE_AMOUNT || '10.00'
+  amountDetails.currency = process.env.CYBS_SMOKE_CURRENCY || 'USD'
+  orderInformation.amountDetails = amountDetails
+  req.orderInformation = orderInformation
+
+  return req
+}
+
+function pickRequestId(response, error) {
+  const headers = response?.headers || error?.response?.headers || {}
+  return headers['v-c-correlation-id'] || headers['x-requestid'] || headers['x-request-id'] || null
+}
+
+function pickBody(response, error) {
+  return response?.body || error?.response?.body || error?.response || error
+}
+
 const TEST_CARDS = [
   {
     label: 'visa',
@@ -104,6 +130,7 @@ const TEST_CARDS = [
 function runSingleSmokeTest(config, cardProfile) {
   const apiClient = new cybersourceRestApi.ApiClient()
   const paymentsApi = new cybersourceRestApi.PaymentsApi(config, apiClient)
+  const captureApi = new cybersourceRestApi.CaptureApi(config, apiClient)
   const request = createTestRequest(cardProfile)
 
   console.log(`\n=== Card: ${cardProfile.label.toUpperCase()} ===`)
@@ -111,18 +138,13 @@ function runSingleSmokeTest(config, cardProfile) {
   return new Promise((resolve) => {
     paymentsApi.createPayment(request, (error, data, response) => {
       const statusCode = response?.status || error?.status || 'unknown'
-      const headers = response?.headers || error?.response?.headers || {}
-      const requestId =
-        headers['v-c-correlation-id'] ||
-        headers['x-requestid'] ||
-        headers['x-request-id'] ||
-        null
-      const body = response?.body || error?.response?.body || error?.response || error
+      const requestId = pickRequestId(response, error)
+      const body = pickBody(response, error)
 
-      console.log(`- HTTP Status: ${statusCode}`)
-      console.log(`- Request ID: ${requestId || 'n/a'}`)
+      console.log(`- AUTH HTTP Status: ${statusCode}`)
+      console.log(`- AUTH Request ID: ${requestId || 'n/a'}`)
       if (data?.status) {
-        console.log(`- Payment status: ${data.status}`)
+        console.log(`- AUTH payment status: ${data.status}`)
       }
 
       if (error) {
@@ -131,12 +153,57 @@ function runSingleSmokeTest(config, cardProfile) {
           console.log('- Response body:')
           console.log(JSON.stringify(body, null, 2))
         }
-        resolve({ ok: false, card: cardProfile.label, statusCode })
+        resolve({ ok: false, card: cardProfile.label, authStatusCode: statusCode, captureStatusCode: 'skipped' })
         return
       }
 
-      console.log('- Result: OK')
-      resolve({ ok: true, card: cardProfile.label, statusCode, paymentStatus: data?.status || null })
+      const paymentId = data?.id
+      if (!paymentId) {
+        console.log('- Result: FAIL')
+        console.log('- Missing payment id after authorization.')
+        resolve({ ok: false, card: cardProfile.label, authStatusCode: statusCode, captureStatusCode: 'skipped' })
+        return
+      }
+
+      const captureRequest = createCaptureRequest(cardProfile)
+      captureApi.capturePayment(captureRequest, paymentId, (captureError, captureData, captureResponse) => {
+        const captureHttpStatus = captureResponse?.status || captureError?.status || 'unknown'
+        const captureRequestId = pickRequestId(captureResponse, captureError)
+        const captureBody = pickBody(captureResponse, captureError)
+
+        console.log(`- CAPTURE HTTP Status: ${captureHttpStatus}`)
+        console.log(`- CAPTURE Request ID: ${captureRequestId || 'n/a'}`)
+        if (captureData?.status) {
+          console.log(`- CAPTURE status: ${captureData.status}`)
+        }
+
+        if (captureError) {
+          console.log('- Result: FAIL')
+          if (captureBody) {
+            console.log('- Capture response body:')
+            console.log(JSON.stringify(captureBody, null, 2))
+          }
+          resolve({
+            ok: false,
+            card: cardProfile.label,
+            authStatusCode: statusCode,
+            authPaymentStatus: data?.status || null,
+            captureStatusCode: captureHttpStatus,
+            captureStatus: captureData?.status || null,
+          })
+          return
+        }
+
+        console.log('- Result: OK')
+        resolve({
+          ok: true,
+          card: cardProfile.label,
+          authStatusCode: statusCode,
+          authPaymentStatus: data?.status || null,
+          captureStatusCode: captureHttpStatus,
+          captureStatus: captureData?.status || null,
+        })
+      })
     })
   })
 }
@@ -144,10 +211,10 @@ function runSingleSmokeTest(config, cardProfile) {
 async function runSmokeTest() {
   const config = buildConfig()
 
-  console.log('Running CyberSource SDK smoke test (3 cards)...')
+  console.log('Running CyberSource SDK smoke test (AUTH + CAPTURE, 3 cards)...')
   console.log(`- Host: ${config.runEnvironment}`)
   console.log(`- Merchant ID: ${config.merchantID}`)
-  console.log('- Endpoint: /pts/v2/payments')
+  console.log('- Endpoints: /pts/v2/payments and /pts/v2/payments/{id}/captures')
   console.log(`- Amount: ${process.env.CYBS_SMOKE_AMOUNT || '10.00'}`)
   console.log(`- Currency: ${process.env.CYBS_SMOKE_CURRENCY || 'USD'}`)
 
@@ -160,8 +227,11 @@ async function runSmokeTest() {
   console.log('\n=== Summary ===')
   for (const result of results) {
     console.log(
-      `- ${result.card.toUpperCase()}: ${result.ok ? 'OK' : 'FAIL'} (HTTP ${result.statusCode})` +
-        `${result.paymentStatus ? ` status=${result.paymentStatus}` : ''}`
+      `- ${result.card.toUpperCase()}: ${result.ok ? 'OK' : 'FAIL'}` +
+        ` auth=${result.authStatusCode}` +
+        `${result.authPaymentStatus ? ` authStatus=${result.authPaymentStatus}` : ''}` +
+        ` capture=${result.captureStatusCode}` +
+        `${result.captureStatus ? ` captureStatus=${result.captureStatus}` : ''}`
     )
   }
 

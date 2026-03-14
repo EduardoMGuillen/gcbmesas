@@ -33,6 +33,9 @@ export async function POST(req: NextRequest) {
 
     const total = (Number(event.paypalPrice) * Number(numberOfEntries)).toFixed(2)
     const paymentReference = `CS-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`.toUpperCase()
+    const primaryName = cleanNames[0] || 'Cliente General'
+    const firstName = primaryName.split(' ')[0] || 'Cliente'
+    const lastName = primaryName.split(' ').slice(1).join(' ') || 'General'
 
     const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
     const cyberEnv = (process.env.CYBERSOURCE_ENV || 'test').toLowerCase()
@@ -124,6 +127,17 @@ export async function POST(req: NextRequest) {
           amountDetails: {
             totalAmount: total,
             currency,
+          },
+          billTo: {
+            firstName,
+            lastName,
+            email: String(clientEmail).trim(),
+            country: 'HN',
+            locality: 'Tegucigalpa',
+            address1: 'N/A',
+            administrativeArea: 'FM',
+            postalCode: '11101',
+            phoneNumber: clientPhone ? String(clientPhone).trim() : '00000000',
           },
         },
       },
