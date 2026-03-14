@@ -3,6 +3,19 @@ import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { CyberSourceApiError, cyberSourcePost } from '@/lib/cybersource'
 
+function parseJwtPayload(token: string) {
+  try {
+    const parts = token.split('.')
+    if (parts.length < 2) return null
+    const payloadB64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4)
+    const json = Buffer.from(padded, 'base64').toString('utf8')
+    return JSON.parse(json)
+  } catch {
+    return null
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -104,38 +117,14 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const enable3DS = process.env.CYBERSOURCE_ENABLE_3DS !== 'false'
     const captureContextPayload: any = {
       targetOrigins: [appUrl],
-      clientVersion: '0.31',
+      clientVersion: 'v2',
       allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX'],
-      allowedPaymentTypes: ['PANENTRY'],
-      country: 'HN',
-      locale: 'en_US',
-      captureMandate: {
-        billingType: 'FULL',
-        requestEmail: true,
-        requestPhone: true,
-        showAcceptedNetworkIcons: true,
-      },
-      data: {
-        clientReferenceInformation: { code: paymentReference },
-        orderInformation: {
-          amountDetails: {
-            totalAmount: total,
-            currency,
-          },
-        },
-      },
-    }
-    if (enable3DS) {
-      captureContextPayload.completeMandate = {
-        type: 'PREFER_AUTH',
-        consumerAuthentication: true,
-      }
+      allowedPaymentTypes: ['CARD'],
     }
 
-    const captureContext = await cyberSourcePost<any>('/up/v1/capture-contexts', captureContextPayload)
+    const captureContext = await cyberSourcePost<any>('/microform/v2/sessions', captureContextPayload)
 
     const captureContextJwt =
       captureContext?.captureContext || captureContext?.token || (typeof captureContext === 'string' ? captureContext : null)
@@ -143,16 +132,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'CyberSource no devolvió capture context.' }, { status: 502 })
     }
 
+    const payload = parseJwtPayload(String(captureContextJwt))
+    const ctxData = payload?.ctx?.[0]?.data || {}
+
     return NextResponse.json({
       paymentReference,
       directMode: false,
       captureContext: captureContextJwt,
       clientLibrary:
+        ctxData.clientLibrary ||
         captureContext?.clientLibrary ||
         (cyberEnv === 'live'
-          ? 'https://api.cybersource.com/up/v1/assets/0.31.0/SecureAcceptance.js'
-          : 'https://apitest.cybersource.com/up/v1/assets/0.31.0/SecureAcceptance.js'),
-      clientLibraryIntegrity: captureContext?.clientLibraryIntegrity || null,
+          ? 'https://flex.cybersource.com/microform/bundle/v2/flex-microform.min.js'
+          : 'https://testflex.cybersource.com/microform/bundle/v2/flex-microform.min.js'),
+      clientLibraryIntegrity: ctxData.clientLibraryIntegrity || captureContext?.clientLibraryIntegrity || null,
     })
   } catch (error: any) {
     if (error instanceof CyberSourceApiError) {
