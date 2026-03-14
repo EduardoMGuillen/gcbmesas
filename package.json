@@ -21,6 +21,7 @@
     "db:verify-password": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/verify-admin-password.ts",
     "import:bebidas": "node scripts/import-bebidas-wrapper.js",
     "cybs:sdk-smoke": "node scripts/cybersource-sdk-smoke.js",
+    "cybs:microform-smoke": "node scripts/cybersource-microform-smoke.js",
     "cap:sync": "cap sync",
     "cap:android": "cap sync android && cap open android",
     "android": "cap sync android && cap open android",
