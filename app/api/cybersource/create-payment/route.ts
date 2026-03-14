@@ -104,10 +104,11 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const captureContext = await cyberSourcePost<any>('/up/v1/capture-contexts', {
+    const enable3DS = process.env.CYBERSOURCE_ENABLE_3DS !== 'false'
+    const captureContextPayload: any = {
       targetOrigins: [appUrl],
       clientVersion: '0.31',
-      allowedCardNetworks: ['VISA', 'MASTERCARD'],
+      allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX'],
       allowedPaymentTypes: ['PANENTRY'],
       country: 'HN',
       locale: 'en_US',
@@ -126,7 +127,15 @@ export async function POST(req: NextRequest) {
           },
         },
       },
-    })
+    }
+    if (enable3DS) {
+      captureContextPayload.completeMandate = {
+        type: 'CAPTURE',
+        consumerAuthentication: true,
+      }
+    }
+
+    const captureContext = await cyberSourcePost<any>('/up/v1/capture-contexts', captureContextPayload)
 
     const captureContextJwt =
       captureContext?.captureContext || captureContext?.token || (typeof captureContext === 'string' ? captureContext : null)
