@@ -207,7 +207,7 @@ export async function POST(req: NextRequest) {
             clientReferenceInformation: { code: paymentReference },
             processingInformation: {
               commerceIndicator: 'internet',
-              capture: true,
+              capture: false,
             },
             tokenInformation: {
               transientTokenJwt: String(transientToken),
@@ -254,6 +254,45 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const amountToCapture = (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2)
+    let captureId: string | null = null
+    let captureStatus: string | null = null
+    if (!isMockMode && transactionId) {
+      const captureResponse = await cyberSourcePost<any>(`/pts/v2/payments/${transactionId}/captures`, {
+        clientReferenceInformation: { code: `${paymentReference}-CAPTURE` },
+        orderInformation: {
+          amountDetails: {
+            totalAmount: amountToCapture,
+            currency,
+          },
+        },
+      })
+      captureId = String(captureResponse?.id || '') || null
+      captureStatus = String(captureResponse?.status || '').toUpperCase() || null
+      const okCaptureStatuses = ['PENDING', 'TRANSMITTED', 'COMPLETED', 'SUCCESS', 'CAPTURED']
+      if (!captureStatus || !okCaptureStatuses.includes(captureStatus)) {
+        await prisma.log.update({
+          where: { id: pendingLog.id },
+          data: {
+            details: {
+              ...pendingDetails,
+              status: 'REJECTED',
+              decision: status,
+              reasonCode,
+              transactionId: transactionId || null,
+              captureId,
+              captureStatus: captureStatus || 'FAILED',
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        })
+        return NextResponse.json(
+          { error: `Captura rechazada por CyberSource (${captureStatus || 'sin-estado'}).` },
+          { status: 402 }
+        )
+      }
+    }
+
     const entries = []
     for (let i = 0; i < Number(pendingDetails?.numberOfEntries || numberOfEntries); i++) {
       const qrToken = generateToken()
@@ -288,6 +327,8 @@ export async function POST(req: NextRequest) {
           cybersourceDecision: status,
           cybersourceReasonCode: reasonCode,
           cybersourceTransactionId: transactionId || null,
+          cybersourceCaptureId: captureId,
+          cybersourceCaptureStatus: captureStatus,
         },
       },
     })
@@ -301,6 +342,8 @@ export async function POST(req: NextRequest) {
           decision: status,
           reasonCode,
           transactionId: transactionId || null,
+          captureId,
+          captureStatus,
           updatedAt: new Date().toISOString(),
         },
       },
