@@ -168,24 +168,29 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    await prisma.log.create({
-      data: {
-        userId,
-        action: 'ATTENDANCE_MARK',
-        details: {
-          attendanceMarkId: mark.id,
-          type: mark.type,
-          role,
-          markedAt: mark.markedAt.toISOString(),
-          latitude: mark.latitude,
-          longitude: mark.longitude,
-          accuracyMeters: mark.accuracyMeters,
-          selfieUrl: mark.selfieUrl,
-          distanceMeters: Math.round(distanceMeters),
-          allowedRadiusMeters: allowedRadius,
+    // Logging is non-blocking: marking attendance must not fail if log insert fails.
+    try {
+      await prisma.log.create({
+        data: {
+          userId,
+          action: 'ATTENDANCE_MARK',
+          details: {
+            attendanceMarkId: mark.id,
+            type: mark.type,
+            role,
+            markedAt: mark.markedAt.toISOString(),
+            latitude: mark.latitude,
+            longitude: mark.longitude,
+            accuracyMeters: mark.accuracyMeters,
+            selfieUrl: mark.selfieUrl,
+            distanceMeters: Math.round(distanceMeters),
+            allowedRadiusMeters: allowedRadius,
+          },
         },
-      },
-    })
+      })
+    } catch (logError) {
+      console.error('[attendance/mark] Log insert failed (non-blocking):', logError)
+    }
 
     return NextResponse.json({
       ok: true,
