@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 type MarkType = 'IN' | 'OUT'
 
@@ -37,10 +37,12 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState('')
   const [message, setMessage] = useState('')
+  const [cameraSupported, setCameraSupported] = useState(true)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const desiredType: MarkType = useMemo(() => (status === 'IN' ? 'OUT' : 'IN'), [status])
 
@@ -74,6 +76,11 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
   }, [])
 
   useEffect(() => {
+    setCameraSupported(
+      typeof navigator !== 'undefined' &&
+        !!navigator.mediaDevices &&
+        typeof navigator.mediaDevices.getUserMedia === 'function'
+    )
     loadToday()
     return () => {
       cleanupStream()
@@ -113,7 +120,13 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
 
   const startCamera = useCallback(async () => {
     setMessage('')
+    cleanupStream()
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraSupported(false)
+        throw new Error('Este dispositivo no permite cámara directa. Usa "Subir selfie".')
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } },
         audio: false,
@@ -121,12 +134,15 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
       streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        videoRef.current.muted = true
+        videoRef.current.setAttribute('playsinline', 'true')
+        await videoRef.current.play().catch(() => {})
       }
       setCameraOn(true)
     } catch (error: any) {
       setMessage(error?.message || 'No se pudo abrir la cámara')
     }
-  }, [])
+  }, [cleanupStream])
 
   const takePhoto = useCallback(async () => {
     const video = videoRef.current
@@ -151,6 +167,24 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
     setPhotoPreviewUrl(URL.createObjectURL(blob))
     cleanupStream()
   }, [cleanupStream, photoPreviewUrl])
+
+  const onFileSelected = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (!file) return
+      if (!file.type.startsWith('image/')) {
+        setMessage('Selecciona una imagen válida para selfie')
+        return
+      }
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+      setPhotoBlob(file)
+      setPhotoPreviewUrl(URL.createObjectURL(file))
+      cleanupStream()
+      event.target.value = ''
+      setMessage('')
+    },
+    [cleanupStream, photoPreviewUrl]
+  )
 
   const submitMark = useCallback(async () => {
     setMessage('')
@@ -221,34 +255,53 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
       ) : (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-dark-50 border border-dark-200 rounded-lg p-3 space-y-3">
+            <div className="bg-dark-50 border border-dark-200 rounded-lg p-3 sm:p-4 space-y-3">
               <p className="text-sm font-medium text-white">1) Selfie</p>
+              <p className="text-xs text-white/60">
+                En móvil puedes usar cámara o subir una foto si el navegador bloquea permisos.
+              </p>
 
               {!cameraOn && !photoPreviewUrl && (
-                <button
-                  type="button"
-                  onClick={startCamera}
-                  className="px-3 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors"
-                >
-                  Activar cámara
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={startCamera}
+                    className="w-full sm:w-auto px-3 py-2.5 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors disabled:opacity-60"
+                    disabled={!cameraSupported}
+                  >
+                    {cameraSupported ? 'Activar cámara' : 'Cámara no disponible'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full sm:w-auto px-3 py-2.5 text-sm rounded-lg bg-dark-200 hover:bg-dark-300 text-white transition-colors"
+                  >
+                    Subir selfie
+                  </button>
+                </div>
               )}
 
               {cameraOn && (
                 <div className="space-y-2">
-                  <video ref={videoRef} autoPlay playsInline className="w-full rounded-lg border border-dark-200" />
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full rounded-lg border border-dark-200 min-h-[220px] bg-black object-cover"
+                  />
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={takePhoto}
-                      className="px-3 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors"
+                      className="flex-1 px-3 py-2.5 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors"
                     >
                       Tomar selfie
                     </button>
                     <button
                       type="button"
                       onClick={cleanupStream}
-                      className="px-3 py-2 text-sm rounded-lg bg-dark-200 hover:bg-dark-300 text-white transition-colors"
+                      className="px-3 py-2.5 text-sm rounded-lg bg-dark-200 hover:bg-dark-300 text-white transition-colors"
                     >
                       Cancelar
                     </button>
@@ -258,24 +311,34 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
 
               {photoPreviewUrl && (
                 <div className="space-y-2">
-                  <img src={photoPreviewUrl} alt="Selfie capturada" className="w-full rounded-lg border border-dark-200 object-cover" />
-                  <button
-                    type="button"
-                    onClick={startCamera}
-                    className="px-3 py-2 text-sm rounded-lg bg-dark-200 hover:bg-dark-300 text-white transition-colors"
-                  >
-                    Repetir selfie
-                  </button>
+                  <img src={photoPreviewUrl} alt="Selfie capturada" className="w-full rounded-lg border border-dark-200 object-cover min-h-[220px]" />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      onClick={startCamera}
+                      className="w-full sm:w-auto px-3 py-2.5 text-sm rounded-lg bg-dark-200 hover:bg-dark-300 text-white transition-colors"
+                      disabled={!cameraSupported}
+                    >
+                      Repetir con cámara
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full sm:w-auto px-3 py-2.5 text-sm rounded-lg bg-dark-200 hover:bg-dark-300 text-white transition-colors"
+                    >
+                      Cambiar archivo
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="bg-dark-50 border border-dark-200 rounded-lg p-3 space-y-3">
+            <div className="bg-dark-50 border border-dark-200 rounded-lg p-3 sm:p-4 space-y-3">
               <p className="text-sm font-medium text-white">2) Geolocalización</p>
               <button
                 type="button"
                 onClick={requestLocation}
-                className="px-3 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors"
+                className="w-full sm:w-auto px-3 py-2.5 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors"
               >
                 Obtener ubicación
               </button>
@@ -290,12 +353,12 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2">
             <button
               type="button"
               onClick={submitMark}
               disabled={submitting}
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-60"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-60"
             >
               {submitting
                 ? 'Guardando...'
@@ -304,7 +367,7 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
                   : 'Marcar salida'}
             </button>
             {latest && (
-              <p className="text-xs text-white/60">
+              <p className="text-xs text-white/60 sm:ml-2">
                 Último marcaje: {latest.type === 'IN' ? 'Entrada' : 'Salida'} -{' '}
                 {new Date(latest.markedAt).toLocaleString('es-HN')}
               </p>
@@ -332,6 +395,14 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
       )}
 
       <canvas ref={canvasRef} className="hidden" />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="user"
+        className="hidden"
+        onChange={onFileSelected}
+      />
     </div>
   )
 }
