@@ -39,6 +39,18 @@ type AdminResponse = {
   }>
 }
 
+type SettingsResponse = {
+  ok: boolean
+  settings: {
+    id: number
+    referenceLatitude: number | null
+    referenceLongitude: number | null
+    radiusMeters: number
+    isActive: boolean
+    updatedAt: string | null
+  }
+}
+
 function todayDateInput() {
   return new Date().toISOString().split('T')[0]
 }
@@ -57,6 +69,11 @@ export function MarcajesClient() {
   const [userId, setUserId] = useState('')
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState({ total: 0, totalPages: 1 })
+  const [configLat, setConfigLat] = useState('')
+  const [configLng, setConfigLng] = useState('')
+  const [settingsUpdatedAt, setSettingsUpdatedAt] = useState<string | null>(null)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [settingsMsg, setSettingsMsg] = useState('')
 
   const query = useMemo(() => {
     const params = new URLSearchParams()
@@ -89,15 +106,105 @@ export function MarcajesClient() {
     }
   }, [query])
 
+  const loadSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/attendance/admin-settings', { cache: 'no-store' })
+      const data = (await res.json()) as SettingsResponse | { error?: string }
+      if (!res.ok || !('ok' in data)) {
+        throw new Error((data as any)?.error || 'No se pudo cargar configuración')
+      }
+      setConfigLat(
+        data.settings.referenceLatitude == null ? '' : String(data.settings.referenceLatitude)
+      )
+      setConfigLng(
+        data.settings.referenceLongitude == null ? '' : String(data.settings.referenceLongitude)
+      )
+      setSettingsUpdatedAt(data.settings.updatedAt)
+    } catch (err: any) {
+      setSettingsMsg(err?.message || 'No se pudo cargar configuración')
+    }
+  }, [])
+
+  const saveSettings = useCallback(async () => {
+    setSavingSettings(true)
+    setSettingsMsg('')
+    try {
+      const res = await fetch('/api/attendance/admin-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referenceLatitude: Number(configLat),
+          referenceLongitude: Number(configLng),
+        }),
+      })
+      const data = (await res.json()) as SettingsResponse | { error?: string }
+      if (!res.ok || !('ok' in data)) {
+        throw new Error((data as any)?.error || 'No se pudo guardar coordenadas')
+      }
+      setSettingsUpdatedAt(data.settings.updatedAt)
+      setSettingsMsg('Coordenadas guardadas correctamente.')
+    } catch (err: any) {
+      setSettingsMsg(err?.message || 'No se pudo guardar coordenadas')
+    } finally {
+      setSavingSettings(false)
+    }
+  }, [configLat, configLng])
+
   useEffect(() => {
     loadData()
-  }, [loadData])
+    loadSettings()
+  }, [loadData, loadSettings])
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">Marcajes</h1>
         <p className="text-sm text-dark-400">Auditoría de entrada/salida con selfie y geolocalización.</p>
+      </div>
+
+      <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 mb-4">
+        <h2 className="text-sm font-semibold text-white mb-2">Coordenadas de referencia (pruebas)</h2>
+        <p className="text-xs text-white/60 mb-3">Radio fijo de validación: 100m (bloquea fuera del radio).</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <label className="text-xs text-white/70">
+            Latitud
+            <input
+              type="number"
+              step="any"
+              value={configLat}
+              onChange={(e) => setConfigLat(e.target.value)}
+              className="mt-1 w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-sm text-white"
+              placeholder="14.0818"
+            />
+          </label>
+          <label className="text-xs text-white/70">
+            Longitud
+            <input
+              type="number"
+              step="any"
+              value={configLng}
+              onChange={(e) => setConfigLng(e.target.value)}
+              className="mt-1 w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-sm text-white"
+              placeholder="-87.2068"
+            />
+          </label>
+          <div className="flex items-end">
+            <button
+              type="button"
+              disabled={savingSettings}
+              onClick={saveSettings}
+              className="w-full px-3 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-60"
+            >
+              {savingSettings ? 'Guardando...' : 'Guardar coordenadas'}
+            </button>
+          </div>
+        </div>
+        {settingsUpdatedAt && (
+          <p className="text-xs text-white/60 mt-2">
+            Última actualización: {new Date(settingsUpdatedAt).toLocaleString('es-HN')}
+          </p>
+        )}
+        {settingsMsg && <p className="text-xs text-white/80 mt-2">{settingsMsg}</p>}
       </div>
 
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 mb-4">

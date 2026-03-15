@@ -8,6 +8,8 @@ import { prisma } from '@/lib/prisma'
 const ALLOWED_ROLES = ['ADMIN', 'MESERO', 'CAJERO', 'TAQUILLA']
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 const MAX_ACCURACY_METERS = 3000
+const SETTINGS_ID = 1
+const DEFAULT_RADIUS_METERS = 100
 
 function toFiniteNumber(value: FormDataEntryValue | null) {
   if (typeof value !== 'string') return null
@@ -17,6 +19,26 @@ function toFiniteNumber(value: FormDataEntryValue | null) {
 
 function isSupportedMarkType(value: FormDataEntryValue | null): value is AttendanceMarkType {
   return value === 'IN' || value === 'OUT'
+}
+
+function haversineDistanceMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const R = 6371000
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
 }
 
 export async function POST(req: NextRequest) {
@@ -74,6 +96,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No puedes marcar salida sin una entrada previa.' }, { status: 409 })
     }
 
+    const settings = await prisma.attendanceSettings.findUnique({
+      where: { id: SETTINGS_ID },
+      select: {
+        referenceLatitude: true,
+        referenceLongitude: true,
+        radiusMeters: true,
+        isActive: true,
+      },
+    })
+
+    if (
+      !settings ||
+      !settings.isActive ||
+      settings.referenceLatitude == null ||
+      settings.referenceLongitude == null
+    ) {
+      return NextResponse.json(
+        { error: 'El admin aún no ha configurado las coordenadas de referencia.' },
+        { status: 400 }
+      )
+    }
+
+    const allowedRadius = settings.radiusMeters || DEFAULT_RADIUS_METERS
+    const distanceMeters = haversineDistanceMeters(
+      latitude,
+      longitude,
+      settings.referenceLatitude,
+      settings.referenceLongitude
+    )
+
+    if (distanceMeters > allowedRadius) {
+      return NextResponse.json(
+        {
+          error: `Marcaje bloqueado: estás a ${Math.round(distanceMeters)}m del punto permitido (máximo ${allowedRadius}m).`,
+        },
+        { status: 400 }
+      )
+    }
+
     const safeName = selfie.name.replace(/[^a-zA-Z0-9._-]/g, '_')
     const filename = `attendance/${userId}/${Date.now()}-${safeName || 'selfie.jpg'}`
     const blob = await put(filename, selfie, { access: 'public' })
@@ -116,6 +177,8 @@ export async function POST(req: NextRequest) {
           longitude: mark.longitude,
           accuracyMeters: mark.accuracyMeters,
           selfieUrl: mark.selfieUrl,
+          distanceMeters: Math.round(distanceMeters),
+          allowedRadiusMeters: allowedRadius,
         },
       },
     })
