@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 const ALLOWED_ROLES = ['ADMIN', 'MESERO', 'CAJERO', 'TAQUILLA']
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024
 const MAX_ACCURACY_METERS_RAW = Number(process.env.ATTENDANCE_MAX_ACCURACY_METERS || '200')
 const MAX_ACCURACY_METERS =
   Number.isFinite(MAX_ACCURACY_METERS_RAW) && MAX_ACCURACY_METERS_RAW > 0
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'La selfie debe ser una imagen' }, { status: 400 })
     }
     if (selfie.size <= 0 || selfie.size > MAX_IMAGE_SIZE) {
-      return NextResponse.json({ error: 'La selfie debe pesar máximo 5MB' }, { status: 400 })
+      return NextResponse.json({ error: 'La selfie debe pesar máximo 2MB' }, { status: 400 })
     }
     if (latitude == null || longitude == null || accuracyMeters == null) {
       return NextResponse.json({ error: 'La geolocalización es obligatoria' }, { status: 400 })
