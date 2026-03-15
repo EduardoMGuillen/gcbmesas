@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { CashierOrders } from '@/components/CashierOrders'
 import { CashierAccounts } from '@/components/CashierAccounts'
+import { AttendanceMarkCard } from '@/components/AttendanceMarkCard'
 
 type ActiveMesero = {
   id: string
@@ -112,6 +113,10 @@ export function CajeroDashboard({
 
   return (
     <>
+      <div className="mb-6">
+        <AttendanceMarkCard compact />
+      </div>
+
       {/* Filtro de meseros activos */}
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-3">

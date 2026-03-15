@@ -10,6 +10,12 @@ function parsePositiveInt(value: string | null, fallback: number) {
   return Math.floor(parsed)
 }
 
+const MAX_ACCURACY_METERS_RAW = Number(process.env.ATTENDANCE_MAX_ACCURACY_METERS || '200')
+const MAX_ACCURACY_METERS =
+  Number.isFinite(MAX_ACCURACY_METERS_RAW) && MAX_ACCURACY_METERS_RAW > 0
+    ? MAX_ACCURACY_METERS_RAW
+    : 200
+
 function parseDateStart(value: string | null) {
   if (!value) return null
   const d = new Date(value)
@@ -39,6 +45,7 @@ export async function GET(req: NextRequest) {
     const role = searchParams.get('role')
     const type = searchParams.get('type')
     const userId = searchParams.get('userId')
+    const precisionStatus = searchParams.get('precisionStatus')
     const page = parsePositiveInt(searchParams.get('page'), 1)
     const pageSize = Math.min(parsePositiveInt(searchParams.get('pageSize'), 50), 200)
     const skip = (page - 1) * pageSize
@@ -57,6 +64,11 @@ export async function GET(req: NextRequest) {
     }
     if (userId) {
       where.userId = userId
+    }
+    if (precisionStatus === 'good') {
+      where.accuracyMeters = { lte: MAX_ACCURACY_METERS }
+    } else if (precisionStatus === 'bad') {
+      where.accuracyMeters = { gt: MAX_ACCURACY_METERS }
     }
 
     const [marks, total, users] = await Promise.all([

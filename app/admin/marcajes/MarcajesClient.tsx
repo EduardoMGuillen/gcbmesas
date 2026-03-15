@@ -66,6 +66,7 @@ export function MarcajesClient() {
   const [to, setTo] = useState(todayDateInput)
   const [role, setRole] = useState('')
   const [type, setType] = useState('')
+  const [precisionStatus, setPrecisionStatus] = useState('')
   const [userId, setUserId] = useState('')
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState({ total: 0, totalPages: 1 })
@@ -83,9 +84,10 @@ export function MarcajesClient() {
     params.set('pageSize', '50')
     if (role) params.set('role', role)
     if (type) params.set('type', type)
+    if (precisionStatus) params.set('precisionStatus', precisionStatus)
     if (userId) params.set('userId', userId)
     return params.toString()
-  }, [from, to, role, type, userId, page])
+  }, [from, to, role, type, precisionStatus, userId, page])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -149,6 +151,72 @@ export function MarcajesClient() {
       setSavingSettings(false)
     }
   }, [configLat, configLng])
+
+  const copyCoordinates = useCallback(async (lat: number, lng: number) => {
+    try {
+      await navigator.clipboard.writeText(`${lat}, ${lng}`)
+      setSettingsMsg('Coordenadas copiadas al portapapeles.')
+    } catch {
+      setSettingsMsg('No se pudo copiar al portapapeles.')
+    }
+  }, [])
+
+  const exportCsv = useCallback(async () => {
+    try {
+      const params = new URLSearchParams()
+      params.set('from', from)
+      params.set('to', to)
+      params.set('page', '1')
+      params.set('pageSize', '5000')
+      if (role) params.set('role', role)
+      if (type) params.set('type', type)
+      if (precisionStatus) params.set('precisionStatus', precisionStatus)
+      if (userId) params.set('userId', userId)
+
+      const res = await fetch(`/api/attendance/admin?${params.toString()}`, { cache: 'no-store' })
+      const data = (await res.json()) as AdminResponse | { error?: string }
+      if (!res.ok || !('ok' in data)) {
+        throw new Error((data as any)?.error || 'No se pudo exportar CSV')
+      }
+
+      const headers = [
+        'fecha',
+        'usuario',
+        'rol',
+        'tipo',
+        'latitud',
+        'longitud',
+        'precision_metros',
+        'origen',
+        'selfie_url',
+      ]
+      const rows = data.marks.map((m) => [
+        new Date(m.markedAt).toISOString(),
+        m.user.name || m.user.username,
+        m.role,
+        m.type,
+        String(m.latitude),
+        String(m.longitude),
+        String(m.accuracyMeters),
+        m.source,
+        m.selfieUrl,
+      ])
+
+      const escapeCsv = (value: string) => `"${String(value).replace(/"/g, '""')}"`
+      const content =
+        `${headers.map(escapeCsv).join(',')}\n` +
+        rows.map((row) => row.map(escapeCsv).join(',')).join('\n')
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `marcajes_${from}_${to}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo exportar CSV')
+    }
+  }, [from, precisionStatus, role, to, type, userId])
 
   useEffect(() => {
     loadData()
@@ -265,6 +333,21 @@ export function MarcajesClient() {
               <option value="OUT">Salida</option>
             </select>
           </label>
+          <label className="text-xs text-white/70">
+            Precisión
+            <select
+              value={precisionStatus}
+              onChange={(e) => {
+                setPrecisionStatus(e.target.value)
+                setPage(1)
+              }}
+              className="mt-1 w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-sm text-white"
+            >
+              <option value="">Todas</option>
+              <option value="good">Precisa (&lt;=200m)</option>
+              <option value="bad">Imprecisa (&gt;200m)</option>
+            </select>
+          </label>
           <label className="text-xs text-white/70 sm:col-span-2">
             Usuario
             <select
@@ -289,13 +372,22 @@ export function MarcajesClient() {
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm text-white/70">Registros: {meta.total}</p>
-          <button
-            type="button"
-            onClick={loadData}
-            className="px-3 py-1.5 text-xs rounded-lg bg-primary-600 hover:bg-primary-700 text-white"
-          >
-            Recargar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="px-3 py-1.5 text-xs rounded-lg bg-green-600 hover:bg-green-700 text-white"
+            >
+              Exportar CSV
+            </button>
+            <button
+              type="button"
+              onClick={loadData}
+              className="px-3 py-1.5 text-xs rounded-lg bg-primary-600 hover:bg-primary-700 text-white"
+            >
+              Recargar
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -314,7 +406,8 @@ export function MarcajesClient() {
                   <th className="text-left py-2 px-3 text-white/70 font-medium">Rol</th>
                   <th className="text-left py-2 px-3 text-white/70 font-medium">Tipo</th>
                   <th className="text-left py-2 px-3 text-white/70 font-medium">GPS</th>
-                  <th className="text-left py-2 px-3 text-white/70 font-medium">Selfie</th>
+                  <th className="text-left py-2 px-3 text-white/70 font-medium">Origen</th>
+                  <th className="text-left py-2 px-3 text-white/70 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -336,14 +429,24 @@ export function MarcajesClient() {
                       <div>{m.latitude.toFixed(5)}, {m.longitude.toFixed(5)}</div>
                       <div>Precisión: {Math.round(m.accuracyMeters)}m</div>
                     </td>
+                    <td className="py-2 px-3 text-xs text-white/70">{m.source || 'web'}</td>
                     <td className="py-2 px-3">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedImage(m.selfieUrl)}
-                        className="px-2 py-1 rounded bg-primary-600 hover:bg-primary-700 text-white text-xs"
-                      >
-                        Ver selfie
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedImage(m.selfieUrl)}
+                          className="px-2 py-1 rounded bg-primary-600 hover:bg-primary-700 text-white text-xs"
+                        >
+                          Ver selfie
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copyCoordinates(m.latitude, m.longitude)}
+                          className="px-2 py-1 rounded bg-dark-200 hover:bg-dark-300 text-white text-xs"
+                        >
+                          Copiar coords
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
