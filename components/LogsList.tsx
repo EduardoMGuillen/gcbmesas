@@ -31,6 +31,7 @@ const actionLabels: Record<LogAction, string> = {
   EVENT_UPDATED: 'Evento Actualizado',
   ENTRY_SOLD: 'Entrada Vendida',
   ENTRY_USED: 'Entrada Utilizada',
+  ATTENDANCE_MARK: 'Marcaje de Asistencia',
 }
 
 function getActionLabel(action: string): string {

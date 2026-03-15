@@ -7,6 +7,7 @@ import { CleanUrlParams } from '@/components/CleanUrlParams'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { closeOldAccounts } from '@/lib/actions'
+import { AttendanceMarkCard } from '@/components/AttendanceMarkCard'
 
 export default async function MeseroPage() {
   const session = await getServerSession(authOptions)
@@ -34,6 +35,10 @@ export default async function MeseroPage() {
           <p className="text-sm sm:text-base text-dark-400">
             Gestiona pedidos y cuentas de las mesas
           </p>
+        </div>
+
+        <div className="mb-6">
+          <AttendanceMarkCard compact />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">

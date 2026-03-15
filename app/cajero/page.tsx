@@ -5,6 +5,7 @@ import { getCashierDashboardData, closeOldAccounts } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { CajeroDashboard } from './CajeroDashboard'
+import { AttendanceMarkCard } from '@/components/AttendanceMarkCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,8 @@ export default async function CajeroPage() {
             realizados cuando estén listos.
           </p>
         </div>
+
+        <AttendanceMarkCard compact />
 
         <CajeroDashboard
           accounts={accounts}
