@@ -1,6 +1,7 @@
 'use client'
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 type MarkType = 'IN' | 'OUT'
 
@@ -26,6 +27,7 @@ type TodayResponse = {
 }
 
 export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState<'IN' | 'OUT'>('OUT')
@@ -33,29 +35,13 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
   const [todayMarks, setTodayMarks] = useState<TodayResponse['todayMarks']>([])
   const [location, setLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null)
   const [locationError, setLocationError] = useState('')
-  const [cameraOn, setCameraOn] = useState(false)
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState('')
   const [message, setMessage] = useState('')
-  const [cameraSupported, setCameraSupported] = useState(true)
 
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const desiredType: MarkType = useMemo(() => (status === 'IN' ? 'OUT' : 'IN'), [status])
-
-  const cleanupStream = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-    }
-    setCameraOn(false)
-  }, [])
 
   const loadToday = useCallback(async () => {
     setLoading(true)
@@ -76,14 +62,8 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
   }, [])
 
   useEffect(() => {
-    setCameraSupported(
-      typeof navigator !== 'undefined' &&
-        !!navigator.mediaDevices &&
-        typeof navigator.mediaDevices.getUserMedia === 'function'
-    )
     loadToday()
     return () => {
-      cleanupStream()
       if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,56 +98,6 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
     })
   }, [])
 
-  const startCamera = useCallback(async () => {
-    setMessage('')
-    cleanupStream()
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraSupported(false)
-        throw new Error('Este dispositivo no permite cámara directa. Usa "Subir selfie".')
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } },
-        audio: false,
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.muted = true
-        videoRef.current.setAttribute('playsinline', 'true')
-        await videoRef.current.play().catch(() => {})
-      }
-      setCameraOn(true)
-    } catch (error: any) {
-      setMessage(error?.message || 'No se pudo abrir la cámara')
-    }
-  }, [cleanupStream])
-
-  const takePhoto = useCallback(async () => {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas) return
-    if (!video.videoWidth || !video.videoHeight) {
-      setMessage('La cámara aún no está lista')
-      return
-    }
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9))
-    if (!blob) {
-      setMessage('No se pudo capturar la selfie')
-      return
-    }
-    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
-    setPhotoBlob(blob)
-    setPhotoPreviewUrl(URL.createObjectURL(blob))
-    cleanupStream()
-  }, [cleanupStream, photoPreviewUrl])
-
   const onFileSelected = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
@@ -179,11 +109,10 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
       if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
       setPhotoBlob(file)
       setPhotoPreviewUrl(URL.createObjectURL(file))
-      cleanupStream()
       event.target.value = ''
       setMessage('')
     },
-    [cleanupStream, photoPreviewUrl]
+    [photoPreviewUrl]
   )
 
   const submitMark = useCallback(async () => {
@@ -223,12 +152,15 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
       setPhotoPreviewUrl('')
       setLocation(null)
       await loadToday()
+      if (desiredType === 'IN') {
+        router.refresh()
+      }
     } catch (error: any) {
       setMessage(error?.message || 'No se pudo guardar el marcaje')
     } finally {
       setSubmitting(false)
     }
-  }, [desiredType, loadToday, location, photoBlob, photoPreviewUrl])
+  }, [desiredType, loadToday, location, photoBlob, photoPreviewUrl, router])
 
   const headerTitle = compact ? 'Marcaje de turno' : 'Marcaje de asistencia'
 
@@ -258,54 +190,18 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
             <div className="bg-dark-50 border border-dark-200 rounded-lg p-3 sm:p-4 space-y-3">
               <p className="text-sm font-medium text-white">1) Selfie</p>
               <p className="text-xs text-white/60">
-                En móvil puedes usar cámara o subir una foto si el navegador bloquea permisos.
+                Selecciona o toma la foto con el botón de subir selfie.
               </p>
 
-              {!cameraOn && !photoPreviewUrl && (
+              {!photoPreviewUrl && (
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"
-                    onClick={startCamera}
-                    className="w-full sm:w-auto px-3 py-2.5 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors disabled:opacity-60"
-                    disabled={!cameraSupported}
-                  >
-                    {cameraSupported ? 'Activar cámara' : 'Cámara no disponible'}
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full sm:w-auto px-3 py-2.5 text-sm rounded-lg bg-dark-200 hover:bg-dark-300 text-white transition-colors"
+                    className="w-full sm:w-auto px-3 py-2.5 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors"
                   >
                     Subir selfie
                   </button>
-                </div>
-              )}
-
-              {cameraOn && (
-                <div className="space-y-2">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full rounded-lg border border-dark-200 min-h-[220px] bg-black object-cover"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={takePhoto}
-                      className="flex-1 px-3 py-2.5 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors"
-                    >
-                      Tomar selfie
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cleanupStream}
-                      className="px-3 py-2.5 text-sm rounded-lg bg-dark-200 hover:bg-dark-300 text-white transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -313,14 +209,6 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
                 <div className="space-y-2">
                   <img src={photoPreviewUrl} alt="Selfie capturada" className="w-full rounded-lg border border-dark-200 object-cover min-h-[220px]" />
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <button
-                      type="button"
-                      onClick={startCamera}
-                      className="w-full sm:w-auto px-3 py-2.5 text-sm rounded-lg bg-dark-200 hover:bg-dark-300 text-white transition-colors"
-                      disabled={!cameraSupported}
-                    >
-                      Repetir con cámara
-                    </button>
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -394,7 +282,6 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
         </div>
       )}
 
-      <canvas ref={canvasRef} className="hidden" />
       <input
         ref={fileInputRef}
         type="file"
