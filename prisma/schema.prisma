@@ -45,6 +45,12 @@ enum LogAction {
   EVENT_UPDATED
   ENTRY_SOLD
   ENTRY_USED
+  ATTENDANCE_MARK
+}
+
+enum AttendanceMarkType {
+  IN
+  OUT
 }
 
 enum EntryStatus {
@@ -68,6 +74,7 @@ model User {
   pushSubscriptions PushSubscription[]
   createdEvents     Event[]
   createdEntries    Entry[]
+  attendanceMarks   AttendanceMark[]
 
   @@map("users")
 }
@@ -222,5 +229,29 @@ model Entry {
   @@index([status])
   @@index([createdAt])
   @@map("entries")
+}
+
+model AttendanceMark {
+  id             String             @id @default(cuid())
+  userId         String
+  role           UserRole
+  type           AttendanceMarkType
+  markedAt       DateTime           @default(now())
+  latitude       Float
+  longitude      Float
+  accuracyMeters Float
+  selfieUrl      String
+  source         String             @default("web")
+  userAgent      String?
+  notes          String?
+  createdAt      DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, markedAt])
+  @@index([role, markedAt])
+  @@index([type, markedAt])
+  @@index([createdAt])
+  @@map("attendance_marks")
 }
 
