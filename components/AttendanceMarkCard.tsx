@@ -26,6 +26,69 @@ type TodayResponse = {
   }>
 }
 
+const MAX_SELFIE_BYTES = 2 * 1024 * 1024
+const TARGET_SELFIE_BYTES = Math.floor(1.8 * 1024 * 1024)
+
+async function compressImageToTarget(file: File, targetBytes = TARGET_SELFIE_BYTES) {
+  if (file.size <= targetBytes) return file
+
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen'))
+    reader.readAsDataURL(file)
+  })
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('No se pudo cargar la imagen para compresión'))
+    img.src = dataUrl
+  })
+
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return file
+
+  let width = image.width
+  let height = image.height
+  const maxDimension = 1600
+  if (width > maxDimension || height > maxDimension) {
+    const scale = Math.min(maxDimension / width, maxDimension / height)
+    width = Math.round(width * scale)
+    height = Math.round(height * scale)
+  }
+
+  let bestBlob: Blob | null = null
+  for (let round = 0; round < 4; round++) {
+    canvas.width = width
+    canvas.height = height
+    ctx.clearRect(0, 0, width, height)
+    ctx.drawImage(image, 0, 0, width, height)
+
+    for (const quality of [0.86, 0.76, 0.66, 0.56, 0.46]) {
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', quality)
+      )
+      if (!blob) continue
+      if (!bestBlob || blob.size < bestBlob.size) bestBlob = blob
+      if (blob.size <= targetBytes) {
+        return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', {
+          type: 'image/jpeg',
+        })
+      }
+    }
+
+    width = Math.max(640, Math.round(width * 0.85))
+    height = Math.max(640, Math.round(height * 0.85))
+  }
+
+  if (!bestBlob) return file
+  return new File([bestBlob], file.name.replace(/\.\w+$/, '') + '.jpg', {
+    type: 'image/jpeg',
+  })
+}
+
 export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -106,9 +169,14 @@ export function AttendanceMarkCard({ compact = false }: { compact?: boolean }) {
         setMessage('Selecciona una imagen válida para selfie')
         return
       }
+      const compressedFile = await compressImageToTarget(file)
+      if (compressedFile.size > MAX_SELFIE_BYTES) {
+        setMessage('La selfie sigue muy pesada. Usa una imagen más ligera (máx 2MB).')
+        return
+      }
       if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
-      setPhotoBlob(file)
-      setPhotoPreviewUrl(URL.createObjectURL(file))
+      setPhotoBlob(compressedFile)
+      setPhotoPreviewUrl(URL.createObjectURL(compressedFile))
       event.target.value = ''
       setMessage('')
     },

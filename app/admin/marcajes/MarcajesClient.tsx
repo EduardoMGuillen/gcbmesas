@@ -75,6 +75,7 @@ export function MarcajesClient() {
   const [settingsUpdatedAt, setSettingsUpdatedAt] = useState<string | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState('')
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   const query = useMemo(() => {
     const params = new URLSearchParams()
@@ -161,23 +162,28 @@ export function MarcajesClient() {
     }
   }, [])
 
+  const fetchFilteredMarks = useCallback(async () => {
+    const params = new URLSearchParams()
+    params.set('from', from)
+    params.set('to', to)
+    params.set('page', '1')
+    params.set('pageSize', '5000')
+    if (role) params.set('role', role)
+    if (type) params.set('type', type)
+    if (precisionStatus) params.set('precisionStatus', precisionStatus)
+    if (userId) params.set('userId', userId)
+
+    const res = await fetch(`/api/attendance/admin?${params.toString()}`, { cache: 'no-store' })
+    const data = (await res.json()) as AdminResponse | { error?: string }
+    if (!res.ok || !('ok' in data)) {
+      throw new Error((data as any)?.error || 'No se pudo cargar marcajes')
+    }
+    return data
+  }, [from, precisionStatus, role, to, type, userId])
+
   const exportCsv = useCallback(async () => {
     try {
-      const params = new URLSearchParams()
-      params.set('from', from)
-      params.set('to', to)
-      params.set('page', '1')
-      params.set('pageSize', '5000')
-      if (role) params.set('role', role)
-      if (type) params.set('type', type)
-      if (precisionStatus) params.set('precisionStatus', precisionStatus)
-      if (userId) params.set('userId', userId)
-
-      const res = await fetch(`/api/attendance/admin?${params.toString()}`, { cache: 'no-store' })
-      const data = (await res.json()) as AdminResponse | { error?: string }
-      if (!res.ok || !('ok' in data)) {
-        throw new Error((data as any)?.error || 'No se pudo exportar CSV')
-      }
+      const data = await fetchFilteredMarks()
 
       const headers = [
         'fecha',
@@ -216,7 +222,85 @@ export function MarcajesClient() {
     } catch (err: any) {
       setError(err?.message || 'No se pudo exportar CSV')
     }
-  }, [from, precisionStatus, role, to, type, userId])
+  }, [fetchFilteredMarks, from, to])
+
+  const imageUrlToDataUrl = useCallback(async (url: string) => {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('No se pudo cargar selfie')
+    const blob = await res.blob()
+    const bitmap = await createImageBitmap(blob)
+    const canvas = document.createElement('canvas')
+    const maxW = 320
+    const maxH = 240
+    const scale = Math.min(maxW / bitmap.width, maxH / bitmap.height, 1)
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('No se pudo preparar selfie')
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/jpeg', 0.7)
+  }, [])
+
+  const exportPdf = useCallback(async () => {
+    setExportingPdf(true)
+    setError('')
+    try {
+      const data = await fetchFilteredMarks()
+      const { jsPDF } = await import('jspdf')
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
+      const left = 12
+      const right = 198
+      const pageBottom = 285
+      let y = 12
+
+      pdf.setFontSize(14)
+      pdf.text('Reporte de Marcajes', left, y)
+      y += 6
+      pdf.setFontSize(9)
+      pdf.text(`Rango: ${from} a ${to}`, left, y)
+      y += 4
+      pdf.text(`Filtros: rol=${role || 'todos'}, tipo=${type || 'todos'}, precisión=${precisionStatus || 'todas'}`, left, y)
+      y += 4
+      pdf.text(`Total registros: ${data.marks.length}`, left, y)
+      y += 6
+
+      for (const mark of data.marks) {
+        if (y > pageBottom - 50) {
+          pdf.addPage()
+          y = 12
+        }
+
+        pdf.setDrawColor(70, 70, 70)
+        pdf.rect(left, y, right - left, 46)
+        pdf.setFontSize(9)
+        const userLabel = mark.user.name || mark.user.username
+        pdf.text(`Usuario: ${userLabel} (${mark.role})`, left + 2, y + 5)
+        pdf.text(`Tipo: ${mark.type === 'IN' ? 'Entrada' : 'Salida'}`, left + 2, y + 10)
+        pdf.text(`Fecha: ${new Date(mark.markedAt).toLocaleString('es-HN')}`, left + 2, y + 15)
+        pdf.text(`GPS: ${mark.latitude.toFixed(6)}, ${mark.longitude.toFixed(6)}`, left + 2, y + 20)
+        pdf.text(`Precisión: ${Math.round(mark.accuracyMeters)}m`, left + 2, y + 25)
+        pdf.text(`Origen: ${mark.source || 'web'}`, left + 2, y + 30)
+
+        try {
+          const dataUrl = await imageUrlToDataUrl(mark.selfieUrl)
+          pdf.addImage(dataUrl, 'JPEG', right - 52, y + 2, 38, 28)
+          pdf.setFontSize(7)
+          pdf.text('Selfie', right - 37, y + 34, { align: 'center' })
+        } catch {
+          pdf.setFontSize(8)
+          pdf.text('Selfie no disponible', right - 48, y + 20)
+        }
+
+        y += 50
+      }
+
+      pdf.save(`marcajes_${from}_${to}.pdf`)
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo exportar PDF')
+    } finally {
+      setExportingPdf(false)
+    }
+  }, [fetchFilteredMarks, from, imageUrlToDataUrl, precisionStatus, role, to, type])
 
   useEffect(() => {
     loadData()
@@ -373,6 +457,14 @@ export function MarcajesClient() {
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm text-white/70">Registros: {meta.total}</p>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={exportPdf}
+              disabled={exportingPdf}
+              className="px-3 py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60"
+            >
+              {exportingPdf ? 'Generando PDF...' : 'Exportar PDF'}
+            </button>
             <button
               type="button"
               onClick={exportCsv}
