@@ -7,13 +7,9 @@ import { prisma } from '@/lib/prisma'
 
 const ALLOWED_ROLES = ['ADMIN', 'MESERO', 'CAJERO', 'TAQUILLA']
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024
-const MAX_ACCURACY_METERS_RAW = Number(process.env.ATTENDANCE_MAX_ACCURACY_METERS || '200')
-const MAX_ACCURACY_METERS =
-  Number.isFinite(MAX_ACCURACY_METERS_RAW) && MAX_ACCURACY_METERS_RAW > 0
-    ? MAX_ACCURACY_METERS_RAW
-    : 200
 const SETTINGS_ID = 1
 const DEFAULT_RADIUS_METERS = 100
+const DEFAULT_MAX_ACCURACY_METERS = 200
 
 function toFiniteNumber(value: FormDataEntryValue | null) {
   if (typeof value !== 'string') return null
@@ -78,11 +74,8 @@ export async function POST(req: NextRequest) {
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
       return NextResponse.json({ error: 'Coordenadas inválidas' }, { status: 400 })
     }
-    if (accuracyMeters <= 0 || accuracyMeters > MAX_ACCURACY_METERS) {
-      return NextResponse.json(
-        { error: `Precisión GPS insuficiente (${Math.round(accuracyMeters)}m)` },
-        { status: 400 }
-      )
+    if (accuracyMeters <= 0) {
+      return NextResponse.json({ error: 'Precisión GPS inválida' }, { status: 400 })
     }
 
     const userId = session.user.id
@@ -106,6 +99,7 @@ export async function POST(req: NextRequest) {
         referenceLatitude: true,
         referenceLongitude: true,
         radiusMeters: true,
+        maxAccuracyMeters: true,
         isActive: true,
       },
     })
@@ -123,6 +117,13 @@ export async function POST(req: NextRequest) {
     }
 
     const allowedRadius = settings.radiusMeters || DEFAULT_RADIUS_METERS
+    const allowedAccuracy = settings.maxAccuracyMeters || DEFAULT_MAX_ACCURACY_METERS
+    if (accuracyMeters > allowedAccuracy) {
+      return NextResponse.json(
+        { error: `Precisión GPS insuficiente (${Math.round(accuracyMeters)}m). Máximo permitido: ${allowedAccuracy}m.` },
+        { status: 400 }
+      )
+    }
     const distanceMeters = haversineDistanceMeters(
       latitude,
       longitude,
@@ -185,6 +186,7 @@ export async function POST(req: NextRequest) {
             selfieUrl: mark.selfieUrl,
             distanceMeters: Math.round(distanceMeters),
             allowedRadiusMeters: allowedRadius,
+            allowedAccuracyMeters: allowedAccuracy,
           },
         },
       })
