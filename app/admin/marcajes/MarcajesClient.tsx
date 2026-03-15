@@ -46,6 +46,7 @@ type SettingsResponse = {
     referenceLatitude: number | null
     referenceLongitude: number | null
     radiusMeters: number
+    maxAccuracyMeters: number
     isActive: boolean
     updatedAt: string | null
   }
@@ -72,9 +73,12 @@ export function MarcajesClient() {
   const [meta, setMeta] = useState({ total: 0, totalPages: 1 })
   const [configLat, setConfigLat] = useState('')
   const [configLng, setConfigLng] = useState('')
+  const [configRadiusMeters, setConfigRadiusMeters] = useState('100')
+  const [configMaxAccuracyMeters, setConfigMaxAccuracyMeters] = useState('200')
   const [settingsUpdatedAt, setSettingsUpdatedAt] = useState<string | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState('')
+  const [showGeoConfig, setShowGeoConfig] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
 
   const query = useMemo(() => {
@@ -122,6 +126,8 @@ export function MarcajesClient() {
       setConfigLng(
         data.settings.referenceLongitude == null ? '' : String(data.settings.referenceLongitude)
       )
+      setConfigRadiusMeters(String(data.settings.radiusMeters || 100))
+      setConfigMaxAccuracyMeters(String(data.settings.maxAccuracyMeters || 200))
       setSettingsUpdatedAt(data.settings.updatedAt)
     } catch (err: any) {
       setSettingsMsg(err?.message || 'No se pudo cargar configuración')
@@ -138,6 +144,8 @@ export function MarcajesClient() {
         body: JSON.stringify({
           referenceLatitude: Number(configLat),
           referenceLongitude: Number(configLng),
+          radiusMeters: Number(configRadiusMeters),
+          maxAccuracyMeters: Number(configMaxAccuracyMeters),
         }),
       })
       const data = (await res.json()) as SettingsResponse | { error?: string }
@@ -151,7 +159,7 @@ export function MarcajesClient() {
     } finally {
       setSavingSettings(false)
     }
-  }, [configLat, configLng])
+  }, [configLat, configLng, configMaxAccuracyMeters, configRadiusMeters])
 
   const copyCoordinates = useCallback(async (lat: number, lng: number) => {
     try {
@@ -315,48 +323,88 @@ export function MarcajesClient() {
       </div>
 
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 mb-4">
-        <h2 className="text-sm font-semibold text-white mb-2">Coordenadas de referencia (pruebas)</h2>
-        <p className="text-xs text-white/60 mb-3">Radio fijo de validación: 100m (bloquea fuera del radio).</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <label className="text-xs text-white/70">
-            Latitud
-            <input
-              type="number"
-              step="any"
-              value={configLat}
-              onChange={(e) => setConfigLat(e.target.value)}
-              className="mt-1 w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-sm text-white"
-              placeholder="14.0818"
-            />
-          </label>
-          <label className="text-xs text-white/70">
-            Longitud
-            <input
-              type="number"
-              step="any"
-              value={configLng}
-              onChange={(e) => setConfigLng(e.target.value)}
-              className="mt-1 w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-sm text-white"
-              placeholder="-87.2068"
-            />
-          </label>
-          <div className="flex items-end">
-            <button
-              type="button"
-              disabled={savingSettings}
-              onClick={saveSettings}
-              className="w-full px-3 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-60"
-            >
-              {savingSettings ? 'Guardando...' : 'Guardar coordenadas'}
-            </button>
+        <button
+          type="button"
+          onClick={() => setShowGeoConfig((v) => !v)}
+          className="w-full flex items-center justify-between text-left"
+        >
+          <div>
+            <h2 className="text-sm font-semibold text-white">Configuración geográfica (admin)</h2>
+            <p className="text-xs text-white/60">
+              Sección oculta: ajustar límites de validación y coordenadas.
+            </p>
           </div>
-        </div>
-        {settingsUpdatedAt && (
-          <p className="text-xs text-white/60 mt-2">
-            Última actualización: {new Date(settingsUpdatedAt).toLocaleString('es-HN')}
-          </p>
+          <span className="text-xs text-primary-300">{showGeoConfig ? 'Ocultar' : 'Mostrar'}</span>
+        </button>
+
+        {showGeoConfig && (
+          <div className="mt-3 border-t border-dark-200 pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <label className="text-xs text-white/70">
+                Latitud
+                <input
+                  type="number"
+                  step="any"
+                  value={configLat}
+                  onChange={(e) => setConfigLat(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-sm text-white"
+                  placeholder="14.0818"
+                />
+              </label>
+              <label className="text-xs text-white/70">
+                Longitud
+                <input
+                  type="number"
+                  step="any"
+                  value={configLng}
+                  onChange={(e) => setConfigLng(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-sm text-white"
+                  placeholder="-87.2068"
+                />
+              </label>
+              <label className="text-xs text-white/70">
+                Radio permitido (m)
+                <input
+                  type="number"
+                  min={10}
+                  max={5000}
+                  value={configRadiusMeters}
+                  onChange={(e) => setConfigRadiusMeters(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-sm text-white"
+                  placeholder="100"
+                />
+              </label>
+              <label className="text-xs text-white/70">
+                Precisión máxima (m)
+                <input
+                  type="number"
+                  min={10}
+                  max={5000}
+                  value={configMaxAccuracyMeters}
+                  onChange={(e) => setConfigMaxAccuracyMeters(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-sm text-white"
+                  placeholder="200"
+                />
+              </label>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  disabled={savingSettings}
+                  onClick={saveSettings}
+                  className="w-full px-3 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-60"
+                >
+                  {savingSettings ? 'Guardando...' : 'Guardar ajustes'}
+                </button>
+              </div>
+            </div>
+            {settingsUpdatedAt && (
+              <p className="text-xs text-white/60 mt-2">
+                Última actualización: {new Date(settingsUpdatedAt).toLocaleString('es-HN')}
+              </p>
+            )}
+            {settingsMsg && <p className="text-xs text-white/80 mt-2">{settingsMsg}</p>}
+          </div>
         )}
-        {settingsMsg && <p className="text-xs text-white/80 mt-2">{settingsMsg}</p>}
       </div>
 
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 mb-4">

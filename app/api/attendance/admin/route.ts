@@ -10,11 +10,8 @@ function parsePositiveInt(value: string | null, fallback: number) {
   return Math.floor(parsed)
 }
 
-const MAX_ACCURACY_METERS_RAW = Number(process.env.ATTENDANCE_MAX_ACCURACY_METERS || '200')
-const MAX_ACCURACY_METERS =
-  Number.isFinite(MAX_ACCURACY_METERS_RAW) && MAX_ACCURACY_METERS_RAW > 0
-    ? MAX_ACCURACY_METERS_RAW
-    : 200
+const DEFAULT_MAX_ACCURACY_METERS = 200
+const SETTINGS_ID = 1
 
 function parseDateStart(value: string | null) {
   if (!value) return null
@@ -65,10 +62,16 @@ export async function GET(req: NextRequest) {
     if (userId) {
       where.userId = userId
     }
+    const settings = await prisma.attendanceSettings.findUnique({
+      where: { id: SETTINGS_ID },
+      select: { maxAccuracyMeters: true },
+    })
+    const maxAccuracyMeters = settings?.maxAccuracyMeters || DEFAULT_MAX_ACCURACY_METERS
+
     if (precisionStatus === 'good') {
-      where.accuracyMeters = { lte: MAX_ACCURACY_METERS }
+      where.accuracyMeters = { lte: maxAccuracyMeters }
     } else if (precisionStatus === 'bad') {
-      where.accuracyMeters = { gt: MAX_ACCURACY_METERS }
+      where.accuracyMeters = { gt: maxAccuracyMeters }
     }
 
     const [marks, total, users] = await Promise.all([

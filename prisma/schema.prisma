@@ -260,6 +260,7 @@ model AttendanceSettings {
   referenceLatitude  Float
   referenceLongitude Float
   radiusMeters       Int      @default(100)
+  maxAccuracyMeters  Int      @default(200)
   isActive           Boolean  @default(true)
   updatedByUserId    String?
   createdAt          DateTime @default(now())
