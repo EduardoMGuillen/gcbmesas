@@ -33,6 +33,35 @@ function summarizeCardNumber(cardNumber: unknown) {
   }
 }
 
+function parseJwtPayload(token: string): any | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length < 2) return null
+    const payload = parts[1]
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
+    const decoded = Buffer.from(padded, 'base64').toString('utf-8')
+    return JSON.parse(decoded)
+  } catch {
+    return null
+  }
+}
+
+function normalizeConsumerAuthenticationInformation(raw: any) {
+  if (!raw || typeof raw !== 'object') return null
+  const normalized = {
+    authenticationTransactionId: raw.authenticationTransactionId ? String(raw.authenticationTransactionId) : undefined,
+    cavv: raw.cavv ? String(raw.cavv) : undefined,
+    xid: raw.xid ? String(raw.xid) : undefined,
+    eci: raw.eci ? String(raw.eci) : undefined,
+    acsTransactionId: raw.acsTransactionId ? String(raw.acsTransactionId) : undefined,
+    threeDSServerTransactionId: raw.threeDSServerTransactionId ? String(raw.threeDSServerTransactionId) : undefined,
+    directoryServerTransactionId: raw.directoryServerTransactionId ? String(raw.directoryServerTransactionId) : undefined,
+  }
+  const hasAny = Object.values(normalized).some((v) => Boolean(v))
+  return hasAny ? normalized : null
+}
+
 function generateToken(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   let token = ''
@@ -60,6 +89,9 @@ export async function POST(req: NextRequest) {
     billToAdministrativeArea?: string
     billToPostalCode?: string
     billToCountry?: string
+    paymentCardType?: string
+    commerceIndicator?: string
+    hasConsumerAuthInfo?: boolean
   } = {}
   const currency = 'HNL'
 
@@ -81,6 +113,9 @@ export async function POST(req: NextRequest) {
       billToAdministrativeArea,
       billToPostalCode,
       billToCountry,
+      paymentCardType,
+      commerceIndicator,
+      consumerAuthenticationInformation,
     } = body
     debugContext.paymentReference = paymentReference
     debugContext.eventId = eventId
@@ -96,6 +131,9 @@ export async function POST(req: NextRequest) {
     debugContext.billToAdministrativeArea = billToAdministrativeArea
     debugContext.billToPostalCode = billToPostalCode
     debugContext.billToCountry = billToCountry
+    debugContext.paymentCardType = paymentCardType
+    debugContext.commerceIndicator = commerceIndicator
+    debugContext.hasConsumerAuthInfo = Boolean(consumerAuthenticationInformation)
 
     if (!paymentReference || !eventId || !clientEmail || !numberOfEntries) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
@@ -195,6 +233,8 @@ export async function POST(req: NextRequest) {
       phoneNumber: String(pendingDetails?.clientPhone || '00000000').trim() || '00000000',
     }
 
+    const normalizedConsumerAuth = normalizeConsumerAuthenticationInformation(consumerAuthenticationInformation)
+
     const paymentResponse = isMockMode
       ? {
           status: 'AUTHORIZED',
@@ -218,23 +258,57 @@ export async function POST(req: NextRequest) {
             billToPostalCode: String(billToPostalCode),
             billToCountry: String(billToCountry).toUpperCase(),
           })
-        : await cyberSourcePost<any>('/pts/v2/payments', {
-            clientReferenceInformation: { code: paymentReference },
-            processingInformation: {
-              commerceIndicator: 'internet',
-              capture: false,
-            },
-            tokenInformation: {
-              transientTokenJwt: String(transientToken),
-            },
-            orderInformation: {
-              amountDetails: {
-                totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
-                currency,
+        : await (async () => {
+            const transientTokenString = String(transientToken)
+            const tokenPayload = parseJwtPayload(transientTokenString)
+            const tokenDetectedType = tokenPayload?.content?.paymentInformation?.card?.number?.detectedCardTypes?.[0]
+
+            let resolvedCardType = String(paymentCardType || tokenDetectedType || '').trim()
+            if (!resolvedCardType) {
+              try {
+                const tokenForPath = encodeURIComponent(transientTokenString.trim())
+                const paymentDetails = await cyberSourceGet<any>(`/up/v1/payment-details/${tokenForPath}`)
+                resolvedCardType = String(paymentDetails?.paymentInformation?.card?.type || '').trim()
+              } catch {
+                // non-blocking, card type is optional in some setups
+              }
+            }
+
+            const normalizedCommerceIndicator = String(
+              commerceIndicator || (normalizedConsumerAuth ? 'aesk' : 'internet')
+            )
+              .trim()
+              .toLowerCase()
+
+            const requestPayload: any = {
+              clientReferenceInformation: { code: paymentReference },
+              processingInformation: {
+                commerceIndicator: normalizedCommerceIndicator || 'internet',
+                capture: false,
               },
-              billTo: resolvedBillTo,
-            },
-          })
+              tokenInformation: {
+                transientTokenJwt: transientTokenString,
+              },
+              orderInformation: {
+                amountDetails: {
+                  totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
+                  currency,
+                },
+                billTo: resolvedBillTo,
+              },
+            }
+
+            if (resolvedCardType) {
+              requestPayload.paymentInformation = {
+                card: { type: resolvedCardType },
+              }
+            }
+            if (normalizedConsumerAuth) {
+              requestPayload.consumerAuthenticationInformation = normalizedConsumerAuth
+            }
+
+            return cyberSourcePost<any>('/pts/v2/payments', requestPayload)
+          })()
 
     const status = String(paymentResponse?.status || '').toUpperCase()
     const transactionId = String(paymentResponse?.id || '')
