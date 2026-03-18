@@ -75,6 +75,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   const [microformPaymentReference, setMicroformPaymentReference] = useState('')
   const [microformExpMonth, setMicroformExpMonth] = useState('')
   const [microformExpYear, setMicroformExpYear] = useState('')
+  const [microformCardType, setMicroformCardType] = useState('')
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('unknown')
   const [cardHolderName, setCardHolderName] = useState('')
   const [cardNumber, setCardNumber] = useState('')
@@ -189,6 +190,13 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     })
     numberField.load('#cybs-card-number')
     securityCodeField.load('#cybs-card-cvv')
+    numberField.on('change', (data: any) => {
+      const firstCard = data?.card?.[0]
+      const typeFromField = String(firstCard?.cybsCardType || firstCard?.type || '').trim()
+      if (typeFromField) {
+        setMicroformCardType(typeFromField)
+      }
+    })
     microformRef.current = microform
     setMicroformReady(true)
   }
@@ -227,6 +235,46 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
       }
     })
 
+    let payerAuthResult: any = null
+    try {
+      const payerAuthRes = await fetch('/api/cybersource/payer-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentReference: microformPaymentReference,
+          eventId: event.id,
+          clientEmail: clientEmail.trim(),
+          numberOfEntries,
+          transientToken,
+          cardHolderName: cardHolderName.trim(),
+          billToAddress1: billingAddress1.trim(),
+          billToLocality: billingCity.trim(),
+          billToAdministrativeArea: billingState.trim(),
+          billToPostalCode: billingPostalCode.trim(),
+          billToCountry: billingCountry.trim().toUpperCase(),
+          paymentCardType: microformCardType || undefined,
+        }),
+      })
+      payerAuthResult = await payerAuthRes.json()
+      if (!payerAuthRes.ok) {
+        throw new Error(payerAuthResult?.error || 'Error en validación 3DS')
+      }
+      if (payerAuthResult?.status === 'challenge_required') {
+        throw new Error('3DS requiere challenge. Tu banco debe habilitar este flujo para completar la autenticación.')
+      }
+      if (payerAuthResult?.status === 'failed') {
+        console.warn('[CyberSource] Payer auth returned failed status, continuing without 3DS payload.', payerAuthResult)
+        payerAuthResult = null
+      }
+    } catch (payerErr: any) {
+      const message = String(payerErr?.message || '')
+      if (message.includes('challenge')) {
+        throw new Error(message)
+      }
+      console.warn('[CyberSource] Payer auth skipped due to error, continuing payment attempt.', payerErr)
+      payerAuthResult = null
+    }
+
     const confirmRes = await fetch('/api/cybersource/confirm-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -242,6 +290,9 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
         billToAdministrativeArea: billingState.trim(),
         billToPostalCode: billingPostalCode.trim(),
         billToCountry: billingCountry.trim().toUpperCase(),
+        paymentCardType: payerAuthResult?.paymentCardType || microformCardType || undefined,
+        commerceIndicator: payerAuthResult?.commerceIndicator || undefined,
+        consumerAuthenticationInformation: payerAuthResult?.consumerAuthenticationInformation || undefined,
       }),
     })
     const result = await confirmRes.json()

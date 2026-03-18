@@ -122,9 +122,35 @@ export async function POST(req: NextRequest) {
       clientVersion: 'v2',
       allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX'],
       allowedPaymentTypes: ['CARD'],
+      orderInformation: {
+        amountDetails: {
+          totalAmount: total,
+          currency,
+        },
+      },
     }
 
-    const captureContext = await cyberSourcePost<any>('/microform/v2/sessions', captureContextPayload)
+    const minimalCaptureContextPayload: any = {
+      targetOrigins: [appUrl],
+      clientVersion: 'v2',
+      allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX'],
+      allowedPaymentTypes: ['CARD'],
+    }
+
+    let captureContext: any
+    try {
+      captureContext = await cyberSourcePost<any>('/microform/v2/sessions', captureContextPayload)
+    } catch (error: any) {
+      if (error instanceof CyberSourceApiError && error.status === 400) {
+        console.warn('[CyberSource] microform session enriched payload rejected, retrying minimal payload.', {
+          requestId: error.requestId,
+          responseBody: error.responseBody,
+        })
+        captureContext = await cyberSourcePost<any>('/microform/v2/sessions', minimalCaptureContextPayload)
+      } else {
+        throw error
+      }
+    }
 
     const captureContextJwt =
       captureContext?.captureContext || captureContext?.token || (typeof captureContext === 'string' ? captureContext : null)
