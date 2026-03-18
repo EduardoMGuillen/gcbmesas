@@ -220,6 +220,26 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     if (error instanceof CyberSourceApiError) {
+      const isRiskEndpoint = String(error.endpoint || '').startsWith('/risk/v1/')
+      const isUnavailable404 = isRiskEndpoint && error.status === 404
+      if (isUnavailable404) {
+        console.warn('[CyberSource] Payer auth endpoint unavailable for this merchant, continuing without 3DS.', {
+          endpoint: error.endpoint,
+          status: error.status,
+          requestId: error.requestId,
+          responseBody: error.responseBody,
+        })
+        return NextResponse.json({
+          enabled: false,
+          status: 'unavailable',
+          commerceIndicator: 'internet',
+          consumerAuthenticationInformation: null,
+          requestId: error.requestId,
+          endpoint: error.endpoint,
+          reason: 'Payer Authentication no está habilitado para este merchant en este ambiente.',
+        })
+      }
+
       console.error('[CyberSource] Payer auth API error:', {
         endpoint: error.endpoint,
         status: error.status,
