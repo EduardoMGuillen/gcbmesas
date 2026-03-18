@@ -558,6 +558,9 @@ export async function POST(req: NextRequest) {
         paymentMode: debugContext.paymentMode,
         tokenSummary: summarizeTransientToken(debugContext.transientToken),
         cardSummary: summarizeCardNumber(debugContext.cardNumber),
+        paymentCardType: debugContext.paymentCardType || null,
+        requestedCommerceIndicator: debugContext.commerceIndicator || null,
+        hasConsumerAuthInfo: Boolean(debugContext.hasConsumerAuthInfo),
       })
       if (error.status === 404 && debugContext.transientToken) {
         try {
