@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
     // Build a de-duped list of allowed origins for the Microform capture context.
     // Must contain every origin where the Microform will be embedded.
-    const targetOrigins = [...new Set([appUrl, configuredUrl].filter(Boolean))]
+    const targetOrigins = Array.from(new Set([appUrl, configuredUrl].filter(Boolean)))
 
     const captureContextPayload: any = {
       targetOrigins,
