@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
       clientReferenceInformation: { code: `${paymentReference}-3DS-AUTH` },
       consumerAuthenticationInformation: {
         referenceId,
-        returnUrl: `${appUrl}/eventos/${eventId}`,
+        returnUrl: `${appUrl}/api/cybersource/3ds-callback`,
         transactionMode: 'eCommerce',
       },
       tokenInformation: { transientTokenJwt: String(transientToken) },
@@ -191,12 +191,17 @@ export async function POST(req: NextRequest) {
     )
 
     if (looksLikeChallengeRequired(authenticationResponse)) {
+      const cai = authenticationResponse?.consumerAuthenticationInformation || {}
       return NextResponse.json({
         enabled: true,
         status: 'challenge_required',
         commerceIndicator: 'internet',
         consumerAuthenticationInformation: normalizedConsumerAuth,
         paymentCardType: resolvedCardType || null,
+        // Data the frontend needs to drive the ACS challenge iframe
+        stepUpUrl: cai.stepUpUrl || null,
+        accessToken: cai.accessToken || null,
+        authenticationTransactionId: cai.authenticationTransactionId || null,
       })
     }
 

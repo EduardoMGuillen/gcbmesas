@@ -47,7 +47,12 @@ export async function POST(req: NextRequest) {
     const total = (Number(event.paypalPrice) * Number(numberOfEntries)).toFixed(2)
     const paymentReference = `CS-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`.toUpperCase()
 
-    const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
+    // Use the browser's actual origin (from the Origin request header) as the primary
+    // targetOrigin so it always matches window.location.origin exactly.
+    // Fall back to the configured app URL (trailing slash stripped) when the header is absent.
+    const requestOrigin = (req.headers.get('origin') || '').replace(/\/$/, '')
+    const configuredUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
+    const appUrl = requestOrigin || configuredUrl || req.nextUrl.origin.replace(/\/$/, '')
     const cyberEnv = (process.env.CYBERSOURCE_ENV || 'test').toLowerCase()
     const currency = 'HNL'
     const isMockMode = process.env.CYBERSOURCE_MOCK === 'true'
@@ -117,8 +122,12 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Build a de-duped list of allowed origins for the Microform capture context.
+    // Must contain every origin where the Microform will be embedded.
+    const targetOrigins = [...new Set([appUrl, configuredUrl].filter(Boolean))]
+
     const captureContextPayload: any = {
-      targetOrigins: [appUrl],
+      targetOrigins,
       clientVersion: 'v2',
       allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX'],
       allowedPaymentTypes: ['CARD'],
@@ -131,7 +140,7 @@ export async function POST(req: NextRequest) {
     }
 
     const minimalCaptureContextPayload: any = {
-      targetOrigins: [appUrl],
+      targetOrigins,
       clientVersion: 'v2',
       allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX'],
       allowedPaymentTypes: ['CARD'],

@@ -27,27 +27,24 @@ function getCyberSourceBaseUrl() {
   return env === 'live' ? 'https://api.cybersource.com' : 'https://apitest.cybersource.com'
 }
 
-function isBase64(value: string) {
-  if (!value) return false
-  const normalized = value.replace(/\s+/g, '')
-  // Base64 strings should be divisible by 4 after removing padding.
-  if (normalized.length % 4 !== 0) return false
-  if (!/^[A-Za-z0-9+/=]+$/.test(normalized)) return false
-  try {
-    return Buffer.from(normalized, 'base64').toString('base64') === normalized
-  } catch {
-    return false
-  }
-}
-
-function getSharedSecretBuffer(sharedSecretRaw: string) {
+function getSharedSecretBuffer(sharedSecretRaw: string): Buffer {
   const sharedSecret = sharedSecretRaw.trim()
   if (!sharedSecret) {
     throw new Error('CYBERSOURCE_SHARED_SECRET está vacío.')
   }
-  return isBase64(sharedSecret)
-    ? Buffer.from(sharedSecret, 'base64')
-    : Buffer.from(sharedSecret, 'utf8')
+  const cleaned = sharedSecret.replace(/\s+/g, '')
+  // CyberSource portal always provides the shared secret as standard base64.
+  // Attempt to decode it; if the characters are not base64 or decoding yields
+  // an empty buffer, fall back to treating it as a raw UTF-8 string.
+  if (/^[A-Za-z0-9+/=]+$/.test(cleaned)) {
+    try {
+      const decoded = Buffer.from(cleaned, 'base64')
+      if (decoded.length > 0) return decoded
+    } catch {
+      // fall through to UTF-8
+    }
+  }
+  return Buffer.from(sharedSecret, 'utf8')
 }
 
 function buildSignature(params: {

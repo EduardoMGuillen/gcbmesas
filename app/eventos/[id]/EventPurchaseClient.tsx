@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 
 type EventData = {
@@ -88,6 +88,28 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   const [billingPostalCode, setBillingPostalCode] = useState('')
   const [billingCountry, setBillingCountry] = useState('HN')
   const microformRef = useRef<any>(null)
+
+  // 3DS challenge state
+  const [show3dsChallenge, setShow3dsChallenge] = useState(false)
+  const [challengeStepUpUrl, setChallengeStepUpUrl] = useState('')
+  const [challengeAccessToken, setChallengeAccessToken] = useState('')
+  const [challengeAuthTransactionId, setChallengeAuthTransactionId] = useState('')
+  // Stores the data needed to complete confirm-payment after the challenge finishes
+  const challengePendingRef = useRef<{
+    transientToken: string
+    paymentRef: string
+    paymentCardType: string
+    clientEmail: string
+    numberOfEntries: number
+    cardHolderName: string
+    billingAddress1: string
+    billingCity: string
+    billingState: string
+    billingPostalCode: string
+    billingCountry: string
+  } | null>(null)
+  const challengeFormRef = useRef<HTMLFormElement>(null)
+  const challengeIframeRef = useRef<HTMLIFrameElement>(null)
 
   const totalPrice = event.onlinePrice * numberOfEntries
 
@@ -208,36 +230,72 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     if (!microformProfileValid) {
       throw new Error('Completa nombre del titular y datos de facturación.')
     }
-    const expMonth = microformExpMonth.trim().replace(/\D/g, '').slice(0, 2)
+
+    // Fix #2: zero-pad month so "3" becomes "03" as CyberSource expects
+    const expMonth = microformExpMonth.trim().replace(/\D/g, '').slice(0, 2).padStart(2, '0')
     const expYear = microformExpYear.trim().replace(/\D/g, '').slice(0, 4)
-    if (!expMonth || !expYear) {
+    if (!expMonth || expMonth === '00' || !expYear) {
       throw new Error('Completa mes y año de expiración de la tarjeta.')
     }
 
+    // Tokenize card — detect context-expiry errors so we can give a clear message
     const transientToken = await new Promise<string>((resolve, reject) => {
+      let settled = false
+      const settle = (fn: typeof resolve | typeof reject, val: any) => {
+        if (!settled) { settled = true; fn(val) }
+      }
+
       const maybePromise = microformRef.current.createToken(
-        {
-          expirationMonth: expMonth,
-          expirationYear: expYear,
-        },
+        { expirationMonth: expMonth, expirationYear: expYear },
         (error: any, token: string) => {
           if (error) {
-            reject(new Error(error?.message || 'No se pudo tokenizar la tarjeta.'))
+            const msg = String(error?.message || error?.details || JSON.stringify(error) || '')
+            const isExpired = /expir|invalid.*context|context.*invalid/i.test(msg)
+            const err = Object.assign(
+              new Error(isExpired
+                ? 'La sesión de pago expiró. Ingresa tus datos de tarjeta nuevamente.'
+                : (msg || 'No se pudo tokenizar la tarjeta.')),
+              { expired: isExpired }
+            )
+            settle(reject, err)
             return
           }
-          resolve(String(token))
+          settle(resolve, String(token))
         }
       )
       if (maybePromise && typeof maybePromise.then === 'function') {
-        maybePromise.then((token: string) => resolve(String(token))).catch((err: any) => {
-          reject(new Error(err?.message || 'No se pudo tokenizar la tarjeta.'))
-        })
+        maybePromise
+          .then((token: string) => settle(resolve, String(token)))
+          .catch((err: any) => {
+            const msg = String(err?.message || '')
+            const isExpired = /expir|invalid.*context|context.*invalid/i.test(msg)
+            settle(reject, Object.assign(
+              new Error(isExpired
+                ? 'La sesión de pago expiró. Ingresa tus datos de tarjeta nuevamente.'
+                : (msg || 'No se pudo tokenizar la tarjeta.')),
+              { expired: isExpired }
+            ))
+          })
       }
+    }).catch((err: any) => {
+      // Fix #6: on expiry, reset the microform so user can re-enter card without reloading the page
+      if (err?.expired) {
+        setShowUnified(false)
+        setMicroformReady(false)
+        setMicroformPaymentReference('')
+        setMicroformExpMonth('')
+        setMicroformExpYear('')
+        setMicroformCardType('')
+        microformRef.current = null
+      }
+      throw err
     })
 
+    // Fix #4 & #5: structured payer-auth error handling — only network failures are silenced
     let payerAuthResult: any = null
+    let payerAuthResponse: Response | null = null
     try {
-      const payerAuthRes = await fetch('/api/cybersource/payer-auth', {
+      payerAuthResponse = await fetch('/api/cybersource/payer-auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -255,41 +313,110 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
           paymentCardType: microformCardType || undefined,
         }),
       })
-      payerAuthResult = await payerAuthRes.json()
-      if (!payerAuthRes.ok) {
-        throw new Error(payerAuthResult?.error || 'Error en validación 3DS')
-      }
-      if (payerAuthResult?.status === 'challenge_required') {
-        throw new Error('3DS requiere challenge. Tu banco debe habilitar este flujo para completar la autenticación.')
-      }
-      if (payerAuthResult?.status === 'failed') {
-        console.warn('[CyberSource] Payer auth returned failed status, continuing without 3DS payload.', payerAuthResult)
-        payerAuthResult = null
-      }
-    } catch (payerErr: any) {
-      const message = String(payerErr?.message || '')
-      if (message.includes('challenge')) {
-        throw new Error(message)
-      }
-      console.warn('[CyberSource] Payer auth skipped due to error, continuing payment attempt.', payerErr)
-      payerAuthResult = null
+    } catch {
+      // True network failure (DNS, timeout) — continue without 3DS rather than blocking payment
+      console.warn('[CyberSource] Payer auth unreachable (network error), continuing without 3DS.')
     }
 
+    if (payerAuthResponse) {
+      const rawPayerAuth = await payerAuthResponse.json()
+
+      if (!payerAuthResponse.ok) {
+        // HTTP error from our own API route — surface it to the user
+        throw new Error(rawPayerAuth?.error || `Error en validación 3DS (${payerAuthResponse.status})`)
+      }
+
+      if (rawPayerAuth?.status === 'challenge_required') {
+        // Fix #1: store everything needed and open the ACS challenge iframe modal
+        challengePendingRef.current = {
+          transientToken,
+          paymentRef: microformPaymentReference,
+          paymentCardType: rawPayerAuth?.paymentCardType || microformCardType || '',
+          clientEmail: clientEmail.trim(),
+          numberOfEntries,
+          cardHolderName: cardHolderName.trim(),
+          billingAddress1: billingAddress1.trim(),
+          billingCity: billingCity.trim(),
+          billingState: billingState.trim(),
+          billingPostalCode: billingPostalCode.trim(),
+          billingCountry: billingCountry.trim().toUpperCase(),
+        }
+        setChallengeAuthTransactionId(rawPayerAuth?.authenticationTransactionId || '')
+        setChallengeStepUpUrl(rawPayerAuth?.stepUpUrl || '')
+        setChallengeAccessToken(rawPayerAuth?.accessToken || '')
+        setShow3dsChallenge(true)
+        return // challenge modal takes over; handleChallengeComplete finishes the flow
+      }
+
+      if (rawPayerAuth?.status === 'failed') {
+        throw new Error(
+          rawPayerAuth?.reason ||
+          'La autenticación 3DS de la tarjeta falló. Intenta con otra tarjeta o consulta a tu banco.'
+        )
+      }
+
+      // 'authenticated' → pass 3DS data through; 'unavailable'/'skipped'/enabled:false → no 3DS data
+      if (rawPayerAuth?.status === 'authenticated' && rawPayerAuth?.consumerAuthenticationInformation) {
+        payerAuthResult = rawPayerAuth
+      }
+    }
+
+    await submitConfirmPayment({
+      transientToken,
+      payerAuthResult,
+      paymentRef: microformPaymentReference,
+      storedClientEmail: clientEmail.trim(),
+      storedNumberOfEntries: numberOfEntries,
+      storedCardHolderName: cardHolderName.trim(),
+      storedBillingAddress1: billingAddress1.trim(),
+      storedBillingCity: billingCity.trim(),
+      storedBillingState: billingState.trim(),
+      storedBillingPostalCode: billingPostalCode.trim(),
+      storedBillingCountry: billingCountry.trim().toUpperCase(),
+    })
+  }
+
+  // Shared helper — called from both the normal flow and the post-challenge flow
+  const submitConfirmPayment = async ({
+    transientToken,
+    payerAuthResult,
+    paymentRef,
+    storedClientEmail,
+    storedNumberOfEntries,
+    storedCardHolderName,
+    storedBillingAddress1,
+    storedBillingCity,
+    storedBillingState,
+    storedBillingPostalCode,
+    storedBillingCountry,
+  }: {
+    transientToken: string
+    payerAuthResult: any
+    paymentRef: string
+    storedClientEmail: string
+    storedNumberOfEntries: number
+    storedCardHolderName: string
+    storedBillingAddress1: string
+    storedBillingCity: string
+    storedBillingState: string
+    storedBillingPostalCode: string
+    storedBillingCountry: string
+  }) => {
     const confirmRes = await fetch('/api/cybersource/confirm-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        paymentReference: microformPaymentReference,
+        paymentReference: paymentRef,
         eventId: event.id,
-        clientEmail: clientEmail.trim(),
-        numberOfEntries,
+        clientEmail: storedClientEmail,
+        numberOfEntries: storedNumberOfEntries,
         transientToken,
-        cardHolderName: cardHolderName.trim(),
-        billToAddress1: billingAddress1.trim(),
-        billToLocality: billingCity.trim(),
-        billToAdministrativeArea: billingState.trim(),
-        billToPostalCode: billingPostalCode.trim(),
-        billToCountry: billingCountry.trim().toUpperCase(),
+        cardHolderName: storedCardHolderName,
+        billToAddress1: storedBillingAddress1,
+        billToLocality: storedBillingCity,
+        billToAdministrativeArea: storedBillingState,
+        billToPostalCode: storedBillingPostalCode,
+        billToCountry: storedBillingCountry,
         paymentCardType: payerAuthResult?.paymentCardType || microformCardType || undefined,
         commerceIndicator: payerAuthResult?.commerceIndicator || undefined,
         consumerAuthenticationInformation: payerAuthResult?.consumerAuthenticationInformation || undefined,
@@ -299,6 +426,71 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     if (!confirmRes.ok) throw new Error(result.error || 'Error al confirmar el pago')
     setSuccess(result)
   }
+
+  // Called when the ACS step-up iframe fires the CYBS_3DS_COMPLETE postMessage
+  const handleChallengeComplete = useCallback(async () => {
+    setShow3dsChallenge(false)
+    const pending = challengePendingRef.current
+    if (!pending) return
+    challengePendingRef.current = null
+
+    setProcessing(true)
+    setError('')
+    try {
+      let payerAuthResult: any = null
+
+      // Fetch the final CAVV/ECI now that the challenge is done
+      if (challengeAuthTransactionId) {
+        const resultRes = await fetch('/api/cybersource/payer-auth-result', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authenticationTransactionId: challengeAuthTransactionId }),
+        })
+        const resultData = await resultRes.json()
+        if (!resultRes.ok) throw new Error(resultData?.error || 'Error al obtener resultado 3DS del challenge.')
+        if (resultData?.status === 'authenticated' && resultData?.consumerAuthenticationInformation) {
+          payerAuthResult = resultData
+        }
+      }
+
+      await submitConfirmPayment({
+        transientToken: pending.transientToken,
+        payerAuthResult,
+        paymentRef: pending.paymentRef,
+        storedClientEmail: pending.clientEmail,
+        storedNumberOfEntries: pending.numberOfEntries,
+        storedCardHolderName: pending.cardHolderName,
+        storedBillingAddress1: pending.billingAddress1,
+        storedBillingCity: pending.billingCity,
+        storedBillingState: pending.billingState,
+        storedBillingPostalCode: pending.billingPostalCode,
+        storedBillingCountry: pending.billingCountry,
+      })
+    } catch (err: any) {
+      setError(err.message || 'Error al completar el pago con 3DS.')
+    } finally {
+      setProcessing(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [challengeAuthTransactionId, event.id])
+
+  // Listen for the postMessage fired by the 3DS callback route
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'CYBS_3DS_COMPLETE') {
+        handleChallengeComplete()
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [handleChallengeComplete])
+
+  // Auto-submit the hidden form into the challenge iframe as soon as it mounts
+  useEffect(() => {
+    if (show3dsChallenge && challengeStepUpUrl && challengeFormRef.current) {
+      challengeFormRef.current.submit()
+    }
+  }, [show3dsChallenge, challengeStepUpUrl])
 
   const startCheckout = async () => {
     setProcessing(true)
@@ -412,6 +604,76 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* 3DS Challenge Modal — shown when the issuing bank requires an ACS step-up */}
+      {show3dsChallenge && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0,0,0,0.88)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '16px',
+            padding: '16px',
+          }}
+        >
+          <p style={{ color: '#fff', fontSize: '15px', fontWeight: 600, textAlign: 'center', maxWidth: 440 }}>
+            Tu banco requiere verificación adicional (3DS).
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', textAlign: 'center', maxWidth: 400, marginTop: -8 }}>
+            Completa el proceso en la ventana de abajo para finalizar tu pago.
+          </p>
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+              width: '100%',
+              maxWidth: 440,
+              minHeight: 400,
+            }}
+          >
+            <iframe
+              ref={challengeIframeRef}
+              name="cybs-step-up-iframe"
+              style={{ width: '100%', height: 520, border: 'none', display: 'block' }}
+              title="Verificación 3DS"
+            />
+          </div>
+          {/* Hidden form that POSTs the JWT into the iframe to start the ACS challenge */}
+          <form
+            ref={challengeFormRef}
+            method="POST"
+            action={challengeStepUpUrl}
+            target="cybs-step-up-iframe"
+            style={{ display: 'none' }}
+          >
+            <input type="hidden" name="JWT" value={challengeAccessToken} />
+          </form>
+          <button
+            type="button"
+            onClick={() => {
+              setShow3dsChallenge(false)
+              challengePendingRef.current = null
+              setError('Verificación 3DS cancelada. Puedes intentarlo de nuevo.')
+            }}
+            style={{
+              color: 'rgba(255,255,255,0.4)',
+              fontSize: '13px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              marginTop: 4,
+            }}
+          >
+            Cancelar verificación
+          </button>
+        </div>
+      )}
       <div>
         {event.coverImage && (
           <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-6" style={{ border: `1px solid ${cardBorder}` }}>
