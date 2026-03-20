@@ -6,7 +6,7 @@ import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
 import { CyberSourceApiError, cyberSourceGet, cyberSourcePost } from '@/lib/cybersource'
-import { cyberSourceDirectPaymentViaSdk } from '@/lib/cybersource-sdk-direct'
+import { cyberSourceDirectPaymentViaSdk, cyberSourceUnifiedPaymentViaSdk } from '@/lib/cybersource-sdk-direct'
 
 function maskMerchantId(merchantId: string | undefined) {
   if (!merchantId) return null
@@ -267,33 +267,15 @@ export async function POST(req: NextRequest) {
               .trim()
               .toLowerCase()
 
-            const requestPayload: any = {
-              clientReferenceInformation: { code: paymentReference },
-              processingInformation: {
-                commerceIndicator: normalizedCommerceIndicator || 'internet',
-                // capture:true — auth + capture in one step (required for most merchant configs)
-                capture: true,
-              },
-              tokenInformation: {
-                transientTokenJwt: transientTokenString,
-              },
-              orderInformation: {
-                amountDetails: {
-                  totalAmount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
-                  currency,
-                },
-                billTo: resolvedBillTo,
-              },
-            }
-
-            // Do NOT include paymentInformation.card.type when using tokenInformation.transientTokenJwt.
-            // The card data is already embedded in the token — adding it separately causes CyberSource
-            // to return 404 "Resource not found" due to conflicting payment method resolution.
-            if (normalizedConsumerAuth) {
-              requestPayload.consumerAuthenticationInformation = normalizedConsumerAuth
-            }
-
-            return cyberSourcePost<any>('/pts/v2/payments', requestPayload)
+            return cyberSourceUnifiedPaymentViaSdk({
+              paymentReference,
+              transientToken: transientTokenString,
+              amount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
+              currency,
+              commerceIndicator: normalizedCommerceIndicator || 'internet',
+              billTo: resolvedBillTo,
+              consumerAuthInfo: normalizedConsumerAuth ?? null,
+            })
           })()
 
     const status = String(paymentResponse?.status || '').toUpperCase()
@@ -320,19 +302,14 @@ export async function POST(req: NextRequest) {
     }
 
     const amountToCapture = (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2)
-    // Unified mode uses capture:true so auth+capture happen in one step — no separate call needed.
-    // Direct (SDK) mode does its own capture internally.
-    // Only do a separate capture for mock mode path (which won't reach here anyway).
     let captureId: string | null = null
     let captureStatus: string | null = null
     if (!isMockMode && isDirectMode && transactionId) {
+      // Direct mode: SDK did auth-only (capture:false), do explicit capture here
       const captureResponse = await cyberSourcePost<any>(`/pts/v2/payments/${transactionId}/captures`, {
         clientReferenceInformation: { code: `${paymentReference}-CAPTURE` },
         orderInformation: {
-          amountDetails: {
-            totalAmount: amountToCapture,
-            currency,
-          },
+          amountDetails: { totalAmount: amountToCapture, currency },
         },
       })
       captureId = String(captureResponse?.id || '') || null
@@ -360,9 +337,9 @@ export async function POST(req: NextRequest) {
         )
       }
     } else if (!isMockMode && !isDirectMode && transactionId) {
-      // Unified mode: capture was requested inline (capture:true), status reflects both
-      captureId = transactionId
-      captureStatus = status
+      // Unified mode: SDK already did auth + capture internally, results are in paymentResponse
+      captureId = String((paymentResponse as any)?.captureId || transactionId) || null
+      captureStatus = String((paymentResponse as any)?.captureStatus || status) || null
     }
 
     const entries = []
