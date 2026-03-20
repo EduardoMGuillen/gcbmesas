@@ -126,24 +126,20 @@ export async function POST(req: NextRequest) {
     // Must contain every origin where the Microform will be embedded.
     const targetOrigins = Array.from(new Set([appUrl, configuredUrl].filter(Boolean)))
 
+    // Keep this payload minimal — exactly what the guide uses.
+    // allowedPaymentTypes is a Unified Checkout field, not Microform; it restricts networks.
+    // orderInformation in the capture context can also limit which card types CyberSource embeds.
     const captureContextPayload: any = {
       targetOrigins,
       clientVersion: 'v2',
       allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX'],
-      allowedPaymentTypes: ['CARD'],
-      orderInformation: {
-        amountDetails: {
-          totalAmount: total,
-          currency,
-        },
-      },
     }
 
+    // Same minimal payload used as fallback (no change needed)
     const minimalCaptureContextPayload: any = {
       targetOrigins,
       clientVersion: 'v2',
       allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX'],
-      allowedPaymentTypes: ['CARD'],
     }
 
     let captureContext: any
@@ -169,6 +165,9 @@ export async function POST(req: NextRequest) {
 
     const payload = parseJwtPayload(String(captureContextJwt))
     const ctxData = payload?.ctx?.[0]?.data || {}
+
+    // Diagnostic: log which card networks CyberSource actually embedded in the JWT
+    console.log('[CyberSource] Capture context card networks:', ctxData.allowedCardNetworks ?? payload?.flx?.data?.allowedCardNetworks ?? 'not found in JWT')
 
     return NextResponse.json({
       paymentReference,
