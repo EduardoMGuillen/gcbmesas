@@ -767,17 +767,6 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
             <p className="text-xs text-white/20 mt-1">Recibiras todas las entradas y QRs aqui</p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-white/50 mb-2">WhatsApp <span className="text-white/20 font-normal">(opcional)</span></label>
-            <input
-              type="tel"
-              value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
-              placeholder="9999-9999"
-              className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none focus:ring-2 transition-all"
-              style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-            />
-          </div>
 
           {paymentMode === 'direct' && (
             <div className="rounded-lg p-4 space-y-3" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
@@ -961,8 +950,15 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                 <label className="block text-xs text-blue-100/80">Número de tarjeta</label>
                 <div
                   id="cybs-card-number"
-                  className="w-full px-4 py-3 rounded-lg min-h-[50px]"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className="w-full rounded-lg overflow-hidden"
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${inputBorder}`,
+                    height: '44px',
+                    padding: '0 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
                 />
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -972,8 +968,8 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                   value={microformExpMonth}
                   onChange={(e) => setMicroformExpMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
                   placeholder="MM"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className="w-full px-4 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}`, height: '44px' }}
                 />
                 <input
                   type="text"
@@ -981,13 +977,20 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
                   value={microformExpYear}
                   onChange={(e) => setMicroformExpYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   placeholder="YYYY"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className="w-full px-4 rounded-lg text-white placeholder-white/20 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}`, height: '44px' }}
                 />
                 <div
                   id="cybs-card-cvv"
-                  className="w-full px-4 py-3 rounded-lg min-h-[50px]"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className="w-full rounded-lg overflow-hidden"
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${inputBorder}`,
+                    height: '44px',
+                    padding: '0 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1052,7 +1055,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               className="w-full font-semibold py-3 px-4 rounded-lg transition-all hover:opacity-90 shadow-[0_10px_30px_rgba(201,168,76,0.25)]"
               style={{ background: goldGradient, color: '#0a0a15' }}
             >
-              {paymentMode === 'unified' && showUnified && microformReady ? 'Confirmar pago con Microform' : 'Pagar con CyberSource'}
+              Pagar con tarjeta
             </button>
           ) : (
             <div className="rounded-lg p-4 text-center" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
@@ -1061,7 +1064,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
           )}
 
           <p className="text-xs text-white/25 text-center">
-            Pago seguro a traves de CyberSource. Al pagar, recibiras tu entrada por email automaticamente.
+            Pago seguro procesado por CyberSource (Visa / Mastercard / Amex). Recibirás tu entrada por email automáticamente.
           </p>
         </div>
       </div>
