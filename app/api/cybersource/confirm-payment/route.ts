@@ -284,7 +284,8 @@ export async function POST(req: NextRequest) {
               clientReferenceInformation: { code: paymentReference },
               processingInformation: {
                 commerceIndicator: normalizedCommerceIndicator || 'internet',
-                capture: false,
+                // capture:true — auth + capture in one step (required for most merchant configs)
+                capture: true,
               },
               tokenInformation: {
                 transientTokenJwt: transientTokenString,
@@ -298,11 +299,9 @@ export async function POST(req: NextRequest) {
               },
             }
 
-            if (resolvedCardType) {
-              requestPayload.paymentInformation = {
-                card: { type: resolvedCardType },
-              }
-            }
+            // Do NOT include paymentInformation.card.type when using tokenInformation.transientTokenJwt.
+            // The card data is already embedded in the token — adding it separately causes CyberSource
+            // to return 404 "Resource not found" due to conflicting payment method resolution.
             if (normalizedConsumerAuth) {
               requestPayload.consumerAuthenticationInformation = normalizedConsumerAuth
             }
@@ -334,9 +333,12 @@ export async function POST(req: NextRequest) {
     }
 
     const amountToCapture = (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2)
+    // Unified mode uses capture:true so auth+capture happen in one step — no separate call needed.
+    // Direct (SDK) mode does its own capture internally.
+    // Only do a separate capture for mock mode path (which won't reach here anyway).
     let captureId: string | null = null
     let captureStatus: string | null = null
-    if (!isMockMode && transactionId) {
+    if (!isMockMode && isDirectMode && transactionId) {
       const captureResponse = await cyberSourcePost<any>(`/pts/v2/payments/${transactionId}/captures`, {
         clientReferenceInformation: { code: `${paymentReference}-CAPTURE` },
         orderInformation: {
@@ -370,6 +372,10 @@ export async function POST(req: NextRequest) {
           { status: 402 }
         )
       }
+    } else if (!isMockMode && !isDirectMode && transactionId) {
+      // Unified mode: capture was requested inline (capture:true), status reflects both
+      captureId = transactionId
+      captureStatus = status
     }
 
     const entries = []
