@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { CyberSourceApiError, cyberSourceGet } from '@/lib/cybersource'
+import { CyberSourceApiError } from '@/lib/cybersource'
+import { cyberSourcePayerAuthValidateViaSdk } from '@/lib/cybersource-sdk-direct'
 
 function normalizeConsumerAuthenticationInformation(raw: any) {
   if (!raw || typeof raw !== 'object') return null
@@ -34,9 +35,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'authenticationTransactionId requerido.' }, { status: 400 })
     }
 
-    const result = await cyberSourceGet<any>(
-      `/risk/v1/authentication-results/${encodeURIComponent(String(authenticationTransactionId))}`
-    )
+    const result = await cyberSourcePayerAuthValidateViaSdk({
+      authenticationTransactionId: String(authenticationTransactionId),
+    })
 
     const normalized = normalizeConsumerAuthenticationInformation(result?.consumerAuthenticationInformation)
 
