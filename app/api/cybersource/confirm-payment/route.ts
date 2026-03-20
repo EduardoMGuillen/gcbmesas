@@ -260,19 +260,6 @@ export async function POST(req: NextRequest) {
           })
         : await (async () => {
             const transientTokenString = String(transientToken)
-            const tokenPayload = parseJwtPayload(transientTokenString)
-            const tokenDetectedType = tokenPayload?.content?.paymentInformation?.card?.number?.detectedCardTypes?.[0]
-
-            let resolvedCardType = String(paymentCardType || tokenDetectedType || '').trim()
-            if (!resolvedCardType) {
-              try {
-                const tokenForPath = encodeURIComponent(transientTokenString.trim())
-                const paymentDetails = await cyberSourceGet<any>(`/up/v1/payment-details/${tokenForPath}`)
-                resolvedCardType = String(paymentDetails?.paymentInformation?.card?.type || '').trim()
-              } catch {
-                // non-blocking, card type is optional in some setups
-              }
-            }
 
             const normalizedCommerceIndicator = String(
               commerceIndicator || (normalizedConsumerAuth ? 'aesk' : 'internet')
