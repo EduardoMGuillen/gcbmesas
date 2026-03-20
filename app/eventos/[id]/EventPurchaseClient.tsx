@@ -196,8 +196,11 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
         ':focus': {
           color: '#ffffff',
         },
-        '::-webkit-input-placeholder': {
-          color: 'rgba(255,255,255,0.2)',
+        valid: {
+          color: '#86efac',
+        },
+        invalid: {
+          color: '#fca5a5',
         },
       },
     })
