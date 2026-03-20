@@ -49,17 +49,15 @@ function parseJwtPayload(token: string): any | null {
 
 function normalizeConsumerAuthenticationInformation(raw: any) {
   if (!raw || typeof raw !== 'object') return null
-  const normalized = {
-    authenticationTransactionId: raw.authenticationTransactionId ? String(raw.authenticationTransactionId) : undefined,
-    cavv: raw.cavv ? String(raw.cavv) : undefined,
-    xid: raw.xid ? String(raw.xid) : undefined,
-    eci: raw.eci ? String(raw.eci) : undefined,
-    acsTransactionId: raw.acsTransactionId ? String(raw.acsTransactionId) : undefined,
-    threeDSServerTransactionId: raw.threeDSServerTransactionId ? String(raw.threeDSServerTransactionId) : undefined,
-    directoryServerTransactionId: raw.directoryServerTransactionId ? String(raw.directoryServerTransactionId) : undefined,
-  }
-  const hasAny = Object.values(normalized).some((v) => Boolean(v))
-  return hasAny ? normalized : null
+  // Only pass the fields relevant to the payment step.
+  // Fields like authenticationTransactionId, acsTransactionId, etc. are for
+  // the enrollment/setup phase. Sending them in the payment request causes
+  // CyberSource to look for paymentAccountInformation.card.number → 400.
+  const normalized: Record<string, string> = {}
+  if (raw.cavv) normalized.cavv = String(raw.cavv)
+  if (raw.eci) normalized.eci = String(raw.eci)
+  if (raw.xid) normalized.xid = String(raw.xid)
+  return Object.keys(normalized).length > 0 ? normalized : null
 }
 
 function generateToken(): string {
