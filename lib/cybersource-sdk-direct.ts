@@ -235,10 +235,10 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
     amountDetails: { totalAmount: params.amount, currency: params.currency },
   }
 
-  const paymentsApiForCapture = new sdk.PaymentsApi(configObject, new sdk.ApiClient())
+  const captureApi = new sdk.CaptureApi(configObject, new sdk.ApiClient())
 
   const captureResponse: any = await new Promise((resolve, reject) => {
-    paymentsApiForCapture.capturePayment(
+    captureApi.capturePayment(
       captureRequestObj,
       authId,
       (error: any, data: any, response: any) => {
