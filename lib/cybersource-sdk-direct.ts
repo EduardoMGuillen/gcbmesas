@@ -192,9 +192,12 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
   requestObj.clientReferenceInformation = { code: params.paymentReference }
   requestObj.processingInformation = {
     capture: false,
-    commerceIndicator: params.commerceIndicator || 'internet',
+    commerceIndicator: 'internet',
   }
-  // Transient token from Microform v2 — card data is embedded, do NOT add paymentInformation.card
+  // Transient token from Microform v2 — card data is embedded, do NOT add paymentInformation.card.
+  // Do NOT pass consumerAuthenticationInformation here: CyberSource already linked the 3DS
+  // authentication to this token during the payer-auth setup/enrollment calls. Passing
+  // cavv/eci again triggers it to look for paymentAccountInformation.card.number → 400.
   requestObj.tokenInformation = {
     transientTokenJwt: params.transientToken,
   }
@@ -204,9 +207,6 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
       currency: params.currency,
     },
     billTo: params.billTo,
-  }
-  if (params.consumerAuthInfo) {
-    requestObj.consumerAuthenticationInformation = params.consumerAuthInfo
   }
 
   const paymentsApi = new sdk.PaymentsApi(configObject, apiClient)
