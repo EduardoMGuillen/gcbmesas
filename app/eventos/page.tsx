@@ -31,9 +31,9 @@ export default async function EventosPage() {
           0%   { background-position: -200% center; }
           100% { background-position:  200% center; }
         }
-        @keyframes glowPulse {
-          0%, 100% { box-shadow: 0 0 30px rgba(201,168,76,0.08); }
-          50%       { box-shadow: 0 0 60px rgba(201,168,76,0.22); }
+        .event-card:hover {
+          border-color: rgba(201,168,76,0.25) !important;
+          box-shadow: 0 20px 50px rgba(201,168,76,0.15), 0 4px 24px rgba(0,0,0,0.5) !important;
         }
         @keyframes orb {
           0%, 100% { transform: translate(0, 0) scale(1); }
@@ -191,17 +191,8 @@ export default async function EventosPage() {
                       background: 'linear-gradient(180deg, #12122a 0%, #0a0a1c 100%)',
                       border: '1px solid rgba(255,255,255,0.07)',
                       boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
-                      '--card-delay': `${idx * 0.08}s`,
                       animation: `fadeInUp 0.55s ease ${idx * 0.08}s both`,
                     } as any}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.boxShadow = '0 20px 50px rgba(201,168,76,0.15), 0 4px 24px rgba(0,0,0,0.5)'
-                      ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(201,168,76,0.25)'
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 24px rgba(0,0,0,0.4)'
-                      ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.07)'
-                    }}
                   >
                     <div className="card-shine" />
 
