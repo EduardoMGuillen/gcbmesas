@@ -258,3 +258,133 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
     captureStatus: String(captureResponse?.status || '').toUpperCase(),
   }
 }
+
+// ─── Payer Authentication (3DS) via SDK ────────────────────────────────────
+
+type BillTo = {
+  firstName: string
+  lastName: string
+  email: string
+  country: string
+  locality: string
+  address1: string
+  administrativeArea: string
+  postalCode: string
+  phoneNumber: string
+}
+
+type PayerAuthSetupParams = {
+  paymentReference: string
+  transientToken: string
+  amount: string
+  currency: string
+  billTo: BillTo
+  cardType?: string
+}
+
+type PayerAuthEnrollParams = {
+  paymentReference: string
+  transientToken: string
+  referenceId: string
+  returnUrl: string
+  amount: string
+  currency: string
+  billTo: BillTo
+  cardType?: string
+}
+
+type PayerAuthValidateParams = {
+  authenticationTransactionId: string
+}
+
+function buildPayerAuthSdkConfig(sdk: any): { configObject: any; buildApiClient: () => any } {
+  const merchantId = process.env.CYBERSOURCE_MERCHANT_ID?.trim()
+  const keyId = process.env.CYBERSOURCE_KEY_ID?.trim()
+  const sharedSecret = process.env.CYBERSOURCE_SHARED_SECRET?.trim()
+  if (!merchantId || !keyId || !sharedSecret) {
+    throw new Error('Faltan credenciales REST de CyberSource')
+  }
+  const configObject = {
+    authenticationType: 'http_signature',
+    runEnvironment: getRunEnvironmentHost(),
+    merchantID: merchantId,
+    merchantKeyId: keyId,
+    merchantsecretKey: sharedSecret,
+    logConfiguration: { enableLog: false },
+  }
+  return { configObject, buildApiClient: () => new sdk.ApiClient() }
+}
+
+export async function cyberSourcePayerAuthSetupViaSdk(params: PayerAuthSetupParams): Promise<any> {
+  const cybersourceRestApi: any = await import('cybersource-rest-client')
+  const sdk = (cybersourceRestApi as any).default || cybersourceRestApi
+  const { configObject, buildApiClient } = buildPayerAuthSdkConfig(sdk)
+
+  const requestObj = new sdk.PayerAuthSetupRequest()
+  requestObj.clientReferenceInformation = { code: `${params.paymentReference}-3DS-SETUP` }
+  requestObj.tokenInformation = { transientTokenJwt: params.transientToken }
+  requestObj.orderInformation = {
+    amountDetails: { totalAmount: params.amount, currency: params.currency },
+    billTo: params.billTo,
+  }
+  if (params.cardType) {
+    requestObj.paymentInformation = { card: { type: params.cardType } }
+  }
+
+  const api = new sdk.PayerAuthenticationApi(configObject, buildApiClient())
+  return new Promise((resolve, reject) => {
+    api.payerAuthSetup(requestObj, (error: any, data: any, response: any) => {
+      if (!error) { resolve(data || response?.body || {}); return }
+      rejectPaymentError(reject, error, response, '/risk/v1/authentication-setups')
+    })
+  })
+}
+
+export async function cyberSourcePayerAuthEnrollViaSdk(params: PayerAuthEnrollParams): Promise<any> {
+  const cybersourceRestApi: any = await import('cybersource-rest-client')
+  const sdk = (cybersourceRestApi as any).default || cybersourceRestApi
+  const { configObject, buildApiClient } = buildPayerAuthSdkConfig(sdk)
+
+  const requestObj = new sdk.CheckPayerAuthEnrollmentRequest()
+  requestObj.clientReferenceInformation = { code: `${params.paymentReference}-3DS-AUTH` }
+  requestObj.consumerAuthenticationInformation = {
+    referenceId: params.referenceId,
+    returnUrl: params.returnUrl,
+    transactionMode: 'eCommerce',
+  }
+  requestObj.tokenInformation = { transientTokenJwt: params.transientToken }
+  requestObj.orderInformation = {
+    amountDetails: { totalAmount: params.amount, currency: params.currency },
+    billTo: params.billTo,
+  }
+  if (params.cardType) {
+    requestObj.paymentInformation = { card: { type: params.cardType } }
+  }
+
+  const api = new sdk.PayerAuthenticationApi(configObject, buildApiClient())
+  return new Promise((resolve, reject) => {
+    api.checkPayerAuthEnrollment(requestObj, (error: any, data: any, response: any) => {
+      if (!error) { resolve(data || response?.body || {}); return }
+      rejectPaymentError(reject, error, response, '/risk/v1/authentications')
+    })
+  })
+}
+
+export async function cyberSourcePayerAuthValidateViaSdk(params: PayerAuthValidateParams): Promise<any> {
+  const cybersourceRestApi: any = await import('cybersource-rest-client')
+  const sdk = (cybersourceRestApi as any).default || cybersourceRestApi
+  const { configObject, buildApiClient } = buildPayerAuthSdkConfig(sdk)
+
+  const requestObj = new sdk.ValidateRequest()
+  requestObj.consumerAuthenticationInformation = {
+    authenticationTransactionId: params.authenticationTransactionId,
+  }
+
+  const api = new sdk.PayerAuthenticationApi(configObject, buildApiClient())
+  return new Promise((resolve, reject) => {
+    api.validateAuthenticationResults(requestObj, (error: any, data: any, response: any) => {
+      if (!error) { resolve(data || response?.body || {}); return }
+      rejectPaymentError(reject, error, response, '/risk/v1/authentication-results')
+    })
+  })
+}

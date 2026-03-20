@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { CyberSourceApiError, cyberSourcePost } from '@/lib/cybersource'
+import { CyberSourceApiError } from '@/lib/cybersource'
+import {
+  cyberSourcePayerAuthSetupViaSdk,
+  cyberSourcePayerAuthEnrollViaSdk,
+} from '@/lib/cybersource-sdk-direct'
 
 function parseJwtPayload(token: string): any | null {
   try {
@@ -74,28 +78,11 @@ export async function POST(req: NextRequest) {
     const pendingLog = await prisma.log.findFirst({
       where: {
         action: 'EVENT_UPDATED',
-        createdAt: {
-          gte: new Date(Date.now() - 1000 * 60 * 60 * 48),
-        },
+        createdAt: { gte: new Date(Date.now() - 1000 * 60 * 60 * 48) },
         AND: [
-          {
-            details: {
-              path: ['type'],
-              equals: 'CYBERSOURCE_PENDING',
-            },
-          },
-          {
-            details: {
-              path: ['paymentReference'],
-              equals: paymentReference,
-            },
-          },
-          {
-            details: {
-              path: ['eventId'],
-              equals: eventId,
-            },
-          },
+          { details: { path: ['type'], equals: 'CYBERSOURCE_PENDING' } },
+          { details: { path: ['paymentReference'], equals: paymentReference } },
+          { details: { path: ['eventId'], equals: eventId } },
         ],
       },
       orderBy: { createdAt: 'desc' },
@@ -133,24 +120,16 @@ export async function POST(req: NextRequest) {
     const tokenDetectedType = tokenPayload?.content?.paymentInformation?.card?.number?.detectedCardTypes?.[0]
     const resolvedCardType = String(paymentCardType || tokenDetectedType || '').trim()
 
-    const setupPayload: any = {
-      clientReferenceInformation: { code: `${paymentReference}-3DS-SETUP` },
-      tokenInformation: { transientTokenJwt: String(transientToken) },
-      orderInformation: {
-        amountDetails: {
-          totalAmount: amount,
-          currency,
-        },
-        billTo: resolvedBillTo,
-      },
-    }
-    if (resolvedCardType) {
-      setupPayload.paymentInformation = {
-        card: { type: resolvedCardType },
-      }
-    }
+    // Step 1: Setup device fingerprint / enrollment reference
+    const setupResponse = await cyberSourcePayerAuthSetupViaSdk({
+      paymentReference,
+      transientToken: String(transientToken),
+      amount,
+      currency,
+      billTo: resolvedBillTo,
+      cardType: resolvedCardType || undefined,
+    })
 
-    const setupResponse = await cyberSourcePost<any>('/risk/v1/authentication-setups', setupPayload)
     const referenceId = String(setupResponse?.consumerAuthenticationInformation?.referenceId || '').trim()
     if (!referenceId) {
       return NextResponse.json({
@@ -162,30 +141,20 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
-    const authenticationPayload: any = {
-      clientReferenceInformation: { code: `${paymentReference}-3DS-AUTH` },
-      consumerAuthenticationInformation: {
-        referenceId,
-        returnUrl: `${appUrl}/api/cybersource/3ds-callback`,
-        transactionMode: 'eCommerce',
-      },
-      tokenInformation: { transientTokenJwt: String(transientToken) },
-      orderInformation: {
-        amountDetails: {
-          totalAmount: amount,
-          currency,
-        },
-        billTo: resolvedBillTo,
-      },
-    }
-    if (resolvedCardType) {
-      authenticationPayload.paymentInformation = {
-        card: { type: resolvedCardType },
-      }
-    }
+    const appUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin).replace(/\/$/, '')
 
-    const authenticationResponse = await cyberSourcePost<any>('/risk/v1/authentications', authenticationPayload)
+    // Step 2: Check enrollment / initiate authentication
+    const authenticationResponse = await cyberSourcePayerAuthEnrollViaSdk({
+      paymentReference,
+      transientToken: String(transientToken),
+      referenceId,
+      returnUrl: `${appUrl}/api/cybersource/3ds-callback`,
+      amount,
+      currency,
+      billTo: resolvedBillTo,
+      cardType: resolvedCardType || undefined,
+    })
+
     const normalizedConsumerAuth = normalizeConsumerAuthenticationInformation(
       authenticationResponse?.consumerAuthenticationInformation
     )
@@ -198,7 +167,6 @@ export async function POST(req: NextRequest) {
         commerceIndicator: 'internet',
         consumerAuthenticationInformation: normalizedConsumerAuth,
         paymentCardType: resolvedCardType || null,
-        // Data the frontend needs to drive the ACS challenge iframe
         stepUpUrl: cai.stepUpUrl || null,
         accessToken: cai.accessToken || null,
         authenticationTransactionId: cai.authenticationTransactionId || null,
@@ -259,11 +227,7 @@ export async function POST(req: NextRequest) {
             error.responseBody?.message ||
             error.message
       return NextResponse.json(
-        {
-          error: `CyberSource ${error.status}: ${reason}`,
-          requestId: error.requestId,
-          endpoint: error.endpoint,
-        },
+        { error: `CyberSource ${error.status}: ${reason}`, requestId: error.requestId, endpoint: error.endpoint },
         { status: 502 }
       )
     }
