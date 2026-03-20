@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
 
     const captureContextPayload: any = {
       targetOrigins,
-      clientVersion: 'v2',
+      clientVersion: 'v2.0',
       allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX'],
       allowedPaymentTypes: ['CARD'],
       orderInformation: {
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
 
     const minimalCaptureContextPayload: any = {
       targetOrigins,
-      clientVersion: 'v2',
+      clientVersion: 'v2.0',
       allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX'],
       allowedPaymentTypes: ['CARD'],
     }
