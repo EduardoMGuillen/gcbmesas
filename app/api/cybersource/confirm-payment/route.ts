@@ -49,14 +49,22 @@ function parseJwtPayload(token: string): any | null {
 
 function normalizeConsumerAuthenticationInformation(raw: any) {
   if (!raw || typeof raw !== 'object') return null
-  // Only pass the fields relevant to the payment step.
-  // Fields like authenticationTransactionId, acsTransactionId, etc. are for
-  // the enrollment/setup phase. Sending them in the payment request causes
-  // CyberSource to look for paymentAccountInformation.card.number → 400.
+  // For the PAYMENT step, only pass fields the Ptsv2paymentsConsumerAuthenticationInformation
+  // model recognises. The SDK silently drops unknown keys, so:
+  //   - use "eciRaw"  (not "eci") — that is the SDK model's field name
+  //   - include "paresStatus" so CyberSource knows the auth succeeded
+  // Sending enrollment-only fields (authenticationTransactionId, acsTransactionId, etc.)
+  // triggers CyberSource to look for paymentAccountInformation.card.number → 400.
   const normalized: Record<string, string> = {}
-  if (raw.cavv) normalized.cavv = String(raw.cavv)
-  if (raw.eci) normalized.eci = String(raw.eci)
-  if (raw.xid) normalized.xid = String(raw.xid)
+  if (raw.cavv)       normalized.cavv        = String(raw.cavv)
+  if (raw.eci)        normalized.eciRaw      = String(raw.eci)       // SDK field is eciRaw
+  if (raw.eciRaw)     normalized.eciRaw      = String(raw.eciRaw)
+  if (raw.xid)        normalized.xid         = String(raw.xid)
+  if (raw.paresStatus) normalized.paresStatus = String(raw.paresStatus)
+  // For a frictionless success without explicit paresStatus, default to "Y"
+  if (!normalized.paresStatus && (normalized.cavv || normalized.eciRaw)) {
+    normalized.paresStatus = 'Y'
+  }
   return Object.keys(normalized).length > 0 ? normalized : null
 }
 
