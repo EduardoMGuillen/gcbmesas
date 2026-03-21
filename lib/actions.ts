@@ -63,6 +63,13 @@ function ensureCashierAccess(role: string) {
   }
 }
 
+/** Venta/gestión de entradas y eventos: solo administradores */
+function ensureEntradasAdminOnly(role: string) {
+  if (role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden gestionar el módulo de entradas')
+  }
+}
+
 function ensureEntryScanAccess(role: string) {
   if (!['ADMIN', 'CAJERO', 'TAQUILLA', 'MESERO'].includes(role)) {
     throw new Error('Solo taquilla, meseros, cajeros o administradores pueden escanear entradas')
@@ -2048,7 +2055,7 @@ export async function createEvent(data: {
   paypalPrice?: number
 }) {
   const user = await getCurrentUser()
-  ensureCashierAccess(user.role)
+  ensureEntradasAdminOnly(user.role)
 
   const event = await prisma.event.create({
     data: {
@@ -2090,7 +2097,7 @@ export async function updateEvent(
   data: { name?: string; date?: string; coverPrice?: number; isActive?: boolean; description?: string; coverImage?: string; paypalPrice?: number }
 ) {
   const user = await getCurrentUser()
-  ensureCashierAccess(user.role)
+  ensureEntradasAdminOnly(user.role)
 
   const updateData: any = {}
   if (data.name !== undefined) updateData.name = data.name
@@ -2117,7 +2124,7 @@ export async function updateEvent(
 
 export async function deleteEvent(id: string) {
   const user = await getCurrentUser()
-  ensureCashierAccess(user.role)
+  ensureEntradasAdminOnly(user.role)
 
   // Check if the event has entries
   const entryCount = await prisma.entry.count({ where: { eventId: id } })
@@ -2154,7 +2161,7 @@ export async function createEntry(data: {
   numberOfEntries: number
 }) {
   const user = await getCurrentUser()
-  ensureCashierAccess(user.role)
+  ensureEntradasAdminOnly(user.role)
 
   // Get event to calculate price
   const event = await prisma.event.findUnique({
@@ -2215,7 +2222,7 @@ export async function createBulkEntries(data: {
   guestNames: string[]
 }) {
   const user = await getCurrentUser()
-  ensureCashierAccess(user.role)
+  ensureEntradasAdminOnly(user.role)
 
   const event = await prisma.event.findUnique({
     where: { id: data.eventId },
@@ -2300,7 +2307,7 @@ export async function getEntries(filters?: {
 
 export async function getEntradasDashboardData() {
   const user = await getCurrentUser()
-  ensureCashierAccess(user.role)
+  ensureEntradasAdminOnly(user.role)
 
   const [events, recentEntries, todayStats] = await Promise.all([
     prisma.event.findMany({
@@ -2352,6 +2359,70 @@ export async function getEntradasDashboardData() {
   }
 }
 
+const TAQUILLA_HISTORY_ROLES = ['ADMIN', 'TAQUILLA', 'MESERO', 'CAJERO'] as const
+
+export type TaquillaHistoryEntry = {
+  id: string
+  clientName: string
+  clientEmail: string
+  numberOfEntries: number
+  totalPrice: number
+  qrToken: string
+  status: 'ACTIVE' | 'USED' | 'CANCELLED'
+  createdAt: Date
+  emailSent: boolean
+}
+
+/** Historial de entradas por evento (taquilla): lectura + reenvío de correo en UI */
+export async function getTaquillaEventEntries(input: {
+  eventId: string
+  status?: 'all' | 'ACTIVE' | 'USED' | 'CANCELLED'
+  search?: string
+}): Promise<TaquillaHistoryEntry[]> {
+  const user = await getCurrentUser()
+  if (!TAQUILLA_HISTORY_ROLES.includes(user.role as (typeof TAQUILLA_HISTORY_ROLES)[number])) {
+    throw new Error('No autorizado')
+  }
+
+  const where: Record<string, unknown> = { eventId: input.eventId }
+  if (input.status && input.status !== 'all') {
+    where.status = input.status
+  }
+  const q = input.search?.trim()
+  if (q) {
+    where.AND = [
+      {
+        OR: [
+          { clientName: { contains: q, mode: 'insensitive' } },
+          { clientEmail: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+    ]
+  }
+
+  const rows = await prisma.entry.findMany({
+    where: where as any,
+    orderBy: { createdAt: 'desc' },
+    take: 400,
+    select: {
+      id: true,
+      clientName: true,
+      clientEmail: true,
+      numberOfEntries: true,
+      totalPrice: true,
+      qrToken: true,
+      status: true,
+      createdAt: true,
+      emailSent: true,
+    },
+  })
+
+  return rows.map((r) => ({
+    ...r,
+    totalPrice: Number(r.totalPrice),
+  }))
+}
+
 export async function markEntryUsed(entryId: string) {
   const user = await getCurrentUser()
   ensureEntryScanAccess(user.role)
@@ -2375,11 +2446,12 @@ export async function markEntryUsed(entryId: string) {
   })
 
   revalidatePath('/admin/entradas')
+  revalidatePath('/taquilla')
 }
 
 export async function revertEntryToActive(entryId: string) {
   const user = await getCurrentUser()
-  ensureCashierAccess(user.role)
+  ensureEntradasAdminOnly(user.role)
 
   const entry = await prisma.entry.findUnique({
     where: { id: entryId },
@@ -2404,7 +2476,7 @@ export async function revertEntryToActive(entryId: string) {
 
 export async function cancelEntry(entryId: string) {
   const user = await getCurrentUser()
-  ensureCashierAccess(user.role)
+  ensureEntradasAdminOnly(user.role)
 
   const entry = await prisma.entry.findUnique({
     where: { id: entryId },

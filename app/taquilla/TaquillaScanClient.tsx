@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { signOut } from 'next-auth/react'
-import { markEntryUsed, validateEntryByToken } from '@/lib/actions'
+import { useRouter } from 'next/navigation'
+import {
+  getTaquillaEventEntries,
+  markEntryUsed,
+  validateEntryByToken,
+  type TaquillaHistoryEntry,
+} from '@/lib/actions'
 
 type ActiveEvent = {
   id: string
@@ -24,6 +30,7 @@ type ScannedEntry = {
 }
 
 export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
+  const router = useRouter()
   const [selectedEventId, setSelectedEventId] = useState(events[0]?.id ?? '')
   const [manualToken, setManualToken] = useState('')
   const [scannedEntry, setScannedEntry] = useState<ScannedEntry | null>(null)
@@ -32,6 +39,50 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
   const [scannerError, setScannerError] = useState('')
   const [isScanning, setIsScanning] = useState(false)
   const [isPending, startTransition] = useTransition()
+
+  const [histStatus, setHistStatus] = useState<'all' | 'ACTIVE' | 'USED' | 'CANCELLED'>('all')
+  const [histSearch, setHistSearch] = useState('')
+  const [histSearchDebounced, setHistSearchDebounced] = useState('')
+  const [histRows, setHistRows] = useState<TaquillaHistoryEntry[]>([])
+  const [histLoading, setHistLoading] = useState(false)
+  const [histError, setHistError] = useState('')
+  const [resendingId, setResendingId] = useState<string | null>(null)
+  const [histMsg, setHistMsg] = useState('')
+
+  useEffect(() => {
+    const t = setTimeout(() => setHistSearchDebounced(histSearch), 400)
+    return () => clearTimeout(t)
+  }, [histSearch])
+
+  useEffect(() => {
+    if (!selectedEventId) {
+      setHistRows([])
+      return
+    }
+    let cancelled = false
+    setHistLoading(true)
+    setHistError('')
+    getTaquillaEventEntries({
+      eventId: selectedEventId,
+      status: histStatus,
+      search: histSearchDebounced.trim() || undefined,
+    })
+      .then((rows) => {
+        if (!cancelled) setHistRows(rows)
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setHistError(e?.message || 'No se pudo cargar el historial')
+          setHistRows([])
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setHistLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedEventId, histStatus, histSearchDebounced])
 
   const scannerRef = useRef<any>(null)
   const scannerContainerRef = useRef<HTMLDivElement>(null)
@@ -135,6 +186,20 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
     })
   }
 
+  const refreshHistorial = useCallback(async () => {
+    if (!selectedEventId) return
+    try {
+      const rows = await getTaquillaEventEntries({
+        eventId: selectedEventId,
+        status: histStatus,
+        search: histSearchDebounced.trim() || undefined,
+      })
+      setHistRows(rows)
+    } catch {
+      // ignore
+    }
+  }, [selectedEventId, histStatus, histSearchDebounced])
+
   const handleMarkUsed = () => {
     if (!scannedEntry || scannedEntry.status !== 'ACTIVE') return
     startTransition(async () => {
@@ -142,10 +207,41 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
         await markEntryUsed(scannedEntry.id)
         setScannedEntry({ ...scannedEntry, status: 'USED' })
         setSuccessMsg('Entrada marcada como USADA correctamente.')
+        router.refresh()
+        await refreshHistorial()
       } catch (err: any) {
         setError(err.message || 'No se pudo marcar la entrada')
       }
     })
+  }
+
+  const handleResendTaquillaEmail = async (entry: TaquillaHistoryEntry) => {
+    if (entry.status === 'CANCELLED' || !selectedEvent) return
+    setResendingId(entry.id)
+    setHistError('')
+    setHistMsg('')
+    try {
+      const res = await fetch('/api/send-entry-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entries: [{ entryId: entry.id, qrToken: entry.qrToken, clientName: entry.clientName }],
+          clientEmail: entry.clientEmail,
+          eventName: selectedEvent.name,
+          eventDate: String(selectedEvent.date),
+          totalPrice: entry.totalPrice,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((json as { error?: string }).error || 'Error al enviar correo')
+      setHistMsg(`QR reenviado a ${entry.clientEmail}`)
+      router.refresh()
+      await refreshHistorial()
+    } catch (err: unknown) {
+      setHistError(err instanceof Error ? err.message : 'Error al reenviar')
+    } finally {
+      setResendingId(null)
+    }
   }
 
   const startScanner = async () => {
@@ -278,6 +374,8 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
               setError('')
               setSuccessMsg('')
               setScannedEntry(null)
+              setHistMsg('')
+              setHistError('')
             }}
             className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
@@ -389,6 +487,120 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
             )}
           </section>
         )}
+
+        <section className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-white">Historial del evento</h2>
+              <p className="text-xs text-dark-400 mt-1">
+                Lista filtrable del evento seleccionado. Puedes reenviar el QR al correo del cliente. No hay revertir
+                desde taquilla.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refreshHistorial()}
+              disabled={histLoading || !selectedEventId}
+              className="text-sm px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 disabled:opacity-50 shrink-0"
+            >
+              Actualizar lista
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {(['all', 'ACTIVE', 'USED', 'CANCELLED'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setHistStatus(s)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  histStatus === s
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-dark-50 border border-dark-200 text-white/70 hover:text-white'
+                }`}
+              >
+                {s === 'all'
+                  ? 'Todas'
+                  : s === 'ACTIVE'
+                    ? 'Activas'
+                    : s === 'USED'
+                      ? 'Usadas'
+                      : 'Canceladas'}
+              </button>
+            ))}
+          </div>
+
+          <input
+            type="search"
+            value={histSearch}
+            onChange={(e) => setHistSearch(e.target.value)}
+            placeholder="Filtrar por nombre o correo…"
+            disabled={!selectedEventId}
+            className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 disabled:opacity-50"
+          />
+
+          {histError && (
+            <div className="bg-red-500/15 border border-red-500/40 text-red-300 px-4 py-3 rounded-lg text-sm">
+              {histError}
+            </div>
+          )}
+          {histMsg && (
+            <div className="bg-green-500/15 border border-green-500/40 text-green-300 px-4 py-3 rounded-lg text-sm">
+              {histMsg}
+            </div>
+          )}
+
+          {!selectedEventId || events.length === 0 ? (
+            <p className="text-dark-400 text-sm py-4 text-center">Selecciona un evento para ver el historial.</p>
+          ) : histLoading ? (
+            <p className="text-dark-400 text-sm py-8 text-center">Cargando historial…</p>
+          ) : histRows.length === 0 ? (
+            <p className="text-dark-400 text-sm py-8 text-center">No hay entradas con estos filtros.</p>
+          ) : (
+            <ul className="space-y-2 max-h-[min(420px,50vh)] overflow-y-auto pr-1">
+              {histRows.map((row) => (
+                <li
+                  key={row.id}
+                  className="bg-dark-50 border border-dark-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-white truncate">{row.clientName}</span>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          row.status === 'ACTIVE'
+                            ? 'bg-green-500/20 text-green-300'
+                            : row.status === 'USED'
+                              ? 'bg-blue-500/20 text-blue-300'
+                              : 'bg-red-500/20 text-red-300'
+                        }`}
+                      >
+                        {row.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-dark-400 break-all">{row.clientEmail}</p>
+                    <p className="text-xs text-dark-500 mt-1">
+                      {row.numberOfEntries} entrada{row.numberOfEntries !== 1 ? 's' : ''} · L{' '}
+                      {row.totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })} ·{' '}
+                      {new Date(row.createdAt).toLocaleString('es-HN')}
+                      {row.emailSent ? ' · Email enviado' : ''}
+                    </p>
+                  </div>
+                  {row.status !== 'CANCELLED' && (
+                    <button
+                      type="button"
+                      onClick={() => void handleResendTaquillaEmail(row)}
+                      disabled={resendingId === row.id}
+                      className="shrink-0 text-xs sm:text-sm px-4 py-2 bg-blue-600/25 text-blue-300 hover:bg-blue-600/35 rounded-lg disabled:opacity-50 border border-blue-500/30"
+                    >
+                      {resendingId === row.id ? 'Enviando…' : 'Reenviar al correo'}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </main>
     </div>
   )

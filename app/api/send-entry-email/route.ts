@@ -17,7 +17,8 @@ export async function POST(req: NextRequest) {
   try {
     // Auth check
     const session = await getServerSession(authOptions)
-    if (!session || !['CAJERO', 'ADMIN'].includes(session.user.role)) {
+    const allowedSend = ['ADMIN', 'TAQUILLA', 'MESERO', 'CAJERO'] as const
+    if (!session || !allowedSend.includes(session.user.role as (typeof allowedSend)[number])) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 

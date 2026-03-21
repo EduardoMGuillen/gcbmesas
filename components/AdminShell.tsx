@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -32,6 +32,14 @@ const adminLinks = [
 
 type UserRole = 'ADMIN' | 'MESERO' | 'CAJERO'
 
+function linkAllowedForRole(href: string, role: UserRole): boolean {
+  if (role === 'ADMIN') return true
+  const ok = (bases: string[]) => bases.some((b) => href === b || href.startsWith(`${b}/`))
+  if (role === 'MESERO') return ok(['/admin/cuentas', '/mesero', '/taquilla'])
+  if (role === 'CAJERO') return ok(['/admin/cuentas', '/cajero', '/taquilla'])
+  return false
+}
+
 export function AdminShell({ children, userRole }: { children: React.ReactNode; userRole: UserRole }) {
   const { data: session } = useSession()
   const pathname = usePathname()
@@ -39,21 +47,24 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // Mesero/Cajero solo pueden ver ciertas rutas admin; redirigir si está en otra
+  const navLinks = useMemo(
+    () => adminLinks.filter((l) => linkAllowedForRole(l.href, userRole)),
+    [userRole]
+  )
+
+  // Mesero/Cajero solo /admin/cuentas dentro de admin
   useEffect(() => {
     if (
       (userRole === 'MESERO' || userRole === 'CAJERO') &&
       pathname?.startsWith('/admin') &&
-      !pathname?.startsWith('/admin/cuentas') &&
-      !(userRole === 'CAJERO' && pathname?.startsWith('/admin/entradas'))
+      !pathname?.startsWith('/admin/cuentas')
     ) {
       router.replace(userRole === 'CAJERO' ? '/cajero' : '/mesero')
     }
   }, [userRole, pathname, router])
 
   const isNonAdminOnAllowedRoute =
-    (userRole === 'MESERO' || userRole === 'CAJERO') &&
-    (pathname?.startsWith('/admin/cuentas') || (userRole === 'CAJERO' && pathname?.startsWith('/admin/entradas')))
+    (userRole === 'MESERO' || userRole === 'CAJERO') && pathname?.startsWith('/admin/cuentas')
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/login' })
@@ -132,7 +143,7 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
         {/* Mobile dropdown menu */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-dark-200 py-3 px-4 space-y-1 max-h-[70vh] overflow-y-auto">
-            {adminLinks.map((link) => (
+            {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -157,7 +168,7 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
         }`}
       >
         <nav className="flex-1 py-4 overflow-y-auto">
-          {adminLinks.map((link) => {
+          {navLinks.map((link) => {
             const match = link.href === '/admin' ? pathname === '/admin' : pathname?.startsWith(link.href)
             return (
               <Link
