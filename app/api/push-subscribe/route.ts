@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
           p256dh: null,
           auth: null,
         },
-        update: {},
+        // Mismo dispositivo con otro usuario logueado: reasignar al usuario actual (fix admin/mesero)
+        update: { userId: session.user.id },
       })
       return NextResponse.json({ success: true })
     }
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
       update: {
         p256dh: keys.p256dh,
         auth: keys.auth,
+        userId: session.user.id,
       },
     })
 
