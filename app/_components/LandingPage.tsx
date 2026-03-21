@@ -341,6 +341,7 @@ export default function LandingPage({ events }: LandingPageProps) {
             backdropFilter: 'blur(12px)',
             borderBottom: '1px solid rgba(0,255,255,0.08)',
             transition: 'background 0.3s',
+            paddingTop: 'env(safe-area-inset-top)',
           }}
         >
           {/* Top bar */}
@@ -393,7 +394,7 @@ export default function LandingPage({ events }: LandingPageProps) {
             style={{
               minHeight: '100vh',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              textAlign: 'center', padding: '0 2rem', paddingTop: '80px',
+              textAlign: 'center', padding: '0 2rem', paddingTop: 'calc(80px + env(safe-area-inset-top))',
             }}
           >
             <div style={{ maxWidth: 900 }} className="fade-up">
