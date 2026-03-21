@@ -349,7 +349,7 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
       : 'bg-red-500/20 border-red-500/40 text-red-300'
 
   return (
-    <div className="min-h-screen bg-dark-300 pt-safe">
+    <div className="min-h-screen pt-safe">
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         <header className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 flex items-center justify-between gap-4">
           <div>
