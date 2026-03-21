@@ -253,7 +253,27 @@ export default function LandingPage({ events }: LandingPageProps) {
         .social-btn:hover::before { opacity: 1; }
         .social-btn:hover { transform: translateY(-5px) scale(1.1); }
         .social-btn svg { position: relative; z-index: 2; }
-        /* Fade in */
+        /* Hero logos */
+        .hero-logos {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(32px, 6vw, 80px);
+          margin-bottom: 2.5rem;
+        }
+        .hero-logo-astronomical { height: clamp(60px, 10vw, 110px); width: auto; object-fit: contain; }
+        .hero-logo-studio       { height: clamp(60px, 10vw, 110px); width: auto; object-fit: contain; }
+        .hero-logo-casa         { height: clamp(80px, 13vw, 140px); width: auto; object-fit: contain; }
+        @media (max-width: 600px) {
+          .hero-logos {
+            flex-direction: column;
+            gap: 24px;
+          }
+          .hero-logo-astronomical { height: 70px; }
+          .hero-logo-studio       { height: 70px; }
+          .hero-logo-casa         { height: 90px; }
+        }
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(30px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -359,11 +379,11 @@ export default function LandingPage({ events }: LandingPageProps) {
             }}
           >
             <div style={{ maxWidth: 900 }} className="fade-up">
-              {/* Logos row */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'clamp(24px, 5vw, 64px)', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
-                <Image src="/LogoAstronomical.png" alt="Astronomical" width={260} height={80} style={{ height: 'clamp(44px, 7vw, 72px)', width: 'auto', objectFit: 'contain' }} />
-                <Image src="/LogoCasaBlanca.png"   alt="Casa Blanca"  width={100} height={100} style={{ height: 'clamp(56px, 9vw, 90px)', width: 'auto', objectFit: 'contain' }} />
-                <Image src="/LogoStudio54.png"      alt="Studio 54"   width={260} height={80} style={{ height: 'clamp(44px, 7vw, 72px)', width: 'auto', objectFit: 'contain' }} />
+              {/* Logos */}
+              <div className="hero-logos">
+                <Image src="/LogoAstronomical.png" alt="Astronomical" width={400} height={120} className="hero-logo-astronomical" />
+                <Image src="/LogoStudio54.png"      alt="Studio 54"   width={400} height={120} className="hero-logo-studio" />
+                <Image src="/LogoCasaBlanca.png"   alt="Casa Blanca"  width={180} height={180} className="hero-logo-casa" />
               </div>
 
               <p style={{ fontSize: 'clamp(1rem, 2.5vw, 1.3rem)', marginBottom: '2.5rem', color: 'rgba(255,255,255,0.75)', fontWeight: 300 }}>
