@@ -1,52 +1,31 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getPublicEvents } from '@/lib/actions'
+import LandingPage from './_components/LandingPage'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata = {
+  title: 'La Gran Casa Blanca | Astronomical · Studio 54 · San Pedro Sula',
+  description: 'La mejor experiencia nocturna de San Pedro Sula. Astronomical, Studio 54 y Casa Blanca. Compra tus entradas en línea.',
+}
 
 export default async function Home() {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session) {
-      redirect('/login')
-      return
+    if (session?.user?.role) {
+      if (session.user.role === 'ADMIN')    redirect('/admin')
+      if (session.user.role === 'MESERO')   redirect('/mesero')
+      if (session.user.role === 'CAJERO')   redirect('/cajero')
+      if (session.user.role === 'TAQUILLA') redirect('/taquilla')
     }
-
-    // Validate session has required fields
-    if (!session.user || !session.user.role) {
-      console.error('Invalid session data:', session)
-      redirect('/login')
-      return
-    }
-
-    // Redirect based on role
-    if (session.user.role === 'ADMIN') {
-      redirect('/admin')
-      return
-    }
-
-    if (session.user.role === 'MESERO') {
-      redirect('/mesero')
-      return
-    }
-
-    if (session.user.role === 'CAJERO') {
-      redirect('/cajero')
-      return
-    }
-
-    if (session.user.role === 'TAQUILLA') {
-      redirect('/taquilla')
-      return
-    }
-
-    // Unknown role, redirect to login
-    redirect('/login')
-  } catch (error: any) {
-    console.error('Error in home page:', error)
-    // Redirect to login on error
-    redirect('/login')
+  } catch {
+    // Not authenticated — show landing page
   }
-}
 
+  const events = await getPublicEvents()
+
+  return <LandingPage events={events} />
+}
