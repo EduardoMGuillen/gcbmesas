@@ -281,16 +281,31 @@ export default function LandingPage({ events }: LandingPageProps) {
         .fade-up { animation: fadeUp 0.7s ease both; }
         /* Video */
         .video-card {
-          border-radius: 16px;
+          border-radius: 18px;
           overflow: hidden;
-          border: 1px solid rgba(0,255,255,0.2);
-          box-shadow: 0 0 20px rgba(0,255,255,0.1);
+          border: 1px solid rgba(255,255,255,0.1);
           background: #000;
-          aspect-ratio: 9/16;
+          aspect-ratio: 16/9;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.6);
         }
         .video-card video {
           width: 100%; height: 100%;
           object-fit: cover;
+        }
+        .videos-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 1.5rem;
+        }
+        @media (max-width: 700px) {
+          .videos-grid {
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
+          }
+          .video-card {
+            aspect-ratio: 16/9;
+            border-radius: 14px;
+          }
         }
         /* Hours card */
         .hours-card {
@@ -413,9 +428,9 @@ export default function LandingPage({ events }: LandingPageProps) {
           </section>
 
           {/* ─── VIDEOS ────────────────────────────────── */}
-          <section style={{ padding: '5rem 2rem', maxWidth: 1200, margin: '0 auto' }}>
+          <section style={{ padding: '5rem 1.5rem', maxWidth: 1200, margin: '0 auto' }}>
             <h2 className="section-title">NUESTROS VIDEOS</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
+            <div className="videos-grid">
               {[
                 '/Reels/video1.mp4',
                 '/Reels/video2.mp4',
