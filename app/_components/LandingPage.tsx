@@ -133,6 +133,7 @@ export default function LandingPage({ events }: LandingPageProps) {
           border: none;
           font-family: 'Exo 2', sans-serif;
           font-size: 1rem;
+          white-space: nowrap;
         }
         .nav-link::after {
           content: '';
@@ -145,6 +146,27 @@ export default function LandingPage({ events }: LandingPageProps) {
           transition: width 0.3s;
         }
         .nav-link:hover::after { width: 100%; }
+        .nav-desktop { display: flex; gap: 2rem; align-items: center; }
+        .nav-hamburger { display: none; }
+        .nav-mobile-menu {
+          display: none;
+          flex-direction: column;
+          gap: 0;
+          padding: 0.5rem 0 1rem;
+          border-top: 1px solid rgba(0,255,255,0.08);
+        }
+        .nav-mobile-menu.open { display: flex; }
+        .nav-mobile-link {
+          color: #fff; background: none; border: none;
+          font-family: 'Exo 2', sans-serif; font-size: 1rem; font-weight: 600;
+          padding: 0.85rem 1.5rem; text-align: left; cursor: pointer; width: 100%;
+          transition: background 0.2s, color 0.2s;
+        }
+        .nav-mobile-link:hover { background: rgba(0,255,255,0.06); color: #00ffff; }
+        @media (max-width: 680px) {
+          .nav-desktop { display: none; }
+          .nav-hamburger { display: flex; align-items: center; justify-content: center; }
+        }
         /* Buttons */
         .btn-primary {
           padding: 0.85rem 2rem;
@@ -283,9 +305,10 @@ export default function LandingPage({ events }: LandingPageProps) {
             transition: 'background 0.3s',
           }}
         >
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0.9rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Top bar */}
+          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0.85rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             {/* Desktop nav links */}
-            <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }} className="hidden-mobile">
+            <div className="nav-desktop">
               {navLinks.map(l => (
                 <button key={l.id} className="nav-link" onClick={() => scrollTo(l.id)}>
                   {l.label}
@@ -293,10 +316,33 @@ export default function LandingPage({ events }: LandingPageProps) {
               ))}
             </div>
 
-            {/* Login button */}
-            <Link href="/login" className="btn-primary" style={{ padding: '0.5rem 1.4rem', fontSize: '0.9rem' }}>
-              Login
-            </Link>
+            {/* Mobile: hamburger + login */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Link href="/login" className="btn-primary" style={{ padding: '0.45rem 1.2rem', fontSize: '0.875rem' }}>
+                Login
+              </Link>
+              <button
+                className="nav-hamburger"
+                onClick={() => setMenuOpen(v => !v)}
+                style={{ background: 'none', border: '1px solid rgba(0,255,255,0.3)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: '#00ffff' }}
+                aria-label="Menú"
+              >
+                {menuOpen ? (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                ) : (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile dropdown */}
+          <div className={`nav-mobile-menu ${menuOpen ? 'open' : ''}`}>
+            {navLinks.map(l => (
+              <button key={l.id} className="nav-mobile-link" onClick={() => scrollTo(l.id)}>
+                {l.label}
+              </button>
+            ))}
           </div>
         </nav>
 
