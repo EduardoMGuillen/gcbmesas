@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import Script from 'next/script'
+import { isStandalonePWA } from '@/lib/pwa-detect'
 
 type PublicEvent = {
   id: string
@@ -19,10 +21,18 @@ interface LandingPageProps {
 }
 
 export default function LandingPage({ events }: LandingPageProps) {
+  const router = useRouter()
   const vantaRef = useRef<HTMLDivElement>(null)
   const vantaEffect = useRef<any>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+
+  // PWA instalada: la pantalla pública es solo para navegador; en app siempre ir a login de personal
+  useLayoutEffect(() => {
+    if (isStandalonePWA()) {
+      router.replace('/login')
+    }
+  }, [router])
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 80)
@@ -32,6 +42,7 @@ export default function LandingPage({ events }: LandingPageProps) {
 
   useEffect(() => {
     const loadVanta = async () => {
+      if (isStandalonePWA()) return
       if (!(window as any).THREE) {
         await new Promise<void>((resolve, reject) => {
           const s = document.createElement('script')
