@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { CashierOrders } from '@/components/CashierOrders'
 import { CashierAccounts } from '@/components/CashierAccounts'
-import { AttendanceMarkCard } from '@/components/AttendanceMarkCard'
 import { setCajeroMeseroWatches } from '@/lib/actions'
 
 type ActiveMesero = {
@@ -152,10 +151,6 @@ export function CajeroDashboard({
 
   return (
     <>
-      <div className="mb-6">
-        <AttendanceMarkCard compact />
-      </div>
-
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div>
