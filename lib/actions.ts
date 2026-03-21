@@ -1305,8 +1305,7 @@ export async function createOrder(data: {
   // Notificar a cajeros que siguen al mesero de este pedido (misma selección que el panel)
   {
     const meseroName = account.openedBy?.name || account.openedBy?.username || 'Desconocido'
-    const { resolveMeseroIdForCajeroPush, sendPushToCajerosFollowingMesero, sendPushToAdmins } =
-      await import('@/lib/push')
+    const { resolveMeseroIdForCajeroPush, sendPushToCajerosFollowingMesero } = await import('@/lib/push')
     const meseroId = resolveMeseroIdForCajeroPush('staff', currentUser, account)
     sendPushToCajerosFollowingMesero(
       meseroId,
@@ -1315,9 +1314,6 @@ export async function createOrder(data: {
       quantity,
       meseroName
     ).catch((e) => console.error('[Push Cajero] Error:', e))
-    sendPushToAdmins(account.table.name, product.name, quantity, meseroName, currentUser.id).catch((e) =>
-      console.error('[Push Admin] Error:', e)
-    )
   }
 
   // Revalidar rutas para que tanto clientes como meseros vean los cambios
@@ -1639,8 +1635,7 @@ export async function createCustomerOrder(data: {
   // Notificar a cajeros que siguen al mesero de la mesa
   {
     const meseroName = account.openedBy?.name || account.openedBy?.username || 'Desconocido'
-    const { resolveMeseroIdForCajeroPush, sendPushToCajerosFollowingMesero, sendPushToAdmins } =
-      await import('@/lib/push')
+    const { resolveMeseroIdForCajeroPush, sendPushToCajerosFollowingMesero } = await import('@/lib/push')
     const meseroId = resolveMeseroIdForCajeroPush('customer', customerUser, account)
     sendPushToCajerosFollowingMesero(
       meseroId,
@@ -1649,9 +1644,6 @@ export async function createCustomerOrder(data: {
       quantity,
       meseroName
     ).catch((e) => console.error('[Push Cajero] Error:', e))
-    sendPushToAdmins(account.table.name, product.name, quantity, meseroName, customerUser.id).catch((e) =>
-      console.error('[Push Admin] Error:', e)
-    )
   }
 
   // Revalidar todas las posibles rutas que pueden mostrar esta mesa

@@ -7,7 +7,6 @@ import { CleanUrlParams } from '@/components/CleanUrlParams'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { closeOldAccounts } from '@/lib/actions'
-import { AttendanceMarkCard } from '@/components/AttendanceMarkCard'
 import { PushSubscriptionButton } from '@/components/PushSubscriptionButton'
 
 export default async function MeseroPage() {
@@ -41,10 +40,6 @@ export default async function MeseroPage() {
             </div>
             <PushSubscriptionButton />
           </div>
-        </div>
-
-        <div className="mb-6">
-          <AttendanceMarkCard compact />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
