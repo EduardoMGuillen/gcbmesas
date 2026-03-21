@@ -25,7 +25,12 @@ export default async function Home() {
     // Not authenticated — show landing page
   }
 
-  const events = await getPublicEvents()
+  const rawEvents = await getPublicEvents()
+  const events = rawEvents.map(e => ({
+    ...e,
+    paypalPrice: e.paypalPrice?.toString() ?? null,
+    coverPrice:  e.coverPrice?.toString()  ?? null,
+  }))
 
   return <LandingPage events={events} />
 }
