@@ -5,6 +5,7 @@ import { getCashierDashboardData, closeOldAccounts } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { CajeroDashboard } from './CajeroDashboard'
+import { PushSubscriptionButton } from '@/components/PushSubscriptionButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,11 +29,16 @@ export default async function CajeroPage() {
       {!isAdmin && <Navbar />}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 flex-1">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Panel de Cajero</h1>
-          <p className="text-dark-200">
-            Consulta el estado de las cuentas abiertas y marca los pedidos como
-            realizados cuando estén listos.
-          </p>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">Panel de Cajero</h1>
+              <p className="text-dark-200">
+                Consulta el estado de las cuentas abiertas y marca los pedidos como
+                realizados cuando estén listos.
+              </p>
+            </div>
+            <PushSubscriptionButton />
+          </div>
         </div>
 
         <CajeroDashboard
