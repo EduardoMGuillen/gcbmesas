@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 
 function base64ToUint8Array(base64: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4)
@@ -13,9 +14,35 @@ function base64ToUint8Array(base64: string): ArrayBuffer {
 
 type Status = 'idle' | 'loading' | 'granted' | 'denied' | 'unsupported' | 'error'
 
+const STAFF_ROLES = ['MESERO', 'ADMIN', 'CAJERO'] as const
+
 export function PushSubscriptionButton() {
+  const { data: session } = useSession()
   const [status, setStatus] = useState<Status>('idle')
   const [message, setMessage] = useState<string | null>(null)
+  const [testLoading, setTestLoading] = useState(false)
+  const [testMsg, setTestMsg] = useState('')
+
+  const canTest =
+    session?.user?.role && STAFF_ROLES.includes(session.user.role as (typeof STAFF_ROLES)[number])
+
+  const handleTest = async () => {
+    setTestMsg('')
+    setTestLoading(true)
+    try {
+      const res = await fetch('/api/push-test', { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setTestMsg('Enviada. Si no la ves: minimiza la app o cambia de pestaña.')
+      } else {
+        setTestMsg(json.error || 'Error al enviar')
+      }
+    } catch {
+      setTestMsg('Error de conexión')
+    } finally {
+      setTestLoading(false)
+    }
+  }
 
   // On mount: check if already subscribed or permission denied
   useEffect(() => {
@@ -103,13 +130,35 @@ export function PushSubscriptionButton() {
     }
   }
 
-  // Ya activo — no mostrar nada molesto
+  // Suscripción activa: estado + probar (igual que el antiguo PushNotifyButton en admin)
   if (status === 'granted') {
     return (
-      <span className="flex items-center gap-1.5 text-xs text-green-400/70 font-medium">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
-        Notificaciones activas
-      </span>
+      <div className="flex flex-col items-end gap-1 max-w-[min(100%,280px)]">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="flex items-center gap-1.5 text-xs text-green-400/90 font-medium whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block shrink-0" />
+            Notificaciones activas
+          </span>
+          {canTest && (
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={testLoading}
+              className="px-2.5 py-1 text-xs font-medium text-primary-400 hover:text-primary-300 hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50 border border-primary-500/30"
+              title="Chrome no muestra notificación con la pestaña enfocada; minimiza o cambia de app."
+            >
+              {testLoading ? 'Enviando…' : 'Probar'}
+            </button>
+          )}
+        </div>
+        {testMsg && <p className="text-[11px] text-right text-green-400/90 break-words">{testMsg}</p>}
+        {typeof navigator !== 'undefined' &&
+          !/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) && (
+            <p className="text-[10px] text-right text-white/45 max-w-[260px]">
+              En PC: minimiza esta ventana o cambia de pestaña antes de pulsar Probar.
+            </p>
+          )}
+      </div>
     )
   }
 
