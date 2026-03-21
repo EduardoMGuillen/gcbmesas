@@ -153,3 +153,36 @@ export async function sendPushToCajeros(
     )
   }
 }
+
+/** Notifica a todos los administradores con push activo (mismo aviso que el mesero que abrió la mesa). */
+export async function sendPushToAdmins(
+  tableName: string,
+  productName: string,
+  quantity: number,
+  meseroName: string,
+  excludeUserId?: string | null
+) {
+  const adminSubs = await prisma.pushSubscription.findMany({
+    where: { user: { role: 'ADMIN' } },
+    select: { userId: true },
+  })
+  let uniqueIds = Array.from(new Set(adminSubs.map((s) => s.userId)))
+  if (excludeUserId) uniqueIds = uniqueIds.filter((id) => id !== excludeUserId)
+  if (uniqueIds.length === 0) return
+
+  const title = 'Nuevo pedido'
+  const body = `${quantity}x ${productName} - Mesa ${tableName} (${meseroName})`
+  const data = {
+    type: 'new_order',
+    tableName,
+    productName,
+    quantity: String(quantity),
+    meseroName,
+  }
+
+  for (const userId of uniqueIds) {
+    sendPushToUser(userId, title, body, data).catch((e) =>
+      console.error('[Push Admin] Error enviando a', userId, e)
+    )
+  }
+}
