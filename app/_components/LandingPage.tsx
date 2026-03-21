@@ -17,21 +17,9 @@ interface LandingPageProps {
   events: PublicEvent[]
 }
 
-// Deterministic star positions so server & client match (no hydration mismatch)
-const STARS = Array.from({ length: 80 }, (_, i) => {
-  const seed = (i * 9301 + 49297) % 233280
-  const r    = (n: number) => ((n * 9301 + 49297) % 233280) / 233280
-  return {
-    top:   `${r(seed) * 100}%`,
-    left:  `${r(seed * 2 + 1) * 100}%`,
-    size:  r(seed * 3 + 2) > 0.7 ? 2 : 1,
-    dur:   `${2.5 + r(seed * 4 + 3) * 3}s`,
-    delay: `${r(seed * 5 + 4) * 4}s`,
-    op:    0.15 + r(seed * 6 + 5) * 0.5,
-  }
-})
-
 export default function LandingPage({ events }: LandingPageProps) {
+  const vantaRef = useRef<HTMLDivElement>(null)
+  const vantaEffect = useRef<any>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -39,6 +27,54 @@ export default function LandingPage({ events }: LandingPageProps) {
     const handleScroll = () => setScrolled(window.scrollY > 80)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    const loadVanta = async () => {
+      if (!(window as any).THREE) {
+        await new Promise<void>((resolve, reject) => {
+          const s = document.createElement('script')
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js'
+          s.onload = () => resolve()
+          s.onerror = reject
+          document.head.appendChild(s)
+        })
+      }
+      if (!(window as any).VANTA) {
+        await new Promise<void>((resolve, reject) => {
+          const s = document.createElement('script')
+          s.src = 'https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.net.min.js'
+          s.onload = () => resolve()
+          s.onerror = reject
+          document.head.appendChild(s)
+        })
+      }
+      if (vantaRef.current && !vantaEffect.current) {
+        vantaEffect.current = (window as any).VANTA.NET({
+          el: vantaRef.current,
+          mouseControls: true,
+          touchControls: true,
+          gyroControls: false,
+          minHeight: 200,
+          minWidth: 200,
+          scale: 1.0,
+          scaleMobile: 1.0,
+          color: 0xffffff,
+          backgroundColor: 0x0a0015,
+          points: 12.0,
+          maxDistance: 22.0,
+          spacing: 20.0,
+          showDots: true,
+        })
+      }
+    }
+    loadVanta()
+    return () => {
+      if (vantaEffect.current) {
+        vantaEffect.current.destroy()
+        vantaEffect.current = null
+      }
+    }
   }, [])
 
   const scrollTo = (id: string) => {
@@ -245,10 +281,6 @@ export default function LandingPage({ events }: LandingPageProps) {
           to   { opacity: 1; transform: translateY(0); }
         }
         .fade-up { animation: fadeUp 0.7s ease both; }
-        @keyframes starTwinkle {
-          0%, 100% { opacity: 0.8; }
-          50%       { opacity: 0.15; }
-        }
         /* Video */
         .video-card {
           border-radius: 18px;
@@ -293,31 +325,19 @@ export default function LandingPage({ events }: LandingPageProps) {
         }
       `}</style>
 
-      <div className="landing" style={{ background: 'radial-gradient(ellipse at 50% 40%, #1a0033 0%, #07000f 55%, #000000 100%)', minHeight: '100vh' }}>
+      <div className="landing" style={{ background: '#0a0015', minHeight: '100vh' }}>
 
-        {/* ─── STARS BACKGROUND ─────────────────────── */}
-        <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-          {STARS.map((s, i) => (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                top: s.top, left: s.left,
-                width: s.size, height: s.size,
-                borderRadius: '50%',
-                background: '#fff',
-                opacity: s.op,
-                animation: `starTwinkle ${s.dur} ${s.delay} ease-in-out infinite`,
-              }}
-            />
-          ))}
-        </div>
+        {/* Vanta animated background */}
+        <div
+          ref={vantaRef}
+          style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}
+        />
 
         {/* ─── NAVBAR ─────────────────────────────────── */}
         <nav
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
-            background: scrolled ? 'rgba(7,0,15,0.97)' : 'rgba(7,0,15,0.75)',
+            background: scrolled ? 'rgba(10,0,21,0.97)' : 'rgba(10,0,21,0.75)',
             backdropFilter: 'blur(12px)',
             borderBottom: '1px solid rgba(0,255,255,0.08)',
             transition: 'background 0.3s',
