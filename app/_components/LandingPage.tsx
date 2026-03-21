@@ -284,11 +284,6 @@ export default function LandingPage({ events }: LandingPageProps) {
           }}
         >
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0.9rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            {/* Brand */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Image src="/LogoAstronomical.png" alt="Astronomical" width={120} height={38} style={{ height: 32, width: 'auto', objectFit: 'contain' }} />
-            </div>
-
             {/* Desktop nav links */}
             <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }} className="hidden-mobile">
               {navLinks.map(l => (

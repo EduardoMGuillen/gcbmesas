@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { signIn, useSession, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const { data: session, status } = useSession()
@@ -13,310 +14,190 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [sessionCheckDone, setSessionCheckDone] = useState(false)
-  const [isLoginOpen, setIsLoginOpen] = useState(false)
 
-  // iOS: las cookies pueden tardar en estar disponibles al reabrir la PWA. Esperar y reintentar.
   useEffect(() => {
     if (status !== 'loading' && session?.user?.role) {
       const url =
-        session.user.role === 'ADMIN' ? '/admin' :
-        session.user.role === 'MESERO' ? '/mesero' :
-        session.user.role === 'CAJERO' ? '/cajero' :
+        session.user.role === 'ADMIN'    ? '/admin'    :
+        session.user.role === 'MESERO'   ? '/mesero'   :
+        session.user.role === 'CAJERO'   ? '/cajero'   :
         session.user.role === 'TAQUILLA' ? '/taquilla' : '/'
       router.replace(`${url}?from=callback`)
       return
     }
     if (status === 'unauthenticated') {
-      // iOS: reintentar getSession tras 1s (cookies pueden tardar en estar disponibles)
       const refetchT = setTimeout(async () => {
         const s = await getSession()
         if (s?.user?.role) {
           const url =
-            s.user.role === 'ADMIN'
-              ? '/admin'
-              : s.user.role === 'MESERO'
-              ? '/mesero'
-              : s.user.role === 'CAJERO'
-              ? '/cajero'
-              : s.user.role === 'TAQUILLA'
-              ? '/taquilla'
-              : '/'
+            s.user.role === 'ADMIN'    ? '/admin'    :
+            s.user.role === 'MESERO'   ? '/mesero'   :
+            s.user.role === 'CAJERO'   ? '/cajero'   :
+            s.user.role === 'TAQUILLA' ? '/taquilla' : '/'
           router.replace(`${url}?from=callback`)
         }
       }, 1000)
       const doneT = setTimeout(() => setSessionCheckDone(true), 2500)
       return () => { clearTimeout(refetchT); clearTimeout(doneT) }
     }
-    if (status === 'authenticated' && !session?.user?.role) {
-      setSessionCheckDone(true)
-    }
+    if (status === 'authenticated' && !session?.user?.role) setSessionCheckDone(true)
     if (status === 'loading') {
-      // Máximo 4s esperando, luego mostrar formulario
       const t = setTimeout(() => setSessionCheckDone(true), 4000)
       return () => clearTimeout(t)
     }
   }, [status, session, router])
 
-  // Check for error in URL and clean up callbackUrl
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href)
-      const errorParam = url.searchParams.get('error')
-      if (errorParam === 'SessionNotFound') {
-        setError('No se pudo establecer la sesión. Por favor, intenta iniciar sesión nuevamente.')
+      if (url.searchParams.get('error') === 'SessionNotFound') {
+        setError('No se pudo establecer la sesión. Por favor, intenta nuevamente.')
         url.searchParams.delete('error')
         window.history.replaceState({}, '', url.pathname)
       }
       if (url.searchParams.get('callbackUrl')) {
-        console.log('[Login] Cleaning up callbackUrl from URL')
         url.searchParams.delete('callbackUrl')
         window.history.replaceState({}, '', url.pathname)
       }
     }
   }, [])
 
-  // Helper function to check if session cookie exists
   const checkSessionCookie = (): boolean => {
     if (typeof document === 'undefined') return false
-    
-    // Check for NextAuth session cookie
-    const cookies = document.cookie.split(';')
-    const sessionCookie = cookies.find(cookie => 
-      cookie.trim().startsWith('next-auth.session-token=')
-    )
-    
-    const hasCookie = !!sessionCookie
-    console.log('[Login] Session cookie check:', { hasCookie, cookie: sessionCookie ? 'exists' : 'missing' })
-    return hasCookie
+    return document.cookie.split(';').some(c => c.trim().startsWith('next-auth.session-token='))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     try {
-      console.log('[Login] Attempting login for user:', username)
-      
-      // For iOS, use NextAuth signIn with redirect to let NextAuth handle everything
-      // This is more reliable because NextAuth manages the cookie setting and redirect
-      try {
-        const result = await signIn('credentials', {
-          username,
-          password,
-          redirect: false,
-        })
-        
-        console.log('[Login] SignIn result:', { ok: result?.ok, error: result?.error })
-
-        // Check for errors
-        if (result?.error) {
-          console.error('[Login] Login error:', result.error)
-          setLoading(false)
-          if (result.error === 'CredentialsSignin') {
-            setError('Usuario o contraseña incorrectos. Verifica tus credenciales.')
-          } else if (result.error.includes('database') || result.error.includes('connection')) {
-            setError('Error de conexión a la base de datos. Verifica la configuración.')
-          } else {
-            setError(`Error: ${result.error}`)
-          }
-          return
-        }
-
-        // If login successful, redirect to callback which will handle session verification
-        if (result?.ok) {
-          console.log('[Login] NextAuth login successful, redirecting to callback')
-          
-          // Check if cookie was set immediately after login
-          const cookieAfterLogin = checkSessionCookie()
-          console.log('[Login] Cookie check after login:', { hasCookie: cookieAfterLogin })
-          
-          // For iPad/iOS: longer delay to ensure cookie is properly set
-          // iPad Safari can be slower to process cookies
-          const isIPad = /iPad/.test(navigator.userAgent) || 
-                        (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
-          const delay = isIPad ? 1500 : 1000 // Increased delay to ensure cookie is set
-          
-          console.log(`[Login] Waiting ${delay}ms before redirect (iPad: ${isIPad})`)
-          await new Promise((resolve) => setTimeout(resolve, delay))
-          
-          // Check cookie again after delay
-          const cookieAfterDelay = checkSessionCookie()
-          console.log('[Login] Cookie check after delay:', { hasCookie: cookieAfterDelay })
-          
-          // Use replace instead of href to avoid back button issues
-          window.location.replace('/auth-callback')
-          return
-        }
-      } catch (signInError) {
-        console.error('[Login] SignIn exception:', signInError)
-        setError('Error al iniciar sesión. Por favor, intenta nuevamente.')
+      const result = await signIn('credentials', { username, password, redirect: false })
+      if (result?.error) {
         setLoading(false)
+        setError(
+          result.error === 'CredentialsSignin'
+            ? 'Usuario o contraseña incorrectos.'
+            : `Error: ${result.error}`
+        )
         return
       }
-
-      // Unexpected result
-      console.error('[Login] Unexpected login result')
-      setError('Error desconocido. Por favor, intenta nuevamente.')
-      setLoading(false)
+      if (result?.ok) {
+        checkSessionCookie()
+        const isIPad = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+        await new Promise(r => setTimeout(r, isIPad ? 1500 : 1000))
+        window.location.replace('/auth-callback')
+      }
     } catch (err: any) {
-      console.error('[Login] Login exception:', err)
       setError(err?.message || 'Error al iniciar sesión.')
       setLoading(false)
     }
   }
 
-  // iOS: mostrar "Verificando sesión..." mientras comprobamos (cookies pueden tardar al reabrir)
   if (!sessionCheckDone && (status === 'loading' || status === 'unauthenticated')) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-dark-50 pt-safe">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#050015' }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4" />
-          <p className="text-white/80">Verificando sesión...</p>
-          <p className="text-dark-400 text-sm mt-2">Espera un momento</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 mx-auto mb-4" style={{ borderColor: '#00ffff' }} />
+          <p className="text-white/60 text-sm">Verificando sesión...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden pt-safe safe-area-inset" style={{ background: 'linear-gradient(180deg, #050510 0%, #0a0a1a 40%, #0d0d20 100%)' }}>
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute w-[2px] h-[2px] bg-white/20 rounded-full" style={{ top: '8%', left: '15%' }} />
-        <div className="absolute w-[1px] h-[1px] bg-white/30 rounded-full" style={{ top: '12%', left: '45%' }} />
-        <div className="absolute w-[2px] h-[2px] bg-white/15 rounded-full" style={{ top: '20%', left: '80%' }} />
-        <div className="absolute w-[1px] h-[1px] bg-white/25 rounded-full" style={{ top: '35%', left: '25%' }} />
-        <div className="absolute w-[1px] h-[1px] bg-white/20 rounded-full" style={{ top: '55%', left: '10%' }} />
-        <div className="absolute w-[2px] h-[2px] bg-white/15 rounded-full" style={{ top: '65%', left: '90%' }} />
-        <div className="absolute w-[1px] h-[1px] bg-white/25 rounded-full" style={{ top: '75%', left: '50%' }} />
-      </div>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'linear-gradient(180deg, #050015 0%, #0a0020 100%)' }}>
+      {/* Subtle grid background */}
+      <div className="fixed inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(0,255,255,0.04) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
-      <header className="relative z-10 border-b border-white/5">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src="/LogoCasaBlanca.png" alt="Casa Blanca" className="w-9 h-9 object-contain" />
-            <span className="text-white font-semibold text-sm sm:text-base">Casa Blanca Tickets</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsLoginOpen(true)}
-            className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            Iniciar Sesión
-          </button>
+      <div className="relative z-10 w-full max-w-sm">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <Image src="/LogoCasaBlanca.png" alt="Casa Blanca" width={72} height={72} className="mx-auto mb-4 object-contain" />
+          <h1 className="text-2xl font-bold text-white mb-1">Acceso de Personal</h1>
+          <p className="text-white/40 text-sm">Ingresa tus credenciales para continuar</p>
         </div>
-      </header>
 
-      <main className="relative z-10 min-h-[calc(100vh-74px)] flex items-center justify-center px-4 sm:px-6">
-        <div className="text-center max-w-xl">
-          <img
-            src="/LogoCasaBlanca.png"
-            alt="Casa Blanca"
-            className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto mb-4"
-          />
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Casa Blanca Tickets</h1>
-          <p className="text-white/60 text-sm sm:text-base mb-6">Compra tus entradas en linea y recibe tu QR al instante.</p>
-          <Link
-            href="/eventos"
-            className="inline-flex items-center justify-center bg-primary-600 hover:bg-primary-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
-          >
-            Ver Eventos
-          </Link>
-        </div>
-      </main>
-
-      {isLoginOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-3 sm:p-4">
-          <div className="w-full max-w-md bg-dark-100 rounded-xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 border border-dark-200">
-            <div className="flex items-center justify-between mb-5 sm:mb-6 md:mb-8">
-              <div>
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1">Iniciar Sesion</h2>
-                <p className="text-xs sm:text-sm md:text-base text-dark-400">Acceso de personal</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsLoginOpen(false)}
-                className="text-white/60 hover:text-white text-2xl leading-none"
-                aria-label="Cerrar"
-              >
-                ×
-              </button>
+        {/* Card */}
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,255,255,0.15)', borderRadius: 20, padding: '2rem' }}>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-white/60 mb-2">
+                Usuario
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                required
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                placeholder="Ingresa tu usuario"
+                style={{ fontSize: 16, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', padding: '12px 16px', width: '100%', outline: 'none' }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(0,255,255,0.5)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)')}
+              />
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
-              <div>
-                <label
-                  htmlFor="username"
-                  className="block text-sm sm:text-base font-medium text-dark-300 mb-2"
-                >
-                  Usuario
-                </label>
-                <input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  autoComplete="username"
-                  inputMode="text"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  className="w-full px-4 py-3.5 sm:py-4 text-base bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                  placeholder="Ingresa tu usuario"
-                  style={{ fontSize: '16px' }}
-                />
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-white/60 mb-2">
+                Contraseña
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                placeholder="Ingresa tu contraseña"
+                style={{ fontSize: 16, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', padding: '12px 16px', width: '100%', outline: 'none' }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(0,255,255,0.5)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)')}
+              />
+            </div>
+
+            {error && (
+              <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 8, padding: '10px 14px', color: '#f87171', fontSize: 14 }}>
+                {error}
               </div>
+            )}
 
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm sm:text-base font-medium text-dark-300 mb-2"
-                >
-                  Contraseña
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  inputMode="text"
-                  className="w-full px-4 py-3.5 sm:py-4 text-base bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                  placeholder="Ingresa tu contraseña"
-                  style={{ fontSize: '16px' }}
-                />
-              </div>
-
-              {error && (
-                <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm sm:text-base">
-                  {error}
-                </div>
-              )}
-
-              <p className="text-xs text-dark-400 text-center">
-                Tu sesión se mantendrá activa al cerrar la app
-              </p>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold py-4 sm:py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-lg touch-manipulation min-h-[48px] shadow-lg active:scale-[0.98]"
-                style={{ WebkitTapHighlightColor: 'transparent' }}
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center">
-                    <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></span>
-                    <span className="text-sm sm:text-base">Iniciando sesión...</span>
-                  </span>
-                ) : (
-                  'Iniciar Sesión'
-                )}
-              </button>
-            </form>
-          </div>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%', padding: '13px', borderRadius: 10, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+                background: loading ? 'rgba(0,255,255,0.2)' : 'linear-gradient(45deg, #00ffff, #0099bb)',
+                color: loading ? 'rgba(255,255,255,0.4)' : '#000',
+                fontWeight: 700, fontSize: 16, transition: 'all 0.3s', minHeight: 48,
+                WebkitTapHighlightColor: 'transparent',
+              } as any}
+            >
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <span style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
+                  Iniciando sesión...
+                </span>
+              ) : 'Iniciar Sesión'}
+            </button>
+          </form>
         </div>
-      )}
+
+        {/* Back link */}
+        <div className="text-center mt-6">
+          <Link href="/" style={{ color: 'rgba(0,255,255,0.5)', fontSize: 13, textDecoration: 'none' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'rgba(0,255,255,0.9)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(0,255,255,0.5)')}
+          >
+            ← Volver al inicio
+          </Link>
+        </div>
+      </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
-
