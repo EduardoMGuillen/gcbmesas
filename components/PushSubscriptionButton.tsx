@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react'
 
-function base64ToUint8Array(base64: string): Uint8Array {
+function base64ToUint8Array(base64: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4)
   const b64 = (base64 + padding).replaceAll('-', '+').replaceAll('_', '/')
   const raw = atob(b64)
   const output = new Uint8Array(raw.length)
   for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i)
-  return output
+  return output.buffer as ArrayBuffer
 }
 
 type Status = 'idle' | 'loading' | 'granted' | 'denied' | 'unsupported' | 'error'
