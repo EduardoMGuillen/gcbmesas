@@ -43,7 +43,6 @@ export function Navbar() {
     { href: '/cajero', label: 'Cajero', match: pathname === '/cajero' },
     { href: '/cajero/marcajes', label: 'Marcaje', match: pathname?.startsWith('/cajero/marcajes') },
     { href: '/admin/cuentas', label: 'Cuentas', match: pathname?.startsWith('/admin/cuentas') },
-    { href: '/admin/entradas', label: 'Entradas', match: pathname?.startsWith('/admin/entradas') },
     { href: '/taquilla', label: 'Taquilla', match: pathname?.startsWith('/taquilla') },
   ]
 
