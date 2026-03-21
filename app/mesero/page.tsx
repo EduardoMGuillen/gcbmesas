@@ -8,6 +8,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { closeOldAccounts } from '@/lib/actions'
 import { AttendanceMarkCard } from '@/components/AttendanceMarkCard'
+import { PushSubscriptionButton } from '@/components/PushSubscriptionButton'
 
 export default async function MeseroPage() {
   const session = await getServerSession(authOptions)
@@ -29,12 +30,17 @@ export default async function MeseroPage() {
       {!isAdmin && <Navbar />}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 flex-1">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
-            Panel de Mesero
-          </h1>
-          <p className="text-sm sm:text-base text-dark-400">
-            Gestiona pedidos y cuentas de las mesas
-          </p>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
+                Panel de Mesero
+              </h1>
+              <p className="text-sm sm:text-base text-dark-400">
+                Gestiona pedidos y cuentas de las mesas
+              </p>
+            </div>
+            <PushSubscriptionButton />
+          </div>
         </div>
 
         <div className="mb-6">
