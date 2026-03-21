@@ -356,9 +356,9 @@ export default function LandingPage({ events }: LandingPageProps) {
             <h2 className="section-title">NUESTROS VIDEOS</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
               {[
-                'https://astronomical-sps.vercel.app/Reels/video1.mp4',
-                'https://astronomical-sps.vercel.app/Reels/video2.mp4',
-                'https://astronomical-sps.vercel.app/Reels/video3.mp4',
+                '/Reels/video1.mp4',
+                '/Reels/video2.mp4',
+                '/Reels/video3.mp4',
               ].map((src, i) => (
                 <div key={i} className="video-card">
                   <video autoPlay muted loop playsInline>
