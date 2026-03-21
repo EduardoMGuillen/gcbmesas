@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { CashierOrders } from '@/components/CashierOrders'
 import { CashierAccounts } from '@/components/CashierAccounts'
 import { AttendanceMarkCard } from '@/components/AttendanceMarkCard'
+import { setCajeroMeseroWatches } from '@/lib/actions'
 
 type ActiveMesero = {
   id: string
@@ -50,6 +52,8 @@ interface CajeroDashboardProps {
   recentServed: OrderItem[]
   activeMeseros: ActiveMesero[]
   userId: string
+  watchedMeseroIds: string[]
+  isCajero: boolean
 }
 
 const STORAGE_KEY_PREFIX = 'cajero-meseros-'
@@ -59,12 +63,10 @@ function loadSavedSelection(userId: string, activeMeseroIds: string[]): Set<stri
     const raw = localStorage.getItem(STORAGE_KEY_PREFIX + userId)
     if (raw) {
       const saved: string[] = JSON.parse(raw)
-      // Solo conservar IDs que sigan siendo meseros activos hoy
       const valid = saved.filter((id) => activeMeseroIds.includes(id))
       if (valid.length > 0) return new Set(valid)
     }
   } catch {}
-  // Si no hay guardado o ninguno es válido, seleccionar todos
   return new Set(activeMeseroIds)
 }
 
@@ -74,23 +76,61 @@ function saveSelection(userId: string, ids: Set<string>) {
   } catch {}
 }
 
+function buildInitialSelection(
+  watchedMeseroIds: string[],
+  userId: string,
+  activeMeseroIds: string[]
+): Set<string> {
+  const validServer = watchedMeseroIds.filter((id) => activeMeseroIds.includes(id))
+  if (validServer.length > 0) return new Set(validServer)
+  return loadSavedSelection(userId, activeMeseroIds)
+}
+
 export function CajeroDashboard({
   accounts,
   pendingOrders,
   recentServed,
   activeMeseros,
   userId,
+  watchedMeseroIds,
+  isCajero,
 }: CajeroDashboardProps) {
+  const router = useRouter()
   const activeMeseroIds = activeMeseros.map((m) => m.id)
-  // Set con todos los IDs de meseros (para distinguir meseros de admins en el filtro)
   const allMeseroIds = new Set(activeMeseroIds)
 
-  // Inicializar desde localStorage o con todos seleccionados
-  const [selectedMeseroIds, setSelectedMeseroIds] = useState<Set<string>>(
-    () => loadSavedSelection(userId, activeMeseroIds)
+  const [selectedMeseroIds, setSelectedMeseroIds] = useState<Set<string>>(() =>
+    buildInitialSelection(watchedMeseroIds, userId, activeMeseroIds)
   )
 
-  // Guardar en localStorage cada vez que cambie la selección
+  const migratedRef = useRef(false)
+  const skipFirstPersistRef = useRef(true)
+
+  // Primera vez: servidor sin filas → guardar selección inicial (p. ej. desde localStorage) para push
+  useEffect(() => {
+    if (!isCajero || migratedRef.current) return
+    if (watchedMeseroIds.length > 0) return
+    migratedRef.current = true
+    const ids = Array.from(selectedMeseroIds)
+    if (ids.length === 0) return
+    void setCajeroMeseroWatches(ids).then(() => router.refresh())
+    // Solo en montaje: selectedMeseroIds es el estado inicial
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCajero, watchedMeseroIds.length, userId, router])
+
+  // Sincronizar selección → servidor (notificaciones push usan la misma lista)
+  useEffect(() => {
+    if (!isCajero) return
+    if (skipFirstPersistRef.current) {
+      skipFirstPersistRef.current = false
+      return
+    }
+    const t = setTimeout(() => {
+      void setCajeroMeseroWatches(Array.from(selectedMeseroIds))
+    }, 450)
+    return () => clearTimeout(t)
+  }, [selectedMeseroIds, isCajero])
+
   useEffect(() => {
     saveSelection(userId, selectedMeseroIds)
   }, [userId, selectedMeseroIds])
@@ -104,8 +144,7 @@ export function CajeroDashboard({
     })
   }, [])
 
-  const selectAll = () =>
-    setSelectedMeseroIds(new Set(activeMeseroIds))
+  const selectAll = () => setSelectedMeseroIds(new Set(activeMeseroIds))
   const deselectAll = () => setSelectedMeseroIds(new Set())
 
   const allSelected = activeMeseros.length > 0 && selectedMeseroIds.size === activeMeseros.length
@@ -117,24 +156,26 @@ export function CajeroDashboard({
         <AttendanceMarkCard compact />
       </div>
 
-      {/* Filtro de meseros activos */}
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <label className="block text-sm font-medium text-white">
-            Filtrar por mesero
-          </label>
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <div>
+            <label className="block text-sm font-medium text-white">Filtrar por mesero</label>
+            {isCajero && (
+              <p className="text-xs text-white/45 mt-1">
+                Misma selección para el panel y para las notificaciones push (activa notificaciones arriba).
+              </p>
+            )}
+          </div>
           <button
             type="button"
             onClick={allSelected ? deselectAll : selectAll}
-            className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+            className="text-xs text-primary-400 hover:text-primary-300 transition-colors shrink-0"
           >
             {allSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
           </button>
         </div>
         {activeMeseros.length === 0 ? (
-          <p className="text-sm text-white/60">
-            No hay meseros registrados.
-          </p>
+          <p className="text-sm text-white/60">No hay meseros registrados.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {activeMeseros.map((mesero) => {
@@ -152,9 +193,7 @@ export function CajeroDashboard({
                 >
                   <span
                     className={`flex items-center justify-center w-4 h-4 rounded border transition-colors ${
-                      isSelected
-                        ? 'bg-primary-500 border-primary-500'
-                        : 'border-white/30 bg-transparent'
+                      isSelected ? 'bg-primary-500 border-primary-500' : 'border-white/30 bg-transparent'
                     }`}
                   >
                     {isSelected && (
@@ -182,10 +221,13 @@ export function CajeroDashboard({
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-white mb-4">
-          Cuentas abiertas
-        </h2>
-        <CashierAccounts accounts={accounts} selectedMeseroIds={selectedMeseroIds} allMeseroIds={allMeseroIds} noneSelected={noneSelected} />
+        <h2 className="text-xl font-semibold text-white mb-4">Cuentas abiertas</h2>
+        <CashierAccounts
+          accounts={accounts}
+          selectedMeseroIds={selectedMeseroIds}
+          allMeseroIds={allMeseroIds}
+          noneSelected={noneSelected}
+        />
       </section>
     </>
   )

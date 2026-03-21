@@ -47,9 +47,9 @@ const authMiddleware = withAuth(
         }
       }
 
-      // Taquilla routes - allow TAQUILLA and ADMIN roles
+      // Taquilla routes - taquilla, admin, mesero y cajero
       if (path.startsWith('/taquilla')) {
-        if (!['TAQUILLA', 'ADMIN'].includes(token.role as string)) {
+        if (!['TAQUILLA', 'ADMIN', 'MESERO', 'CAJERO'].includes(token.role as string)) {
           return NextResponse.redirect(new URL('/login', req.url))
         }
       }

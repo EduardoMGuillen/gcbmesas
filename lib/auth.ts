@@ -7,6 +7,7 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
+import { findUserByUsernameInsensitive } from './find-user-by-login'
 
 // Guarantee a valid secret even if env is missing (preview safety)
 const HARD_FALLBACK_SECRET = 'hard-fallback-secret-32-chars-minimum-string!'
@@ -38,9 +39,7 @@ export const authOptions: NextAuthOptions = {
             throw new Error('Database connection failed')
           }
 
-          const user = await prisma.user.findUnique({
-            where: { username: credentials.username },
-          })
+          const user = await findUserByUsernameInsensitive(credentials.username)
 
           if (!user) {
             console.error(`Auth: User not found: ${credentials.username}`)
