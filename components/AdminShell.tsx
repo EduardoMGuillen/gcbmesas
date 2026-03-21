@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { PushNotifyButton } from './PushNotifyButton'
+import { PushSubscriptionButton } from './PushSubscriptionButton'
 import { RefreshButton } from './RefreshButton'
 import { Footer } from './Footer'
 import { CleanUrlParams } from './CleanUrlParams'
@@ -113,7 +113,7 @@ export function AdminShell({ children, userRole }: { children: React.ReactNode; 
 
           <div className="flex items-center gap-1 sm:gap-3">
             <RefreshButton />
-            <PushNotifyButton />
+            <PushSubscriptionButton />
             <span className="hidden sm:inline-block text-xs sm:text-sm text-white/80 truncate max-w-[120px] lg:max-w-none">
               {session?.user.name || session?.user.username} (Admin)
             </span>
