@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { findUserByUsernameInsensitive } from '@/lib/find-user-by-login'
 import bcrypt from 'bcryptjs'
 import { encode } from 'next-auth/jwt'
 
@@ -17,10 +18,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Verify credentials
-    const user = await prisma.user.findUnique({
-      where: { username },
-    })
+    // Verify credentials (usuario sin distinguir mayúsculas/minúsculas)
+    const user = await findUserByUsernameInsensitive(username)
 
     if (!user) {
       return NextResponse.json(

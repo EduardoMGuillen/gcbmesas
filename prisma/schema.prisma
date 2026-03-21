@@ -75,8 +75,28 @@ model User {
   createdEvents     Event[]
   createdEntries    Entry[]
   attendanceMarks   AttendanceMark[]
+  /// Meseros que este cajero sigue para recibir notificaciones de pedidos
+  cajeroWatchesMeseros CajeroMeseroWatch[] @relation("CajeroWatchesMesero")
+  /// Cajeros que siguen a este mesero
+  meseroWatchedByCajeros CajeroMeseroWatch[] @relation("MeseroWatchedByCajeros")
 
   @@map("users")
+}
+
+/// Cajero elige qué meseros le notifican pedidos (misma lógica que el filtro del panel)
+model CajeroMeseroWatch {
+  id        String   @id @default(cuid())
+  cajeroId  String
+  meseroId  String
+  createdAt DateTime @default(now())
+
+  cajero User @relation("CajeroWatchesMesero", fields: [cajeroId], references: [id], onDelete: Cascade)
+  mesero User @relation("MeseroWatchedByCajeros", fields: [meseroId], references: [id], onDelete: Cascade)
+
+  @@unique([cajeroId, meseroId])
+  @@index([cajeroId])
+  @@index([meseroId])
+  @@map("cajero_mesero_watches")
 }
 
 model PushSubscription {

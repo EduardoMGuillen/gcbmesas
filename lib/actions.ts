@@ -64,8 +64,8 @@ function ensureCashierAccess(role: string) {
 }
 
 function ensureEntryScanAccess(role: string) {
-  if (!['ADMIN', 'CAJERO', 'TAQUILLA'].includes(role)) {
-    throw new Error('Solo taquilla, cajeros o administradores pueden escanear entradas')
+  if (!['ADMIN', 'CAJERO', 'TAQUILLA', 'MESERO'].includes(role)) {
+    throw new Error('Solo taquilla, meseros, cajeros o administradores pueden escanear entradas')
   }
 }
 
@@ -358,7 +358,48 @@ export async function getCashierDashboardData() {
     }),
   ])
 
-  return { accounts, pendingOrders, recentServed, activeMeseros }
+  let watchedMeseroIds: string[] = []
+  if (currentUser.role === 'CAJERO') {
+    watchedMeseroIds = (
+      await prisma.cajeroMeseroWatch.findMany({
+        where: { cajeroId: currentUser.id },
+        select: { meseroId: true },
+      })
+    ).map((w) => w.meseroId)
+  }
+
+  return { accounts, pendingOrders, recentServed, activeMeseros, watchedMeseroIds }
+}
+
+/** Persiste qué meseros notifican a este cajero (misma lógica que el filtro del panel). */
+export async function setCajeroMeseroWatches(meseroIds: string[]) {
+  const currentUser = await getCurrentUser()
+  if (currentUser.role !== 'CAJERO') {
+    throw new Error('Solo los cajeros pueden guardar meseros seguidos')
+  }
+  const allowed = await prisma.user.findMany({
+    where: {
+      id: { in: meseroIds },
+      role: 'MESERO',
+      username: { not: 'CLIENTE' },
+    },
+    select: { id: true },
+  })
+  const allowedIds = allowed.map((u) => u.id)
+  await prisma.$transaction([
+    prisma.cajeroMeseroWatch.deleteMany({ where: { cajeroId: currentUser.id } }),
+    ...(allowedIds.length > 0
+      ? [
+          prisma.cajeroMeseroWatch.createMany({
+            data: allowedIds.map((meseroId) => ({
+              cajeroId: currentUser.id,
+              meseroId,
+            })),
+          }),
+        ]
+      : []),
+  ])
+  revalidatePath('/cajero')
 }
 
 export async function setOrderServed(orderId: string, served: boolean) {
@@ -1176,7 +1217,7 @@ export async function createOrder(data: {
     include: {
       table: true,
       orders: true,
-      openedBy: { select: { id: true, name: true, username: true } },
+      openedBy: { select: { id: true, name: true, username: true, role: true } },
     },
   })
 
@@ -1261,14 +1302,22 @@ export async function createOrder(data: {
     ).catch((e) => console.error('[Push] Error:', e))
   }
 
-  // Notificar a cajeros con push activo
+  // Notificar a cajeros que siguen al mesero de este pedido (misma selección que el panel)
   {
     const meseroName = account.openedBy?.name || account.openedBy?.username || 'Desconocido'
-    const { sendPushToCajeros, sendPushToAdmins } = await import('@/lib/push')
-    sendPushToCajeros(account.table.name, product.name, quantity, meseroName)
-      .catch((e) => console.error('[Push Cajero] Error:', e))
-    sendPushToAdmins(account.table.name, product.name, quantity, meseroName, currentUser.id)
-      .catch((e) => console.error('[Push Admin] Error:', e))
+    const { resolveMeseroIdForCajeroPush, sendPushToCajerosFollowingMesero, sendPushToAdmins } =
+      await import('@/lib/push')
+    const meseroId = resolveMeseroIdForCajeroPush('staff', currentUser, account)
+    sendPushToCajerosFollowingMesero(
+      meseroId,
+      account.table.name,
+      product.name,
+      quantity,
+      meseroName
+    ).catch((e) => console.error('[Push Cajero] Error:', e))
+    sendPushToAdmins(account.table.name, product.name, quantity, meseroName, currentUser.id).catch((e) =>
+      console.error('[Push Admin] Error:', e)
+    )
   }
 
   // Revalidar rutas para que tanto clientes como meseros vean los cambios
@@ -1502,7 +1551,7 @@ export async function createCustomerOrder(data: {
     include: {
       table: true,
       orders: true,
-      openedBy: { select: { id: true, name: true, username: true } },
+      openedBy: { select: { id: true, name: true, username: true, role: true } },
     },
   })
 
@@ -1587,14 +1636,22 @@ export async function createCustomerOrder(data: {
     ).catch((e) => console.error('[Push] Error:', e))
   }
 
-  // Notificar a cajeros con push activo
+  // Notificar a cajeros que siguen al mesero de la mesa
   {
     const meseroName = account.openedBy?.name || account.openedBy?.username || 'Desconocido'
-    const { sendPushToCajeros, sendPushToAdmins } = await import('@/lib/push')
-    sendPushToCajeros(account.table.name, product.name, quantity, meseroName)
-      .catch((e) => console.error('[Push Cajero] Error:', e))
-    sendPushToAdmins(account.table.name, product.name, quantity, meseroName, customerUser.id)
-      .catch((e) => console.error('[Push Admin] Error:', e))
+    const { resolveMeseroIdForCajeroPush, sendPushToCajerosFollowingMesero, sendPushToAdmins } =
+      await import('@/lib/push')
+    const meseroId = resolveMeseroIdForCajeroPush('customer', customerUser, account)
+    sendPushToCajerosFollowingMesero(
+      meseroId,
+      account.table.name,
+      product.name,
+      quantity,
+      meseroName
+    ).catch((e) => console.error('[Push Cajero] Error:', e))
+    sendPushToAdmins(account.table.name, product.name, quantity, meseroName, customerUser.id).catch((e) =>
+      console.error('[Push Admin] Error:', e)
+    )
   }
 
   // Revalidar todas las posibles rutas que pueden mostrar esta mesa

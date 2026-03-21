@@ -4,15 +4,18 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { TaquillaScanClient } from './TaquillaScanClient'
 import { AttendanceMarkCard } from '@/components/AttendanceMarkCard'
+import { Navbar } from '@/components/Navbar'
 
 export const dynamic = 'force-dynamic'
 
 export default async function TaquillaPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session || !['TAQUILLA', 'ADMIN'].includes(session.user.role)) {
+  if (!session || !['TAQUILLA', 'ADMIN', 'MESERO', 'CAJERO'].includes(session.user.role)) {
     redirect('/login')
   }
+
+  const showNavbar = session.user.role !== 'ADMIN'
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -31,9 +34,12 @@ export default async function TaquillaPage() {
   })
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <AttendanceMarkCard compact />
-      <TaquillaScanClient events={activeEvents} />
+    <div className="min-h-screen flex flex-col">
+      {showNavbar && <Navbar />}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
+        <AttendanceMarkCard compact />
+        <TaquillaScanClient events={activeEvents} />
+      </div>
     </div>
   )
 }

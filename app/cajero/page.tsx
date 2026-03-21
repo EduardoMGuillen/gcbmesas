@@ -19,10 +19,11 @@ export default async function CajeroPage() {
   // Cerrar cuentas antiguas en background (no bloquea)
   closeOldAccounts().catch((err) => console.error('[CajeroPage] Error al cerrar cuentas antiguas:', err))
 
-  const { accounts, pendingOrders, recentServed, activeMeseros } =
+  const { accounts, pendingOrders, recentServed, activeMeseros, watchedMeseroIds } =
     await getCashierDashboardData()
 
   const isAdmin = session.user.role === 'ADMIN'
+  const isCajero = session.user.role === 'CAJERO'
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -47,6 +48,8 @@ export default async function CajeroPage() {
           recentServed={recentServed}
           activeMeseros={activeMeseros}
           userId={session.user.id}
+          watchedMeseroIds={watchedMeseroIds}
+          isCajero={isCajero}
         />
       </main>
       {!isAdmin && <Footer />}

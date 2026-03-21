@@ -128,26 +128,55 @@ export async function sendPushToAccountOpener(
   )
 }
 
-/** Notifica a todos los cajeros con push activo sobre un nuevo pedido. */
-export async function sendPushToCajeros(
+/**
+ * Qué usuario mesero “atribuye” el pedido para filtrar notificaciones a cajeros.
+ * - Pedido de staff: el mesero que pide, o el de la mesa si admin/cajero/taquilla pide.
+ * - Pedido de cliente: el mesero que abrió la cuenta.
+ */
+export function resolveMeseroIdForCajeroPush(
+  source: 'staff' | 'customer',
+  orderUser: { id: string; role: string },
+  account: { openedBy: { id: string; role: string } | null }
+): string | null {
+  if (source === 'customer') {
+    return account.openedBy?.role === 'MESERO' ? account.openedBy.id : null
+  }
+  if (orderUser.role === 'MESERO') return orderUser.id
+  if (orderUser.role === 'ADMIN' || orderUser.role === 'CAJERO' || orderUser.role === 'TAQUILLA') {
+    return account.openedBy?.role === 'MESERO' ? account.openedBy.id : null
+  }
+  return null
+}
+
+/** Notifica solo a cajeros que tienen seleccionado este mesero (mismo criterio que el panel). */
+export async function sendPushToCajerosFollowingMesero(
+  meseroId: string | null,
   tableName: string,
   productName: string,
   quantity: number,
   meseroName: string
 ) {
-  const cajeroSubs = await prisma.pushSubscription.findMany({
-    where: { user: { role: 'CAJERO' } },
-    select: { userId: true },
+  if (!meseroId) return
+
+  const watches = await prisma.cajeroMeseroWatch.findMany({
+    where: { meseroId },
+    select: { cajeroId: true },
   })
-  // IDs únicos de cajeros con suscripción push
-  const uniqueIds = Array.from(new Set(cajeroSubs.map((s) => s.userId)))
-  if (uniqueIds.length === 0) return
+  const cajeroIds = Array.from(new Set(watches.map((w) => w.cajeroId)))
+  if (cajeroIds.length === 0) return
 
   const title = 'Nuevo pedido pendiente'
   const body = `${quantity}x ${productName} - Mesa ${tableName} (${meseroName})`
-  const data = { type: 'new_order_cajero', tableName, productName, quantity: String(quantity), meseroName }
+  const data = {
+    type: 'new_order_cajero',
+    tableName,
+    productName,
+    quantity: String(quantity),
+    meseroName,
+    meseroId,
+  }
 
-  for (const userId of uniqueIds) {
+  for (const userId of cajeroIds) {
     sendPushToUser(userId, title, body, data).catch((e) =>
       console.error('[Push Cajero] Error enviando a', userId, e)
     )
