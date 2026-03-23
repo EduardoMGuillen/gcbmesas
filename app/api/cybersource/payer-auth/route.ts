@@ -27,7 +27,8 @@ function normalizeConsumerAuthenticationInformation(raw: any) {
     authenticationTransactionId: raw.authenticationTransactionId ? String(raw.authenticationTransactionId) : undefined,
     cavv: raw.cavv ? String(raw.cavv) : undefined,
     xid: raw.xid ? String(raw.xid) : undefined,
-    eci: raw.eci ? String(raw.eci) : undefined,
+    // CyberSource 3DS2 uses "eci" in some responses and "ecommerceIndicator" in others
+    eci: (raw.eci || raw.ecommerceIndicator) ? String(raw.eci || raw.ecommerceIndicator) : undefined,
     acsTransactionId: raw.acsTransactionId ? String(raw.acsTransactionId) : undefined,
     threeDSServerTransactionId: raw.threeDSServerTransactionId ? String(raw.threeDSServerTransactionId) : undefined,
     directoryServerTransactionId: raw.directoryServerTransactionId ? String(raw.directoryServerTransactionId) : undefined,
@@ -164,14 +165,23 @@ export async function POST(req: NextRequest) {
       cardType: resolvedCardType || undefined,
     })
 
+    const caiRaw = authenticationResponse?.consumerAuthenticationInformation || {}
     console.log('[CyberSource] payer-auth enrollment response:', {
+      topLevelKeys: Object.keys(authenticationResponse || {}),
       status: authenticationResponse?.status,
-      paresStatus: authenticationResponse?.consumerAuthenticationInformation?.paresStatus,
-      hasCavv: Boolean(authenticationResponse?.consumerAuthenticationInformation?.cavv),
-      hasEci: Boolean(authenticationResponse?.consumerAuthenticationInformation?.eci),
-      hasAuthTxnId: Boolean(authenticationResponse?.consumerAuthenticationInformation?.authenticationTransactionId),
-      hasStepUpUrl: Boolean(authenticationResponse?.consumerAuthenticationInformation?.stepUpUrl),
-      rawKeys: Object.keys(authenticationResponse?.consumerAuthenticationInformation || {}),
+      errorInfo: authenticationResponse?.errorInformation,
+      cai: {
+        keys: Object.keys(caiRaw),
+        veresEnrolled: caiRaw.veresEnrolled,
+        paresStatus: caiRaw.paresStatus,
+        ecommerceIndicator: caiRaw.ecommerceIndicator,
+        specificationVersion: caiRaw.specificationVersion,
+        directoryServerErrorCode: caiRaw.directoryServerErrorCode,
+        directoryServerErrorDescription: caiRaw.directoryServerErrorDescription,
+        hasCavv: Boolean(caiRaw.cavv),
+        hasEci: Boolean(caiRaw.eci),
+        hasAuthTxnId: Boolean(caiRaw.authenticationTransactionId),
+      },
     })
 
     let normalizedConsumerAuth = normalizeConsumerAuthenticationInformation(
@@ -192,33 +202,20 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // For frictionless 3DS2, CyberSource sometimes does not include CAVV in the enrollment
-    // response — it requires a separate call to authentication-results to obtain it.
-    const enrollmentCavv = authenticationResponse?.consumerAuthenticationInformation?.cavv
-    const enrollmentAuthTxnId = authenticationResponse?.consumerAuthenticationInformation?.authenticationTransactionId
-    if (!enrollmentCavv && enrollmentAuthTxnId) {
-      try {
-        const validateResponse = await cyberSourcePayerAuthValidateViaSdk({
-          authenticationTransactionId: String(enrollmentAuthTxnId),
-        })
-        console.log('[CyberSource] payer-auth validate response:', {
-          status: validateResponse?.status,
-          hasCavv: Boolean(validateResponse?.consumerAuthenticationInformation?.cavv),
-          hasEci: Boolean(validateResponse?.consumerAuthenticationInformation?.eci),
-          rawKeys: Object.keys(validateResponse?.consumerAuthenticationInformation || {}),
-        })
-        const validatedAuth = normalizeConsumerAuthenticationInformation(
-          validateResponse?.consumerAuthenticationInformation
-        )
-        if (validatedAuth) {
-          normalizedConsumerAuth = { ...normalizedConsumerAuth, ...validatedAuth }
-        }
-      } catch (validateErr: any) {
-        console.warn('[CyberSource] payer-auth: validate after frictionless enrollment failed', {
-          authenticationTransactionId: enrollmentAuthTxnId,
-          error: validateErr?.message,
-        })
-      }
+    // For frictionless 3DS2, CAVV comes from enrollment. Only call validate for challenge flows.
+    // If directoryServerErrorCode is present, the 3DS2 directory server rejected the auth —
+    // this is a merchant configuration issue (merchant not registered for 3DS2 with card network).
+    const enrollmentCai = authenticationResponse?.consumerAuthenticationInformation || {}
+    const enrollmentCavv = enrollmentCai.cavv
+    const enrollmentDsError = enrollmentCai.directoryServerErrorCode
+    const enrollmentAuthTxnId = enrollmentCai.authenticationTransactionId
+
+    if (enrollmentDsError) {
+      console.warn('[CyberSource] payer-auth: directory server error in enrollment', {
+        directoryServerErrorCode: enrollmentDsError,
+        directoryServerErrorDescription: enrollmentCai.directoryServerErrorDescription,
+        veresEnrolled: enrollmentCai.veresEnrolled,
+      })
     }
 
     if (!normalizedConsumerAuth?.cavv) {
@@ -228,7 +225,11 @@ export async function POST(req: NextRequest) {
         commerceIndicator: 'internet',
         consumerAuthenticationInformation: null,
         paymentCardType: resolvedCardType || null,
-        reason: 'Payer Authentication no devolvió CAVV. La tarjeta puede no soportar 3DS en este ambiente.',
+        reason: enrollmentDsError
+          ? `Error en servidor de directorio 3DS (${enrollmentDsError}): ${enrollmentCai.directoryServerErrorDescription || 'El merchant puede no estar registrado para 3DS2 en el ambiente de prueba.'}`
+          : 'Payer Authentication no devolvió CAVV. La tarjeta puede no soportar 3DS en este ambiente.',
+        directoryServerErrorCode: enrollmentDsError || null,
+        veresEnrolled: enrollmentCai.veresEnrolled || null,
       })
     }
 
