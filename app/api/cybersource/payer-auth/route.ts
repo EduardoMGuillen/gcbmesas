@@ -164,6 +164,16 @@ export async function POST(req: NextRequest) {
       cardType: resolvedCardType || undefined,
     })
 
+    console.log('[CyberSource] payer-auth enrollment response:', {
+      status: authenticationResponse?.status,
+      paresStatus: authenticationResponse?.consumerAuthenticationInformation?.paresStatus,
+      hasCavv: Boolean(authenticationResponse?.consumerAuthenticationInformation?.cavv),
+      hasEci: Boolean(authenticationResponse?.consumerAuthenticationInformation?.eci),
+      hasAuthTxnId: Boolean(authenticationResponse?.consumerAuthenticationInformation?.authenticationTransactionId),
+      hasStepUpUrl: Boolean(authenticationResponse?.consumerAuthenticationInformation?.stepUpUrl),
+      rawKeys: Object.keys(authenticationResponse?.consumerAuthenticationInformation || {}),
+    })
+
     let normalizedConsumerAuth = normalizeConsumerAuthenticationInformation(
       authenticationResponse?.consumerAuthenticationInformation
     )
@@ -190,6 +200,12 @@ export async function POST(req: NextRequest) {
       try {
         const validateResponse = await cyberSourcePayerAuthValidateViaSdk({
           authenticationTransactionId: String(enrollmentAuthTxnId),
+        })
+        console.log('[CyberSource] payer-auth validate response:', {
+          status: validateResponse?.status,
+          hasCavv: Boolean(validateResponse?.consumerAuthenticationInformation?.cavv),
+          hasEci: Boolean(validateResponse?.consumerAuthenticationInformation?.eci),
+          rawKeys: Object.keys(validateResponse?.consumerAuthenticationInformation || {}),
         })
         const validatedAuth = normalizeConsumerAuthenticationInformation(
           validateResponse?.consumerAuthenticationInformation
