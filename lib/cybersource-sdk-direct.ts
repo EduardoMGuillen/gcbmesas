@@ -379,12 +379,16 @@ export async function cyberSourcePayerAuthEnrollViaSdk(params: PayerAuthEnrollPa
     requestObj.paymentInformation = { card: { type: params.cardType } }
   }
   // 3DS2 requires browser data; without it the Directory Server returns error 201.
+  // CyberSource SDK field names differ from 3DS spec names:
+  //   browserLanguage     → httpBrowserLanguage
+  //   browserUserAgent    → userAgentBrowserValue
+  //   browserAcceptHeader → httpAcceptContent
   if (params.browserInfo) {
     const b = params.browserInfo
     requestObj.deviceInformation = {
-      ...(b.browserLanguage     && { browserLanguage:     b.browserLanguage }),
+      ...(b.browserLanguage     && { httpBrowserLanguage:  b.browserLanguage }),
       ...(b.browserUserAgent    && { userAgentBrowserValue: b.browserUserAgent }),
-      ...(b.browserAcceptHeader && { httpAcceptBrowserValue: b.browserAcceptHeader }),
+      ...(b.browserAcceptHeader && { httpAcceptContent:    b.browserAcceptHeader }),
       ...(b.browserColorDepth   && { browserColorDepth:   b.browserColorDepth }),
       ...(b.browserScreenHeight && { browserScreenHeight: b.browserScreenHeight }),
       ...(b.browserScreenWidth  && { browserScreenWidth:  b.browserScreenWidth }),
