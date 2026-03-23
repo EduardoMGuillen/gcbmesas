@@ -12,11 +12,13 @@ function commerceIndicatorForBrand(cardType: string): string {
 
 function normalizeConsumerAuthenticationInformation(raw: any) {
   if (!raw || typeof raw !== 'object') return null
+  const cryptogram = raw.cavv || raw.authenticationValue || raw.ucafAuthenticationData
   const normalized = {
     authenticationTransactionId: raw.authenticationTransactionId ? String(raw.authenticationTransactionId) : undefined,
-    cavv: raw.cavv ? String(raw.cavv) : undefined,
+    cavv: cryptogram ? String(cryptogram) : undefined,
     xid: raw.xid ? String(raw.xid) : undefined,
-    eci: raw.eci ? String(raw.eci) : undefined,
+    eci: (raw.eci || raw.ecommerceIndicator) ? String(raw.eci || raw.ecommerceIndicator) : undefined,
+    ucafCollectionIndicator: raw.ucafCollectionIndicator ? String(raw.ucafCollectionIndicator) : undefined,
     acsTransactionId: raw.acsTransactionId ? String(raw.acsTransactionId) : undefined,
     threeDSServerTransactionId: raw.threeDSServerTransactionId ? String(raw.threeDSServerTransactionId) : undefined,
     directoryServerTransactionId: raw.directoryServerTransactionId

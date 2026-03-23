@@ -59,6 +59,7 @@ function normalizeConsumerAuthenticationInformation(raw: any) {
   if (cryptogram)     normalized.cavv        = String(cryptogram)
   if (raw.eci)        normalized.eciRaw      = String(raw.eci)       // SDK field is eciRaw
   if (raw.eciRaw)     normalized.eciRaw      = String(raw.eciRaw)
+  if (raw.ucafCollectionIndicator) normalized.ucafCollectionIndicator = String(raw.ucafCollectionIndicator)
   if (!normalized.eciRaw && raw.ucafCollectionIndicator) normalized.eciRaw = String(raw.ucafCollectionIndicator)
   if (raw.xid)        normalized.xid         = String(raw.xid)
   if (raw.paresStatus) normalized.paresStatus = String(raw.paresStatus)
