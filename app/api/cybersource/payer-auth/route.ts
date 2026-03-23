@@ -34,6 +34,10 @@ function normalizeConsumerAuthenticationInformation(raw: any) {
     eci: eciLike ? String(eciLike) : undefined,
     // Mastercard requires this field in authorization when available.
     ucafCollectionIndicator: raw.ucafCollectionIndicator ? String(raw.ucafCollectionIndicator) : undefined,
+    // Mastercard can require UCAF auth data explicitly in payment auth payload.
+    ucafAuthenticationData: (raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv)
+      ? String(raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv)
+      : undefined,
     acsTransactionId: raw.acsTransactionId ? String(raw.acsTransactionId) : undefined,
     threeDSServerTransactionId: raw.threeDSServerTransactionId ? String(raw.threeDSServerTransactionId) : undefined,
     directoryServerTransactionId: raw.directoryServerTransactionId ? String(raw.directoryServerTransactionId) : undefined,

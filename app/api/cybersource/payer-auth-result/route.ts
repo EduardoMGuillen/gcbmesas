@@ -19,6 +19,9 @@ function normalizeConsumerAuthenticationInformation(raw: any) {
     xid: raw.xid ? String(raw.xid) : undefined,
     eci: (raw.eci || raw.ecommerceIndicator) ? String(raw.eci || raw.ecommerceIndicator) : undefined,
     ucafCollectionIndicator: raw.ucafCollectionIndicator ? String(raw.ucafCollectionIndicator) : undefined,
+    ucafAuthenticationData: (raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv)
+      ? String(raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv)
+      : undefined,
     acsTransactionId: raw.acsTransactionId ? String(raw.acsTransactionId) : undefined,
     threeDSServerTransactionId: raw.threeDSServerTransactionId ? String(raw.threeDSServerTransactionId) : undefined,
     directoryServerTransactionId: raw.directoryServerTransactionId
