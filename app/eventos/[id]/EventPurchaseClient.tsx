@@ -295,6 +295,18 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     let payerAuthResult: any = null
     let payerAuthResponse: Response | null = null
     try {
+      const browserInfo = {
+        browserLanguage: navigator.language || 'en-US',
+        browserUserAgent: navigator.userAgent,
+        browserAcceptHeader: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        browserJavascriptEnabled: true,
+        browserJavaEnabled: typeof navigator.javaEnabled === 'function' ? navigator.javaEnabled() : false,
+        browserColorDepth: String(window.screen.colorDepth || 24),
+        browserScreenHeight: String(window.screen.height || 900),
+        browserScreenWidth: String(window.screen.width || 1440),
+        browserTimeZone: String(new Date().getTimezoneOffset()),
+      }
+
       payerAuthResponse = await fetch('/api/cybersource/payer-auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -311,6 +323,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
           billToPostalCode: billingPostalCode.trim(),
           billToCountry: billingCountry.trim().toUpperCase(),
           paymentCardType: microformCardType || undefined,
+          browserInfo,
         }),
       })
     } catch {
