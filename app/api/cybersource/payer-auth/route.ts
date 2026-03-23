@@ -4,6 +4,7 @@ import { CyberSourceApiError } from '@/lib/cybersource'
 import {
   cyberSourcePayerAuthSetupViaSdk,
   cyberSourcePayerAuthEnrollViaSdk,
+  cyberSourcePayerAuthValidateViaSdk,
 } from '@/lib/cybersource-sdk-direct'
 
 function parseJwtPayload(token: string): any | null {
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
       cardType: resolvedCardType || undefined,
     })
 
-    const normalizedConsumerAuth = normalizeConsumerAuthenticationInformation(
+    let normalizedConsumerAuth = normalizeConsumerAuthenticationInformation(
       authenticationResponse?.consumerAuthenticationInformation
     )
 
@@ -181,14 +182,37 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    if (!normalizedConsumerAuth) {
+    // For frictionless 3DS2, CyberSource sometimes does not include CAVV in the enrollment
+    // response — it requires a separate call to authentication-results to obtain it.
+    const enrollmentCavv = authenticationResponse?.consumerAuthenticationInformation?.cavv
+    const enrollmentAuthTxnId = authenticationResponse?.consumerAuthenticationInformation?.authenticationTransactionId
+    if (!enrollmentCavv && enrollmentAuthTxnId) {
+      try {
+        const validateResponse = await cyberSourcePayerAuthValidateViaSdk({
+          authenticationTransactionId: String(enrollmentAuthTxnId),
+        })
+        const validatedAuth = normalizeConsumerAuthenticationInformation(
+          validateResponse?.consumerAuthenticationInformation
+        )
+        if (validatedAuth) {
+          normalizedConsumerAuth = { ...normalizedConsumerAuth, ...validatedAuth }
+        }
+      } catch (validateErr: any) {
+        console.warn('[CyberSource] payer-auth: validate after frictionless enrollment failed', {
+          authenticationTransactionId: enrollmentAuthTxnId,
+          error: validateErr?.message,
+        })
+      }
+    }
+
+    if (!normalizedConsumerAuth?.cavv) {
       return NextResponse.json({
         enabled: true,
         status: 'failed',
         commerceIndicator: 'internet',
         consumerAuthenticationInformation: null,
         paymentCardType: resolvedCardType || null,
-        reason: 'Payer Authentication no devolvió datos CAVV/ECI/XID válidos.',
+        reason: 'Payer Authentication no devolvió CAVV. La tarjeta puede no soportar 3DS en este ambiente.',
       })
     }
 
