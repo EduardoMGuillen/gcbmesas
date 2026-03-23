@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { CyberSourceApiError } from '@/lib/cybersource'
 import { cyberSourcePayerAuthValidateViaSdk } from '@/lib/cybersource-sdk-direct'
 
+function commerceIndicatorForBrand(cardType: string): string {
+  const t = String(cardType || '').toLowerCase()
+  if (t === '001' || t.includes('visa')) return 'vbv'
+  if (t === '002' || t.includes('mastercard') || t.includes('master')) return 'spa'
+  if (t === '003' || t.includes('amex') || t.includes('american')) return 'aesk'
+  return 'aesk'
+}
+
 function normalizeConsumerAuthenticationInformation(raw: any) {
   if (!raw || typeof raw !== 'object') return null
   const normalized = {
@@ -29,7 +37,7 @@ function normalizeConsumerAuthenticationInformation(raw: any) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { authenticationTransactionId } = body
+    const { authenticationTransactionId, paymentCardType } = body
 
     if (!authenticationTransactionId) {
       return NextResponse.json({ error: 'authenticationTransactionId requerido.' }, { status: 400 })
@@ -56,8 +64,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       status: 'authenticated',
-      commerceIndicator: 'aesk',
+      commerceIndicator: commerceIndicatorForBrand(paymentCardType || ''),
       consumerAuthenticationInformation: normalized,
+      paymentCardType: paymentCardType || null,
     })
   } catch (error: any) {
     if (error instanceof CyberSourceApiError) {

@@ -49,18 +49,20 @@ function parseJwtPayload(token: string): any | null {
 
 function normalizeConsumerAuthenticationInformation(raw: any) {
   if (!raw || typeof raw !== 'object') return null
-  // For the PAYMENT step, only pass fields the Ptsv2paymentsConsumerAuthenticationInformation
-  // model recognises. The SDK silently drops unknown keys, so:
-  //   - use "eciRaw"  (not "eci") — that is the SDK model's field name
-  //   - include "paresStatus" so CyberSource knows the auth succeeded
-  // Sending enrollment-only fields (authenticationTransactionId, acsTransactionId, etc.)
-  // triggers CyberSource to look for paymentAccountInformation.card.number → 400.
+  // For the PAYMENT step only authenticationTransactionId (CyberSource internal enrollment ID)
+  // must be excluded — it triggers CyberSource to look for paymentAccountInformation.card.number → 400.
+  // All other 3DS fields (including the transaction IDs required by the acquirer) must be sent
+  // so the authorization carries the correct ECI/CAVV and is marked as 3DS-authenticated.
+  // SDK field name: "eciRaw" (not "eci").
   const normalized: Record<string, string> = {}
   if (raw.cavv)       normalized.cavv        = String(raw.cavv)
   if (raw.eci)        normalized.eciRaw      = String(raw.eci)       // SDK field is eciRaw
   if (raw.eciRaw)     normalized.eciRaw      = String(raw.eciRaw)
   if (raw.xid)        normalized.xid         = String(raw.xid)
   if (raw.paresStatus) normalized.paresStatus = String(raw.paresStatus)
+  if (raw.acsTransactionId)            normalized.acsTransactionId            = String(raw.acsTransactionId)
+  if (raw.threeDSServerTransactionId)  normalized.threeDSServerTransactionId  = String(raw.threeDSServerTransactionId)
+  if (raw.directoryServerTransactionId) normalized.directoryServerTransactionId = String(raw.directoryServerTransactionId)
   // For a frictionless success without explicit paresStatus, default to "Y"
   if (!normalized.paresStatus && (normalized.cavv || normalized.eciRaw)) {
     normalized.paresStatus = 'Y'

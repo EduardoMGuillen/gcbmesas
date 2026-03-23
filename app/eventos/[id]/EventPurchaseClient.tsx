@@ -444,7 +444,10 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
         const resultRes = await fetch('/api/cybersource/payer-auth-result', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ authenticationTransactionId: challengeAuthTransactionId }),
+          body: JSON.stringify({
+            authenticationTransactionId: challengeAuthTransactionId,
+            paymentCardType: pending.paymentCardType || '',
+          }),
         })
         const resultData = await resultRes.json()
         if (!resultRes.ok) throw new Error(resultData?.error || 'Error al obtener resultado 3DS del challenge.')
