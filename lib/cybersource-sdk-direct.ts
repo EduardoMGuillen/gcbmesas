@@ -357,9 +357,10 @@ export async function cyberSourcePayerAuthEnrollViaSdk(params: PayerAuthEnrollPa
     transactionMode: 'eCommerce',
   }
   requestObj.tokenInformation = { transientTokenJwt: params.transientToken }
+  // billTo triggers country validation on the risk endpoint → 400 for some countries.
+  // The billing address is sent separately in the payment authorization step.
   requestObj.orderInformation = {
     amountDetails: { totalAmount: params.amount, currency: params.currency },
-    billTo: params.billTo,
   }
   if (params.cardType) {
     requestObj.paymentInformation = { card: { type: params.cardType } }
