@@ -57,6 +57,9 @@ function normalizeConsumerAuthenticationInformation(raw: any) {
   const normalized: Record<string, string> = {}
   const cryptogram = raw.cavv || raw.authenticationValue || raw.ucafAuthenticationData
   if (cryptogram)     normalized.cavv        = String(cryptogram)
+  if (raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv) {
+    normalized.ucafAuthenticationData = String(raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv)
+  }
   if (raw.eci)        normalized.eciRaw      = String(raw.eci)       // SDK field is eciRaw
   if (raw.eciRaw)     normalized.eciRaw      = String(raw.eciRaw)
   if (raw.ucafCollectionIndicator) normalized.ucafCollectionIndicator = String(raw.ucafCollectionIndicator)
