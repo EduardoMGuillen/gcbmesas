@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
       billToCountry,
       paymentCardType,
       clientEmail,
+      browserInfo,
     } = body
 
     if (!paymentReference || !eventId || !numberOfEntries || !transientToken) {
@@ -163,6 +164,7 @@ export async function POST(req: NextRequest) {
       currency,
       billTo: resolvedBillTo,
       cardType: resolvedCardType || undefined,
+      browserInfo: browserInfo || undefined,
     })
 
     const caiRaw = authenticationResponse?.consumerAuthenticationInformation || {}

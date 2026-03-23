@@ -285,6 +285,18 @@ type PayerAuthSetupParams = {
   cardType?: string
 }
 
+type BrowserInfo = {
+  browserLanguage?: string
+  browserUserAgent?: string
+  browserAcceptHeader?: string
+  browserJavascriptEnabled?: boolean
+  browserJavaEnabled?: boolean
+  browserColorDepth?: string
+  browserScreenHeight?: string
+  browserScreenWidth?: string
+  browserTimeZone?: string
+}
+
 type PayerAuthEnrollParams = {
   paymentReference: string
   transientToken: string
@@ -294,6 +306,7 @@ type PayerAuthEnrollParams = {
   currency: string
   billTo: BillTo
   cardType?: string
+  browserInfo?: BrowserInfo
 }
 
 type PayerAuthValidateParams = {
@@ -364,6 +377,21 @@ export async function cyberSourcePayerAuthEnrollViaSdk(params: PayerAuthEnrollPa
   }
   if (params.cardType) {
     requestObj.paymentInformation = { card: { type: params.cardType } }
+  }
+  // 3DS2 requires browser data; without it the Directory Server returns error 201.
+  if (params.browserInfo) {
+    const b = params.browserInfo
+    requestObj.deviceInformation = {
+      ...(b.browserLanguage     && { browserLanguage:     b.browserLanguage }),
+      ...(b.browserUserAgent    && { userAgentBrowserValue: b.browserUserAgent }),
+      ...(b.browserAcceptHeader && { httpAcceptBrowserValue: b.browserAcceptHeader }),
+      ...(b.browserColorDepth   && { browserColorDepth:   b.browserColorDepth }),
+      ...(b.browserScreenHeight && { browserScreenHeight: b.browserScreenHeight }),
+      ...(b.browserScreenWidth  && { browserScreenWidth:  b.browserScreenWidth }),
+      ...(b.browserTimeZone     && { browserTimeZone:     b.browserTimeZone }),
+      browserJavascriptEnabled: b.browserJavascriptEnabled ?? true,
+      browserJavaEnabled:       b.browserJavaEnabled       ?? false,
+    }
   }
 
   const api = new sdk.PayerAuthenticationApi(configObject, buildApiClient())
