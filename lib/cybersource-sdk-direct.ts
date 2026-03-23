@@ -326,9 +326,10 @@ export async function cyberSourcePayerAuthSetupViaSdk(params: PayerAuthSetupPara
   const requestObj = new sdk.PayerAuthSetupRequest()
   requestObj.clientReferenceInformation = { code: `${params.paymentReference}-3DS-SETUP` }
   requestObj.tokenInformation = { transientTokenJwt: params.transientToken }
+  // Setup only needs amount to initiate device fingerprinting; billTo is for enrollment.
+  // Sending billTo here triggers country validation on the risk endpoint and can cause 400.
   requestObj.orderInformation = {
     amountDetails: { totalAmount: params.amount, currency: params.currency },
-    billTo: params.billTo,
   }
   if (params.cardType) {
     requestObj.paymentInformation = { card: { type: params.cardType } }
