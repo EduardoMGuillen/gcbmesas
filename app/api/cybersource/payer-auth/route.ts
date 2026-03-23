@@ -23,12 +23,15 @@ function parseJwtPayload(token: string): any | null {
 
 function normalizeConsumerAuthenticationInformation(raw: any) {
   if (!raw || typeof raw !== 'object') return null
+  const cryptogram = raw.cavv || raw.authenticationValue || raw.ucafAuthenticationData
+  const eciLike = raw.eci || raw.eciRaw || raw.ecommerceIndicator || raw.ucafCollectionIndicator
   const normalized = {
     authenticationTransactionId: raw.authenticationTransactionId ? String(raw.authenticationTransactionId) : undefined,
-    cavv: raw.cavv ? String(raw.cavv) : undefined,
+    // Mastercard and some 3DS2 responses use authenticationValue/UCAF instead of cavv.
+    cavv: cryptogram ? String(cryptogram) : undefined,
     xid: raw.xid ? String(raw.xid) : undefined,
-    // CyberSource 3DS2 uses "eci" in some responses and "ecommerceIndicator" in others
-    eci: (raw.eci || raw.ecommerceIndicator) ? String(raw.eci || raw.ecommerceIndicator) : undefined,
+    // CyberSource can return ECI as eci/eciRaw, ecommerceIndicator (vbv/spa/aesk), or MC collection indicator.
+    eci: eciLike ? String(eciLike) : undefined,
     acsTransactionId: raw.acsTransactionId ? String(raw.acsTransactionId) : undefined,
     threeDSServerTransactionId: raw.threeDSServerTransactionId ? String(raw.threeDSServerTransactionId) : undefined,
     directoryServerTransactionId: raw.directoryServerTransactionId ? String(raw.directoryServerTransactionId) : undefined,

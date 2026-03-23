@@ -55,9 +55,11 @@ function normalizeConsumerAuthenticationInformation(raw: any) {
   // so the authorization carries the correct ECI/CAVV and is marked as 3DS-authenticated.
   // SDK field name: "eciRaw" (not "eci").
   const normalized: Record<string, string> = {}
-  if (raw.cavv)       normalized.cavv        = String(raw.cavv)
+  const cryptogram = raw.cavv || raw.authenticationValue || raw.ucafAuthenticationData
+  if (cryptogram)     normalized.cavv        = String(cryptogram)
   if (raw.eci)        normalized.eciRaw      = String(raw.eci)       // SDK field is eciRaw
   if (raw.eciRaw)     normalized.eciRaw      = String(raw.eciRaw)
+  if (!normalized.eciRaw && raw.ucafCollectionIndicator) normalized.eciRaw = String(raw.ucafCollectionIndicator)
   if (raw.xid)        normalized.xid         = String(raw.xid)
   if (raw.paresStatus) normalized.paresStatus = String(raw.paresStatus)
   if (raw.acsTransactionId)            normalized.acsTransactionId            = String(raw.acsTransactionId)
