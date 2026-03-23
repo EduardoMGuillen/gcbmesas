@@ -35,6 +35,14 @@ function normalizeConsumerAuthenticationInformation(raw: any) {
   return hasAny ? normalized : null
 }
 
+function commerceIndicatorForBrand(cardType: string): string {
+  const t = String(cardType || '').toLowerCase()
+  if (t === '001' || t.includes('visa')) return 'vbv'
+  if (t === '002' || t.includes('mastercard') || t.includes('master')) return 'spa'
+  if (t === '003' || t.includes('amex') || t.includes('american')) return 'aesk'
+  return 'aesk'
+}
+
 function looksLikeChallengeRequired(rawAuthResponse: any) {
   const status = String(rawAuthResponse?.status || '').toUpperCase()
   const paStatus = String(rawAuthResponse?.consumerAuthenticationInformation?.paresStatus || '').toUpperCase()
@@ -187,7 +195,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       enabled: true,
       status: 'authenticated',
-      commerceIndicator: 'aesk',
+      commerceIndicator: commerceIndicatorForBrand(resolvedCardType),
       consumerAuthenticationInformation: normalizedConsumerAuth,
       paymentCardType: resolvedCardType || null,
     })
