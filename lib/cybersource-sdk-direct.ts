@@ -381,21 +381,26 @@ export async function cyberSourcePayerAuthEnrollViaSdk(params: PayerAuthEnrollPa
   }
   // 3DS2 requires browser data; without it the Directory Server returns error 201.
   // CyberSource SDK field names differ from 3DS spec names:
-  //   browserLanguage     → httpBrowserLanguage
-  //   browserUserAgent    → userAgentBrowserValue
-  //   browserAcceptHeader → httpAcceptContent
+  //   browserLanguage      → httpBrowserLanguage
+  //   browserUserAgent     → userAgentBrowserValue
+  //   browserAcceptHeader  → httpAcceptContent
+  //   browserColorDepth    → httpBrowserColorDepth
+  //   browserScreenHeight  → httpBrowserScreenHeight
+  //   browserScreenWidth   → httpBrowserScreenWidth
+  //   browserJavaEnabled   → httpBrowserJavaEnabled
+  //   browserTimeZone      → httpBrowserTimeDifference
   if (params.browserInfo) {
     const b = params.browserInfo
     requestObj.deviceInformation = {
       ...(b.browserLanguage     && { httpBrowserLanguage:  b.browserLanguage }),
       ...(b.browserUserAgent    && { userAgentBrowserValue: b.browserUserAgent }),
       ...(b.browserAcceptHeader && { httpAcceptContent:    b.browserAcceptHeader }),
-      ...(b.browserColorDepth   && { browserColorDepth:   b.browserColorDepth }),
-      ...(b.browserScreenHeight && { browserScreenHeight: b.browserScreenHeight }),
-      ...(b.browserScreenWidth  && { browserScreenWidth:  b.browserScreenWidth }),
-      ...(b.browserTimeZone     && { browserTimeZone:     b.browserTimeZone }),
+      ...(b.browserColorDepth   && { httpBrowserColorDepth:     b.browserColorDepth }),
+      ...(b.browserScreenHeight && { httpBrowserScreenHeight:   b.browserScreenHeight }),
+      ...(b.browserScreenWidth  && { httpBrowserScreenWidth:    b.browserScreenWidth }),
+      ...(b.browserTimeZone     && { httpBrowserTimeDifference: b.browserTimeZone }),
       browserJavascriptEnabled: b.browserJavascriptEnabled ?? true,
-      browserJavaEnabled:       b.browserJavaEnabled       ?? false,
+      httpBrowserJavaEnabled:   b.browserJavaEnabled       ?? false,
     }
   }
 
