@@ -204,12 +204,13 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
   if (params.consumerAuthInfo) {
     requestObj.consumerAuthenticationInformation = params.consumerAuthInfo
   }
+  // billTo triggers country validation on the payments endpoint in some environments.
+  // The card/billing data is already embedded in the Microform transient token.
   requestObj.orderInformation = {
     amountDetails: {
       totalAmount: params.amount,
       currency: params.currency,
     },
-    billTo: params.billTo,
   }
 
   const paymentsApi = new sdk.PaymentsApi(configObject, apiClient)
