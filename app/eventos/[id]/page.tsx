@@ -31,6 +31,8 @@ export default async function EventoPage({
     coverImage: event.coverImage,
     coverPrice: Number(event.coverPrice),
     onlinePrice: Number(event.paypalPrice),
+    maxEntries: event.maxEntries,
+    entriesSoldSum: event.entriesSoldSum,
   }
 
   return (

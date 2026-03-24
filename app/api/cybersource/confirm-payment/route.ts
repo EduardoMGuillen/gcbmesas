@@ -5,8 +5,10 @@ import { revalidatePath } from 'next/cache'
 import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
+import { Prisma } from '@prisma/client'
 import { CyberSourceApiError, cyberSourceGet, cyberSourcePost } from '@/lib/cybersource'
 import { cyberSourceDirectPaymentViaSdk, cyberSourceUnifiedPaymentViaSdk } from '@/lib/cybersource-sdk-direct'
+import { assertEventEntryCapacity } from '@/lib/actions'
 
 function maskMerchantId(merchantId: string | undefined) {
   if (!merchantId) return null
@@ -232,6 +234,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Evento no encontrado o sin precio online' }, { status: 404 })
     }
 
+    const qtyNeeded = Number(pendingDetails?.numberOfEntries || numberOfEntries)
+    try {
+      await assertEventEntryCapacity(event, qtyNeeded)
+    } catch (capErr: any) {
+      return NextResponse.json(
+        { error: capErr?.message || 'Sin cupo para este evento.' },
+        { status: 409 }
+      )
+    }
+
     const fallbackFullName = String(cardHolderName || names[0] || 'Cliente General').trim()
     const fallbackFirstName = fallbackFullName.split(' ')[0] || 'Cliente'
     const fallbackLastName = fallbackFullName.split(' ').slice(1).join(' ') || 'General'
@@ -356,23 +368,48 @@ export async function POST(req: NextRequest) {
       captureStatus = String((paymentResponse as any)?.captureStatus || status) || null
     }
 
-    const entries = []
-    for (let i = 0; i < Number(pendingDetails?.numberOfEntries || numberOfEntries); i++) {
-      const qrToken = generateToken()
-      const entryName = (names[i] || names[0]).trim()
-      const entry = await prisma.entry.create({
-        data: {
-          eventId: event.id,
-          clientName: entryName,
-          clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
-          clientPhone: String(pendingDetails?.clientPhone || '').trim() || null,
-          numberOfEntries: 1,
-          totalPrice: Number(event.coverPrice),
-          qrToken,
+    let entries: any[] = []
+    try {
+      entries = await prisma.$transaction(
+        async (tx) => {
+          await assertEventEntryCapacity(event, qtyNeeded, tx)
+          const created = []
+          for (let i = 0; i < qtyNeeded; i++) {
+            const qrToken = generateToken()
+            const entryName = (names[i] || names[0]).trim()
+            const entry = await tx.entry.create({
+              data: {
+                eventId: event.id,
+                clientName: entryName,
+                clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+                clientPhone: String(pendingDetails?.clientPhone || '').trim() || null,
+                numberOfEntries: 1,
+                totalPrice: Number(event.coverPrice),
+                qrToken,
+              },
+              include: { event: true },
+            })
+            created.push(entry)
+          }
+          return created
         },
-        include: { event: true },
-      })
-      entries.push(entry)
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 5000,
+          timeout: 15000,
+        }
+      )
+    } catch (txErr: any) {
+      console.error('[CyberSource] Entry creation failed after successful payment:', txErr)
+      return NextResponse.json(
+        {
+          error:
+            txErr?.message?.includes('Cupo') || txErr?.message?.includes('disponible')
+              ? txErr.message
+              : 'No se pudieron emitir las entradas. Contacta soporte con tu referencia de pago.',
+        },
+        { status: 409 }
+      )
     }
 
     await prisma.log.create({

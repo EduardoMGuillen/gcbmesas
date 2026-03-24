@@ -2053,9 +2053,12 @@ export async function createEvent(data: {
   description?: string
   coverImage?: string
   paypalPrice?: number
+  maxEntries?: number | null
 }) {
   const user = await getCurrentUser()
   ensureEntradasAdminOnly(user.role)
+
+  const maxEntries = normalizeMaxEntriesInput(data.maxEntries)
 
   const event = await prisma.event.create({
     data: {
@@ -2065,6 +2068,7 @@ export async function createEvent(data: {
       description: data.description || null,
       coverImage: data.coverImage || null,
       paypalPrice: data.paypalPrice || null,
+      ...(maxEntries !== undefined ? { maxEntries } : {}),
       createdByUserId: user.id,
     },
   })
@@ -2094,7 +2098,16 @@ export async function getEvents(onlyActive = false) {
 
 export async function updateEvent(
   id: string,
-  data: { name?: string; date?: string; coverPrice?: number; isActive?: boolean; description?: string; coverImage?: string; paypalPrice?: number }
+  data: {
+    name?: string
+    date?: string
+    coverPrice?: number
+    isActive?: boolean
+    description?: string
+    coverImage?: string
+    paypalPrice?: number
+    maxEntries?: number | null
+  }
 ) {
   const user = await getCurrentUser()
   ensureEntradasAdminOnly(user.role)
@@ -2107,6 +2120,16 @@ export async function updateEvent(
   if (data.description !== undefined) updateData.description = data.description || null
   if (data.coverImage !== undefined) updateData.coverImage = data.coverImage || null
   if (data.paypalPrice !== undefined) updateData.paypalPrice = data.paypalPrice || null
+  if (data.maxEntries !== undefined) {
+    const next = normalizeMaxEntriesInput(data.maxEntries)
+    updateData.maxEntries = next
+    if (next != null && next >= 1) {
+      const sold = await getEventSoldEntriesCount(id)
+      if (next < sold) {
+        throw new Error(`El límite no puede ser menor a las entradas ya vendidas (${sold}).`)
+      }
+    }
+  }
 
   const event = await prisma.event.update({
     where: { id },
@@ -2144,6 +2167,41 @@ export async function deleteEvent(id: string) {
 
 // ========== ENTRY ACTIONS ==========
 
+type PrismaDbClient = typeof prisma | Prisma.TransactionClient
+
+export async function getEventSoldEntriesCount(eventId: string, db: PrismaDbClient = prisma): Promise<number> {
+  const agg = await db.entry.aggregate({
+    where: { eventId, status: { not: 'CANCELLED' } },
+    _sum: { numberOfEntries: true },
+  })
+  return Number(agg._sum.numberOfEntries ?? 0)
+}
+
+/** null/<1 en maxEntries = sin límite. */
+export async function assertEventEntryCapacity(
+  event: { id: string; maxEntries: number | null },
+  additionalEntries: number,
+  db: PrismaDbClient = prisma
+): Promise<void> {
+  if (event.maxEntries == null || event.maxEntries < 1) return
+  const sold = await getEventSoldEntriesCount(event.id, db)
+  const remaining = event.maxEntries - sold
+  if (additionalEntries > remaining) {
+    throw new Error(
+      remaining <= 0
+        ? 'Cupo de entradas agotado para este evento.'
+        : `Solo quedan ${remaining} entrada(s) disponible(s) para este evento.`
+    )
+  }
+}
+
+function normalizeMaxEntriesInput(value: number | null | undefined): number | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  if (!Number.isFinite(value) || value < 1) return null
+  return Math.floor(value)
+}
+
 function generateQRToken(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   let token = ''
@@ -2173,34 +2231,42 @@ export async function createEntry(data: {
 
   const totalPrice = Number(event.coverPrice) * data.numberOfEntries
 
-  // Generate unique QR token
-  let qrToken = generateQRToken()
-  let attempts = 0
-  while (attempts < 10) {
-    const existing = await prisma.entry.findUnique({
-      where: { qrToken },
-      select: { id: true },
-    })
-    if (!existing) break
-    qrToken = generateQRToken()
-    attempts++
-  }
-
-  const entry = await prisma.entry.create({
-    data: {
-      eventId: data.eventId,
-      clientName: data.clientName,
-      clientEmail: data.clientEmail,
-      clientPhone: data.clientPhone?.trim() || null,
-      numberOfEntries: data.numberOfEntries,
-      totalPrice,
-      qrToken,
-      createdByUserId: user.id,
+  const entry = await prisma.$transaction(
+    async (tx) => {
+      await assertEventEntryCapacity(event, data.numberOfEntries, tx)
+      let qrToken = generateQRToken()
+      let attempts = 0
+      while (attempts < 10) {
+        const existing = await tx.entry.findUnique({
+          where: { qrToken },
+          select: { id: true },
+        })
+        if (!existing) break
+        qrToken = generateQRToken()
+        attempts++
+      }
+      return tx.entry.create({
+        data: {
+          eventId: data.eventId,
+          clientName: data.clientName,
+          clientEmail: data.clientEmail,
+          clientPhone: data.clientPhone?.trim() || null,
+          numberOfEntries: data.numberOfEntries,
+          totalPrice,
+          qrToken,
+          createdByUserId: user.id,
+        },
+        include: {
+          event: true,
+        },
+      })
     },
-    include: {
-      event: true,
-    },
-  })
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5000,
+      timeout: 15000,
+    }
+  )
 
   await createLog('ENTRY_SOLD', user.id, undefined, {
     entryId: entry.id,
@@ -2232,39 +2298,50 @@ export async function createBulkEntries(data: {
   if (!event.isActive) throw new Error('Este evento no está activo')
 
   const pricePerEntry = Number(event.coverPrice)
-  const entries = []
+  const qty = data.guestNames.length
 
-  for (const guestName of data.guestNames) {
-    let qrToken = generateQRToken()
-    let attempts = 0
-    while (attempts < 10) {
-      const existing = await prisma.entry.findUnique({
-        where: { qrToken },
-        select: { id: true },
-      })
-      if (!existing) break
-      qrToken = generateQRToken()
-      attempts++
+  const entries = await prisma.$transaction(
+    async (tx) => {
+      await assertEventEntryCapacity(event, qty, tx)
+      const created = []
+      for (const guestName of data.guestNames) {
+        let qrToken = generateQRToken()
+        let attempts = 0
+        while (attempts < 10) {
+          const existing = await tx.entry.findUnique({
+            where: { qrToken },
+            select: { id: true },
+          })
+          if (!existing) break
+          qrToken = generateQRToken()
+          attempts++
+        }
+
+        const entry = await tx.entry.create({
+          data: {
+            eventId: data.eventId,
+            clientName: guestName.trim(),
+            clientEmail: data.clientEmail.trim(),
+            clientPhone: data.clientPhone?.trim() || null,
+            numberOfEntries: 1,
+            totalPrice: pricePerEntry,
+            qrToken,
+            createdByUserId: user.id,
+          },
+          include: {
+            event: true,
+          },
+        })
+        created.push(entry)
+      }
+      return created
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5000,
+      timeout: 15000,
     }
-
-    const entry = await prisma.entry.create({
-      data: {
-        eventId: data.eventId,
-        clientName: guestName.trim(),
-        clientEmail: data.clientEmail.trim(),
-        clientPhone: data.clientPhone?.trim() || null,
-        numberOfEntries: 1,
-        totalPrice: pricePerEntry,
-        qrToken,
-        createdByUserId: user.id,
-      },
-      include: {
-        event: true,
-      },
-    })
-
-    entries.push(entry)
-  }
+  )
 
   await createLog('ENTRY_SOLD', user.id, undefined, {
     eventId: data.eventId,
@@ -2309,7 +2386,7 @@ export async function getEntradasDashboardData() {
   const user = await getCurrentUser()
   ensureEntradasAdminOnly(user.role)
 
-  const [events, recentEntries, todayStats] = await Promise.all([
+  const [events, recentEntries, todayStats, soldByEvent] = await Promise.all([
     prisma.event.findMany({
       orderBy: { date: 'desc' },
       include: {
@@ -2335,13 +2412,23 @@ export async function getEntradasDashboardData() {
       _sum: { totalPrice: true, numberOfEntries: true },
       _count: true,
     }),
+    prisma.entry.groupBy({
+      by: ['eventId'],
+      where: { status: { not: 'CANCELLED' } },
+      _sum: { numberOfEntries: true },
+    }),
   ])
+
+  const soldMap = new Map(
+    soldByEvent.map((r) => [r.eventId, Number(r._sum.numberOfEntries ?? 0)])
+  )
 
   return {
     events: events.map((e: any) => ({
       ...e,
       coverPrice: Number(e.coverPrice),
       paypalPrice: e.paypalPrice ? Number(e.paypalPrice) : null,
+      entriesSoldSum: soldMap.get(e.id) ?? 0,
     })),
     recentEntries: recentEntries.map((e: any) => ({
       ...e,
@@ -2562,7 +2649,7 @@ export async function getPublicEvents() {
 }
 
 export async function getPublicEventById(id: string) {
-  return prisma.event.findFirst({
+  const event = await prisma.event.findFirst({
     where: { id, isActive: true },
     select: {
       id: true,
@@ -2572,8 +2659,12 @@ export async function getPublicEventById(id: string) {
       coverImage: true,
       coverPrice: true,
       paypalPrice: true,
+      maxEntries: true,
     },
   })
+  if (!event) return null
+  const entriesSoldSum = await getEventSoldEntriesCount(event.id)
+  return { ...event, entriesSoldSum }
 }
 
 export async function createPublicEntry(data: {
@@ -2590,32 +2681,43 @@ export async function createPublicEntry(data: {
   if (!event.paypalPrice) throw new Error('Este evento no acepta pagos en línea')
 
   const totalPrice = Number(event.paypalPrice) * data.numberOfEntries
-  const entries = []
 
-  for (let i = 0; i < data.numberOfEntries; i++) {
-    let qrToken = generateQRToken()
-    let attempts = 0
-    while (attempts < 10) {
-      const existing = await prisma.entry.findUnique({ where: { qrToken }, select: { id: true } })
-      if (!existing) break
-      qrToken = generateQRToken()
-      attempts++
+  const entries = await prisma.$transaction(
+    async (tx) => {
+      await assertEventEntryCapacity(event, data.numberOfEntries, tx)
+      const created = []
+      for (let i = 0; i < data.numberOfEntries; i++) {
+        let qrToken = generateQRToken()
+        let attempts = 0
+        while (attempts < 10) {
+          const existing = await tx.entry.findUnique({ where: { qrToken }, select: { id: true } })
+          if (!existing) break
+          qrToken = generateQRToken()
+          attempts++
+        }
+
+        const entry = await tx.entry.create({
+          data: {
+            eventId: data.eventId,
+            clientName: data.clientName.trim(),
+            clientEmail: data.clientEmail.trim(),
+            clientPhone: data.clientPhone?.trim() || null,
+            numberOfEntries: 1,
+            totalPrice: Number(event.coverPrice),
+            qrToken,
+          },
+          include: { event: true },
+        })
+        created.push(entry)
+      }
+      return created
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5000,
+      timeout: 15000,
     }
-
-    const entry = await prisma.entry.create({
-      data: {
-        eventId: data.eventId,
-        clientName: data.clientName.trim(),
-        clientEmail: data.clientEmail.trim(),
-        clientPhone: data.clientPhone?.trim() || null,
-        numberOfEntries: 1,
-        totalPrice: Number(event.coverPrice),
-        qrToken,
-      },
-      include: { event: true },
-    })
-    entries.push(entry)
-  }
+  )
 
   await prisma.log.create({
     data: {

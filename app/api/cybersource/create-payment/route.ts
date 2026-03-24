@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { CyberSourceApiError, cyberSourcePost } from '@/lib/cybersource'
+import { assertEventEntryCapacity } from '@/lib/actions'
 
 function parseJwtPayload(token: string) {
   try {
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     const event = await prisma.event.findFirst({
       where: { id: eventId, isActive: true },
-      select: { id: true, name: true, paypalPrice: true },
+      select: { id: true, name: true, paypalPrice: true, maxEntries: true },
     })
 
     if (!event) {
@@ -35,6 +36,15 @@ export async function POST(req: NextRequest) {
     }
     if (!event.paypalPrice) {
       return NextResponse.json({ error: 'Este evento no acepta pagos en línea' }, { status: 400 })
+    }
+
+    try {
+      await assertEventEntryCapacity(event, Number(numberOfEntries))
+    } catch (capErr: any) {
+      return NextResponse.json(
+        { error: capErr?.message || 'Sin cupo para este evento.' },
+        { status: 409 }
+      )
     }
 
     const cleanNames = clientNames
