@@ -42,6 +42,11 @@ function getRunEnvironmentHost() {
   return env === 'live' ? 'api.cybersource.com' : 'apitest.cybersource.com'
 }
 
+/** orderInformation.amountDetails: total unchanged; explicit zero tax for acquirer/reporting. */
+function csAmountDetails(totalAmount: string, currency: string) {
+  return { totalAmount, currency, taxAmount: '0.00' }
+}
+
 export async function cyberSourceDirectPaymentViaSdk(params: DirectPaymentParams): Promise<any> {
   const merchantId = process.env.CYBERSOURCE_MERCHANT_ID?.trim()
   const keyId = process.env.CYBERSOURCE_KEY_ID?.trim()
@@ -81,10 +86,7 @@ export async function cyberSourceDirectPaymentViaSdk(params: DirectPaymentParams
     },
   }
   requestObj.orderInformation = {
-    amountDetails: {
-      totalAmount: params.amount,
-      currency: params.currency,
-    },
+    amountDetails: csAmountDetails(params.amount, params.currency),
     billTo: {
       firstName: params.cardHolderName.trim().split(' ')[0] || 'John',
       lastName: params.cardHolderName.trim().split(' ').slice(1).join(' ') || 'Doe',
@@ -207,10 +209,7 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
   // billTo triggers country validation on the payments endpoint in some environments.
   // The card/billing data is already embedded in the Microform transient token.
   requestObj.orderInformation = {
-    amountDetails: {
-      totalAmount: params.amount,
-      currency: params.currency,
-    },
+    amountDetails: csAmountDetails(params.amount, params.currency),
   }
 
   const paymentsApi = new sdk.PaymentsApi(configObject, apiClient)
@@ -236,7 +235,7 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
   const captureRequestObj = new sdk.CapturePaymentRequest()
   captureRequestObj.clientReferenceInformation = { code: `${params.paymentReference}-CAP` }
   captureRequestObj.orderInformation = {
-    amountDetails: { totalAmount: params.amount, currency: params.currency },
+    amountDetails: csAmountDetails(params.amount, params.currency),
   }
 
   const captureApi = new sdk.CaptureApi(configObject, new sdk.ApiClient())
@@ -343,7 +342,7 @@ export async function cyberSourcePayerAuthSetupViaSdk(params: PayerAuthSetupPara
   // Setup only needs amount to initiate device fingerprinting; billTo is for enrollment.
   // Sending billTo here triggers country validation on the risk endpoint and can cause 400.
   requestObj.orderInformation = {
-    amountDetails: { totalAmount: params.amount, currency: params.currency },
+    amountDetails: csAmountDetails(params.amount, params.currency),
   }
   if (params.cardType) {
     requestObj.paymentInformation = { card: { type: params.cardType } }
@@ -374,7 +373,7 @@ export async function cyberSourcePayerAuthEnrollViaSdk(params: PayerAuthEnrollPa
   // billTo triggers country validation on the risk endpoint → 400 for some countries.
   // The billing address is sent separately in the payment authorization step.
   requestObj.orderInformation = {
-    amountDetails: { totalAmount: params.amount, currency: params.currency },
+    amountDetails: csAmountDetails(params.amount, params.currency),
   }
   if (params.cardType) {
     requestObj.paymentInformation = { card: { type: params.cardType } }

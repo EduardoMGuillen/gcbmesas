@@ -323,7 +323,7 @@ export async function POST(req: NextRequest) {
       const captureResponse = await cyberSourcePost<any>(`/pts/v2/payments/${transactionId}/captures`, {
         clientReferenceInformation: { code: `${paymentReference}-CAPTURE` },
         orderInformation: {
-          amountDetails: { totalAmount: amountToCapture, currency },
+          amountDetails: { totalAmount: amountToCapture, currency, taxAmount: '0.00' },
         },
       })
       captureId = String(captureResponse?.id || '') || null
