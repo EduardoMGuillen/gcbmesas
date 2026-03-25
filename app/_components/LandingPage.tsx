@@ -302,34 +302,6 @@ export default function LandingPage({ events }: LandingPageProps) {
           to   { opacity: 1; transform: translateY(0); }
         }
         .fade-up { animation: fadeUp 0.7s ease both; }
-        /* Video */
-        .video-card {
-          border-radius: 18px;
-          overflow: hidden;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: #000;
-          aspect-ratio: 16/9;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-        }
-        .video-card video {
-          width: 100%; height: 100%;
-          object-fit: cover;
-        }
-        .videos-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1.5rem;
-        }
-        @media (max-width: 700px) {
-          .videos-grid {
-            grid-template-columns: 1fr;
-            gap: 1.25rem;
-          }
-          .video-card {
-            aspect-ratio: 16/9;
-            border-radius: 14px;
-          }
-        }
         /* Hours card */
         .hours-card {
           background: rgba(255,255,255,0.04);
@@ -449,24 +421,6 @@ export default function LandingPage({ events }: LandingPageProps) {
                   <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
                 </a>
               </div>
-            </div>
-          </section>
-
-          {/* ─── VIDEOS ────────────────────────────────── */}
-          <section style={{ padding: '5rem 1.5rem', maxWidth: 1200, margin: '0 auto' }}>
-            <h2 className="section-title">NUESTROS VIDEOS</h2>
-            <div className="videos-grid">
-              {[
-                '/Reels/video1.mp4',
-                '/Reels/video2.mp4',
-                '/Reels/video3.mp4',
-              ].map((src, i) => (
-                <div key={i} className="video-card">
-                  <video autoPlay muted loop playsInline>
-                    <source src={src} type="video/mp4" />
-                  </video>
-                </div>
-              ))}
             </div>
           </section>
 
