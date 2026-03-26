@@ -6,6 +6,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
 import { LogAction } from '@prisma/client'
 import { Prisma } from '@prisma/client'
+import { CyberSourceApiError } from './cybersource'
+import {
+  findOnlineSaleLogForEntry,
+  perEntryRefundAmount,
+  refundCyberSourceCaptureForEntry,
+} from './cybersource-refund'
 
 // Helper to create log
 async function createLog(
@@ -2571,10 +2577,116 @@ export async function cancelEntry(entryId: string) {
 
   if (!entry) throw new Error('Entrada no encontrada')
   if (entry.status === 'USED') throw new Error('No se puede cancelar una entrada ya utilizada')
+  if (entry.status === 'CANCELLED') throw new Error('Esta entrada ya fue cancelada')
 
-  await prisma.entry.update({
-    where: { id: entryId },
-    data: { status: 'CANCELLED' },
+  const saleLog = await findOnlineSaleLogForEntry(entryId)
+
+  if (!saleLog) {
+    await prisma.entry.update({
+      where: { id: entryId },
+      data: { status: 'CANCELLED' },
+    })
+    revalidatePath('/admin/entradas')
+    return
+  }
+
+  const details =
+    saleLog.details && typeof saleLog.details === 'object'
+      ? (saleLog.details as Record<string, unknown>)
+      : {}
+  const entryIds = details.entryIds as string[] | undefined
+  if (!entryIds?.length) {
+    throw new Error(
+      'Esta venta online no tiene datos de reembolso automático (ventas anteriores). Reembolsa manualmente en CyberSource o contacta soporte.'
+    )
+  }
+
+  const priorRefunds = (details.cybersourceRefundEvents as Array<{ entryId: string }> | undefined) || []
+  if (priorRefunds.some((r) => r.entryId === entryId)) {
+    throw new Error('Esta entrada ya tiene un reembolso registrado.')
+  }
+
+  const idx = entryIds.indexOf(entryId)
+  if (idx < 0) {
+    throw new Error('Inconsistencia entre la entrada y el registro de venta. Contacta soporte.')
+  }
+
+  const isMock =
+    process.env.CYBERSOURCE_MOCK === 'true' ||
+    String(details.cybersourceTransactionId || '').startsWith('mock_')
+
+  const captureId = String(details.cybersourceCaptureId || '').trim()
+  if (!isMock && !captureId) {
+    throw new Error(
+      'No hay ID de captura de CyberSource para esta venta. No se puede reembolsar de forma automática.'
+    )
+  }
+
+  const totalPrice = Number(details.totalPrice ?? 0)
+  const refundAmountStr = perEntryRefundAmount(totalPrice, idx, entryIds.length)
+  const currency = String(details.currency || 'HNL')
+  const paymentReference = String(details.paymentReference || 'ref')
+
+  let refundResponse: { id?: string; status?: string }
+
+  try {
+    if (isMock) {
+      refundResponse = { id: `mock_refund_${entryId}`, status: 'PENDING' }
+    } else {
+      refundResponse = await refundCyberSourceCaptureForEntry({
+        captureId,
+        currency,
+        refundAmount: refundAmountStr,
+        paymentReference,
+        entryId,
+      })
+    }
+  } catch (e) {
+    if (e instanceof CyberSourceApiError) {
+      const reason =
+        typeof e.responseBody === 'string'
+          ? e.responseBody
+          : (e.responseBody as any)?.errorInformation?.reason ||
+            (e.responseBody as any)?.message ||
+            e.message
+      throw new Error(`CyberSource no pudo procesar el reembolso (${e.status}): ${reason}`)
+    }
+    throw e
+  }
+
+  const refundId = String(refundResponse?.id || '')
+  const newEvent = {
+    entryId,
+    refundId,
+    amount: refundAmountStr,
+    at: new Date().toISOString(),
+    status: String(refundResponse?.status || 'OK'),
+  }
+
+  const nextRefundEvents = [...priorRefunds, newEvent]
+
+  await prisma.$transaction([
+    prisma.log.update({
+      where: { id: saleLog.id },
+      data: {
+        details: {
+          ...details,
+          cybersourceRefundEvents: nextRefundEvents,
+        } as Prisma.InputJsonValue,
+      },
+    }),
+    prisma.entry.update({
+      where: { id: entryId },
+      data: { status: 'CANCELLED' },
+    }),
+  ])
+
+  await createLog('PAYMENT_REFUNDED', user.id, undefined, {
+    entryId,
+    saleLogId: saleLog.id,
+    paymentReference,
+    refundAmount: refundAmountStr,
+    refundId,
   })
 
   revalidatePath('/admin/entradas')
