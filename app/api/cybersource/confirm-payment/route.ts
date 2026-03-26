@@ -424,6 +424,7 @@ export async function POST(req: NextRequest) {
           paymentReference,
           source: 'online_cybersource',
           currency,
+          entryIds: entries.map((e: { id: string }) => e.id),
           cybersourceDecision: status,
           cybersourceReasonCode: reasonCode,
           cybersourceTransactionId: transactionId || null,
