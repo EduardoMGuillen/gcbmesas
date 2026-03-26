@@ -73,10 +73,10 @@ export default function LandingPage({ events }: LandingPageProps) {
           scaleMobile: 1.0,
           color: 0xffffff,
           backgroundColor: 0x0a0015,
-          points: 12.0,
-          maxDistance: 22.0,
-          spacing: 20.0,
-          showDots: true,
+          points: 7.0,
+          maxDistance: 18.0,
+          spacing: 28.0,
+          showDots: false,
         })
       }
     }
