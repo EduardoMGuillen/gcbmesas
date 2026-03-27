@@ -6,7 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
 import { LogAction } from '@prisma/client'
 import { Prisma } from '@prisma/client'
-import { CyberSourceApiError } from './cybersource'
+import { CyberSourceApiError, getCyberSourceEnvLabel } from './cybersource'
 import {
   findOnlineSaleLogForEntry,
   perEntryRefundAmount,
@@ -2613,6 +2613,7 @@ async function persistRefundFailureAuditLog(params: {
       paymentReference: params.paymentReference,
       refundAmount: params.refundAmount,
       at: new Date().toISOString(),
+      cybersourceEnv: getCyberSourceEnvLabel(),
     }
     if (params.captureId) {
       details.captureIdPrefix = `${params.captureId.slice(0, 8)}…`
@@ -2627,6 +2628,10 @@ async function persistRefundFailureAuditLog(params: {
         typeof err.responseBody === 'string'
           ? err.responseBody.slice(0, 2000)
           : JSON.stringify(err.responseBody ?? {}).slice(0, 2000)
+      if (err.status === 404) {
+        details.refund404Hint =
+          '404 con id correcto suele ser entorno (CYBERSOURCE_ENV=test vs venta en live) o credenciales de otro merchant. Debe coincidir con Business Center.'
+      }
     } else if (err instanceof Error) {
       details.errorMessage = err.message
       details.errorName = err.name
