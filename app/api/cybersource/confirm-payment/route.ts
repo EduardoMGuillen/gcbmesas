@@ -363,9 +363,8 @@ export async function POST(req: NextRequest) {
         )
       }
     } else if (!isMockMode && !isDirectMode && transactionId) {
-      // Unified: SDK fusiona captureId; si falta, transactionId mantiene la venta y el reembolso resuelve el id correcto.
-      captureId =
-        String((paymentResponse as any)?.captureId || transactionId || '').trim() || null
+      // Unified mode: SDK already did auth + capture internally, results are in paymentResponse
+      captureId = String((paymentResponse as any)?.captureId || transactionId) || null
       captureStatus = String((paymentResponse as any)?.captureStatus || status) || null
     }
 
