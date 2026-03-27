@@ -171,6 +171,85 @@ function isNotFound(e: unknown): boolean {
   return e instanceof CyberSourceApiError && e.status === 404
 }
 
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+/** Valor entre comillas para la query TSS (evita que `-` u otros caracteres rompan el filtro). */
+function tssQueryValueForCode(ref: string): string {
+  const t = ref.trim()
+  if (!t) return '""'
+  return `"${t.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+}
+
+function splitTransactionSummaries(data: unknown): unknown[] {
+  const emb = (data as { _embedded?: { transactionSummaries?: unknown[] } })?._embedded
+  const arr = emb?.transactionSummaries
+  return Array.isArray(arr) ? arr : []
+}
+
+function extractIdsFromSummaries(summaries: unknown[]): string[] {
+  const out: string[] = []
+  for (const row of summaries) {
+    if (!row || typeof row !== 'object') continue
+    const id = typeof (row as { id?: unknown }).id === 'string' ? (row as { id: string }).id.trim() : ''
+    if (id) out.push(id)
+  }
+  return out
+}
+
+/**
+ * POST /tss/v2/searches; si hay searchId pero aún no hay resultados, hace poll con GET /tss/v2/searches/{searchId}.
+ * Documentación: Transaction Search (query filters en clientReferenceInformation.code).
+ */
+async function runTssSearch(query: string): Promise<string[]> {
+  const body = {
+    save: false,
+    timezone: 'UTC',
+    offset: 0,
+    limit: 50,
+    sort: 'submitTimeUtc:desc',
+    query,
+  }
+  try {
+    let data = await cyberSourcePost<unknown>('/tss/v2/searches', body)
+    let summaries = splitTransactionSummaries(data)
+    const searchId =
+      typeof (data as { searchId?: unknown })?.searchId === 'string'
+        ? String((data as { searchId: string }).searchId).trim()
+        : ''
+    if (summaries.length === 0 && searchId) {
+      for (let i = 0; i < 12; i++) {
+        await sleepMs(400)
+        data = await cyberSourceGet<unknown>(`/tss/v2/searches/${encodeURIComponent(searchId)}`)
+        summaries = splitTransactionSummaries(data)
+        if (summaries.length > 0) break
+      }
+    }
+    return uniqueStrings(extractIdsFromSummaries(summaries))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Resuelve IDs de transacción conocidos por CyberSource a partir del paymentReference del log:
+ * cobro principal, captura unified SDK (-CAP) y captura direct (-CAPTURE).
+ */
+async function searchTssTransactionIdsByPaymentReference(paymentReference: string): Promise<string[]> {
+  const ref = paymentReference.trim()
+  if (!ref) return []
+  const qCap = `clientReferenceInformation.code:${tssQueryValueForCode(`${ref}-CAP`)}`
+  const qCapture = `clientReferenceInformation.code:${tssQueryValueForCode(`${ref}-CAPTURE`)}`
+  const qMain = `clientReferenceInformation.code:${tssQueryValueForCode(ref)}`
+  const [capIds, captureIds, mainIds] = await Promise.all([
+    runTssSearch(qCap),
+    runTssSearch(qCapture),
+    runTssSearch(qMain),
+  ])
+  return uniqueStrings([...capIds, ...captureIds, ...mainIds])
+}
+
 async function tryAllCaptureThenPayment(
   captureCandidates: string[],
   paymentCandidates: string[],
@@ -203,7 +282,7 @@ async function tryAllCaptureThenPayment(
 
 /**
  * 1) Un solo intento con captureId del log (rápido si es correcto).
- * 2) Si 404: GET /payments y TSS para extraer ids de captura; reintenta captura y luego /payments/refunds.
+ * 2) Si 404: búsqueda TSS por clientReference (ref, -CAP, -CAPTURE), GET /payments y TSS por id; reintenta captura y luego /payments/refunds.
  */
 export async function refundCyberSourceCaptureForEntry(params: {
   captureId: string
@@ -233,9 +312,12 @@ export async function refundCyberSourceCaptureForEntry(params: {
       throw firstErr
     }
 
-    const hints = await collectCaptureIdHints(paymentTx, captureId)
-    const captureCandidates = uniqueStrings([...hints, captureId])
-    const paymentCandidates = uniqueStrings([paymentTx, captureId])
+    const [tssIds, hints] = await Promise.all([
+      searchTssTransactionIdsByPaymentReference(params.paymentReference),
+      collectCaptureIdHints(paymentTx, captureId),
+    ])
+    const captureCandidates = uniqueStrings([...tssIds, ...hints, captureId])
+    const paymentCandidates = uniqueStrings([...tssIds, paymentTx, captureId])
 
     return tryAllCaptureThenPayment(captureCandidates, paymentCandidates, makeBody)
   }
