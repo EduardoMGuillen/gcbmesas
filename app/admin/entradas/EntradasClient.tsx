@@ -1247,7 +1247,13 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
     if (!confirm('¿Cancelar esta entrada?')) return
     setError(''); setActionMsg('')
     startTransition(async () => {
-      try { await cancelEntry(entryId); setActionMsg('Entrada cancelada'); router.refresh() } catch (err: any) { setError(err.message) }
+      const result = await cancelEntry(entryId)
+      if (!result.ok) {
+        setError(result.message)
+        return
+      }
+      setActionMsg('Entrada cancelada')
+      router.refresh()
     })
   }
 

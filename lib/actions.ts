@@ -2429,27 +2429,53 @@ export async function getEntradasDashboardData() {
     soldByEvent.map((r) => [r.eventId, Number(r._sum.numberOfEntries ?? 0)])
   )
 
-  return {
+  const payload = {
     events: events.map((e: any) => ({
-      ...e,
+      id: e.id,
+      name: e.name,
+      date: e.date,
+      description: e.description,
+      coverImage: e.coverImage,
       coverPrice: Number(e.coverPrice),
-      paypalPrice: e.paypalPrice ? Number(e.paypalPrice) : null,
+      paypalPrice: e.paypalPrice != null ? Number(e.paypalPrice) : null,
+      maxEntries: e.maxEntries,
+      isActive: e.isActive,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+      createdByUserId: e.createdByUserId,
+      _count: e._count,
+      createdBy: e.createdBy,
       entriesSoldSum: soldMap.get(e.id) ?? 0,
     })),
     recentEntries: recentEntries.map((e: any) => ({
-      ...e,
+      id: e.id,
+      eventId: e.eventId,
+      clientName: e.clientName,
+      clientEmail: e.clientEmail,
+      clientPhone: e.clientPhone,
+      numberOfEntries: e.numberOfEntries,
       totalPrice: Number(e.totalPrice),
+      qrToken: e.qrToken,
+      status: e.status,
+      emailSent: e.emailSent,
+      whatsappSent: e.whatsappSent,
+      createdAt: e.createdAt,
+      createdByUserId: e.createdByUserId,
       event: {
-        ...e.event,
+        name: e.event.name,
+        date: e.event.date,
         coverPrice: Number(e.event.coverPrice),
       },
+      createdBy: e.createdBy,
     })),
     todayStats: {
-      totalSales: Number(todayStats._sum.totalPrice || 0),
-      totalEntries: Number(todayStats._sum.numberOfEntries || 0),
+      totalSales: Number(todayStats._sum.totalPrice ?? 0),
+      totalEntries: Number(todayStats._sum.numberOfEntries ?? 0),
       totalTransactions: todayStats._count,
     },
   }
+
+  return JSON.parse(JSON.stringify(payload)) as typeof payload
 }
 
 const TAQUILLA_HISTORY_ROLES = ['ADMIN', 'TAQUILLA', 'MESERO', 'CAJERO'] as const
@@ -2567,147 +2593,171 @@ export async function revertEntryToActive(entryId: string) {
   revalidatePath('/admin/entradas')
 }
 
-export async function cancelEntry(entryId: string) {
-  const user = await getCurrentUser()
-  ensureEntradasAdminOnly(user.role)
+export type CancelEntryResult = { ok: true } | { ok: false; message: string }
 
-  const entry = await prisma.entry.findUnique({
-    where: { id: entryId },
-  })
-
-  if (!entry) throw new Error('Entrada no encontrada')
-  if (entry.status === 'USED') throw new Error('No se puede cancelar una entrada ya utilizada')
-  if (entry.status === 'CANCELLED') throw new Error('Esta entrada ya fue cancelada')
-
-  const saleLog = await findOnlineSaleLogForEntry(entryId)
-
-  if (!saleLog) {
-    await prisma.entry.update({
-      where: { id: entryId },
-      data: { status: 'CANCELLED' },
-    })
-    revalidatePath('/admin/entradas')
-    return
-  }
-
-  const details =
-    saleLog.details && typeof saleLog.details === 'object'
-      ? (saleLog.details as Record<string, unknown>)
-      : {}
-  const entryIds = details.entryIds as string[] | undefined
-  if (!entryIds?.length) {
-    throw new Error(
-      'Esta venta online no tiene datos de reembolso automático (ventas anteriores). Reembolsa manualmente en CyberSource o contacta soporte.'
-    )
-  }
-
-  const priorRefunds = Array.isArray(details.cybersourceRefundEvents)
-    ? (details.cybersourceRefundEvents as Array<{ entryId: string }>)
-    : []
-  if (priorRefunds.some((r) => r.entryId === entryId)) {
-    throw new Error('Esta entrada ya tiene un reembolso registrado.')
-  }
-
-  const idx = entryIds.indexOf(entryId)
-  if (idx < 0) {
-    throw new Error('Inconsistencia entre la entrada y el registro de venta. Contacta soporte.')
-  }
-
-  const isMock =
-    process.env.CYBERSOURCE_MOCK === 'true' ||
-    String(details.cybersourceTransactionId || '').startsWith('mock_')
-
-  const captureId = String(details.cybersourceCaptureId || '').trim()
-  if (!isMock && !captureId) {
-    throw new Error(
-      'No hay ID de captura de CyberSource para esta venta. No se puede reembolsar de forma automática.'
-    )
-  }
-
-  const totalPrice = Number(details.totalPrice ?? 0)
-  const refundAmountStr = perEntryRefundAmount(totalPrice, idx, entryIds.length)
-  const currency = String(details.currency || 'HNL')
-  const paymentReference = String(details.paymentReference || 'ref')
-
-  let refundResponse: { id?: string; status?: string }
-
+/** Devuelve resultado en lugar de lanzar: en producción las server actions que lanzan suelen mostrar digest genérico. */
+export async function cancelEntry(entryId: string): Promise<CancelEntryResult> {
   try {
-    if (isMock) {
-      refundResponse = { id: `mock_refund_${entryId}`, status: 'PENDING' }
-    } else {
-      refundResponse = await refundCyberSourceCaptureForEntry({
-        captureId,
-        currency,
-        refundAmount: refundAmountStr,
-        paymentReference,
-        entryId,
+    const user = await getCurrentUser()
+    ensureEntradasAdminOnly(user.role)
+
+    const entry = await prisma.entry.findUnique({
+      where: { id: entryId },
+    })
+
+    if (!entry) return { ok: false, message: 'Entrada no encontrada' }
+    if (entry.status === 'USED') return { ok: false, message: 'No se puede cancelar una entrada ya utilizada' }
+    if (entry.status === 'CANCELLED') return { ok: false, message: 'Esta entrada ya fue cancelada' }
+
+    const saleLog = await findOnlineSaleLogForEntry(entryId)
+
+    if (!saleLog) {
+      await prisma.entry.update({
+        where: { id: entryId },
+        data: { status: 'CANCELLED' },
       })
+      revalidatePath('/admin/entradas')
+      return { ok: true }
     }
-  } catch (e) {
-    if (e instanceof CyberSourceApiError) {
-      const reason =
-        typeof e.responseBody === 'string'
-          ? e.responseBody
-          : (e.responseBody as any)?.errorInformation?.reason ||
-            (e.responseBody as any)?.message ||
-            e.message
-      throw new Error(`CyberSource no pudo procesar el reembolso (${e.status}): ${reason}`)
+
+    const details =
+      saleLog.details && typeof saleLog.details === 'object'
+        ? (saleLog.details as Record<string, unknown>)
+        : {}
+    const entryIds = details.entryIds as string[] | undefined
+    if (!entryIds?.length) {
+      return {
+        ok: false,
+        message:
+          'Esta venta online no tiene datos de reembolso automático (ventas anteriores). Reembolsa manualmente en CyberSource o contacta soporte.',
+      }
     }
-    throw e
-  }
 
-  const refundId = String(refundResponse?.id || '')
-  const newEvent = {
-    entryId,
-    refundId,
-    amount: refundAmountStr,
-    at: new Date().toISOString(),
-    status: String(refundResponse?.status || 'OK'),
-  }
+    const priorRefunds = Array.isArray(details.cybersourceRefundEvents)
+      ? (details.cybersourceRefundEvents as Array<{ entryId: string }>)
+      : []
+    if (priorRefunds.some((r) => r.entryId === entryId)) {
+      return { ok: false, message: 'Esta entrada ya tiene un reembolso registrado.' }
+    }
 
-  const nextRefundEvents = [...priorRefunds, newEvent]
+    const idx = entryIds.indexOf(entryId)
+    if (idx < 0) {
+      return { ok: false, message: 'Inconsistencia entre la entrada y el registro de venta. Contacta soporte.' }
+    }
 
-  await prisma.$transaction([
-    prisma.log.update({
-      where: { id: saleLog.id },
-      data: {
-        details: {
-          ...details,
-          cybersourceRefundEvents: nextRefundEvents,
-        } as Prisma.InputJsonValue,
-      },
-    }),
-    prisma.entry.update({
-      where: { id: entryId },
-      data: { status: 'CANCELLED' },
-    }),
-  ])
+    const isMock =
+      process.env.CYBERSOURCE_MOCK === 'true' ||
+      String(details.cybersourceTransactionId || '').startsWith('mock_')
 
-  try {
-    await createLog('PAYMENT_REFUNDED', user.id, undefined, {
-      entryId,
-      saleLogId: saleLog.id,
-      paymentReference,
-      refundAmount: refundAmountStr,
-      refundId,
-    })
-  } catch (auditErr) {
-    console.error('[cancelEntry] Audit log PAYMENT_REFUNDED failed (¿migración enum en BD?)', auditErr)
+    const captureId = String(details.cybersourceCaptureId || '').trim()
+    if (!isMock && !captureId) {
+      return {
+        ok: false,
+        message:
+          'No hay ID de captura de CyberSource para esta venta. No se puede reembolsar de forma automática.',
+      }
+    }
+
+    const totalPrice = Number(details.totalPrice ?? 0)
+    const refundAmountStr = perEntryRefundAmount(totalPrice, idx, entryIds.length)
+    const currency = String(details.currency || 'HNL')
+    const paymentReference = String(details.paymentReference || 'ref')
+
+    let refundResponse: { id?: string; status?: string }
+
     try {
-      await createLog('EVENT_UPDATED', user.id, undefined, {
-        type: 'PAYMENT_REFUNDED',
+      if (isMock) {
+        refundResponse = { id: `mock_refund_${entryId}`, status: 'PENDING' }
+      } else {
+        refundResponse = await refundCyberSourceCaptureForEntry({
+          captureId,
+          currency,
+          refundAmount: refundAmountStr,
+          paymentReference,
+          entryId,
+        })
+      }
+    } catch (e) {
+      if (e instanceof CyberSourceApiError) {
+        const reason =
+          typeof e.responseBody === 'string'
+            ? e.responseBody
+            : (e.responseBody as any)?.errorInformation?.reason ||
+              (e.responseBody as any)?.message ||
+              e.message
+        return {
+          ok: false,
+          message: `CyberSource no pudo procesar el reembolso (${e.status}): ${reason}`,
+        }
+      }
+      throw e
+    }
+
+    const refundId = String(refundResponse?.id || '')
+    const newEvent = {
+      entryId,
+      refundId,
+      amount: refundAmountStr,
+      at: new Date().toISOString(),
+      status: String(refundResponse?.status || 'OK'),
+    }
+
+    const nextRefundEvents = [...priorRefunds, newEvent]
+
+    const mergedDetails = JSON.parse(
+      JSON.stringify({
+        ...details,
+        cybersourceRefundEvents: nextRefundEvents,
+      })
+    ) as Prisma.InputJsonValue
+
+    await prisma.$transaction([
+      prisma.log.update({
+        where: { id: saleLog.id },
+        data: { details: mergedDetails },
+      }),
+      prisma.entry.update({
+        where: { id: entryId },
+        data: { status: 'CANCELLED' },
+      }),
+    ])
+
+    try {
+      await createLog('PAYMENT_REFUNDED', user.id, undefined, {
         entryId,
         saleLogId: saleLog.id,
         paymentReference,
         refundAmount: refundAmountStr,
         refundId,
       })
-    } catch (fallbackErr) {
-      console.error('[cancelEntry] Fallback audit log failed', fallbackErr)
+    } catch (auditErr) {
+      console.error('[cancelEntry] Audit log PAYMENT_REFUNDED failed (¿migración enum en BD?)', auditErr)
+      try {
+        await createLog('EVENT_UPDATED', user.id, undefined, {
+          type: 'PAYMENT_REFUNDED',
+          entryId,
+          saleLogId: saleLog.id,
+          paymentReference,
+          refundAmount: refundAmountStr,
+          refundId,
+        })
+      } catch (fallbackErr) {
+        console.error('[cancelEntry] Fallback audit log failed', fallbackErr)
+      }
     }
-  }
 
-  revalidatePath('/admin/entradas')
+    revalidatePath('/admin/entradas')
+    return { ok: true }
+  } catch (e: unknown) {
+    const message =
+      e instanceof Error
+        ? e.message
+        : typeof e === 'string'
+          ? e
+          : 'No se pudo cancelar la entrada. Intenta de nuevo.'
+    console.error('[cancelEntry] failed', e)
+    return { ok: false, message }
+  }
 }
 
 export async function validateEntryByToken(token: string) {
