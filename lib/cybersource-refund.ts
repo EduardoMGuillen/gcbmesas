@@ -166,6 +166,13 @@ function uniqueStrings(ids: (string | undefined | null)[]): string[] {
   return out
 }
 
+/** El id de POST /payments (autorización) no es un recurso /captures/{id}; quitarlo de candidatos de reembolso. */
+function excludeAuthPaymentIdFromCaptureCandidates(ids: string[], paymentTx: string): string[] {
+  const p = paymentTx.trim()
+  if (!p) return ids
+  return ids.filter((id) => id.trim() !== p)
+}
+
 async function collectCaptureIdHints(paymentTx: string, captureId: string): Promise<string[]> {
   const hints: string[] = []
   const [dPay, dCap, tPay, tCap] = await Promise.all([
@@ -354,7 +361,8 @@ export async function refundCyberSourceCaptureForEntry(params: {
     })
 
   const hintsFirst = await collectCaptureIdHints(paymentTx, captureId)
-  const firstCandidates = uniqueStrings([...hintsFirst, captureId])
+  const hinted = excludeAuthPaymentIdFromCaptureCandidates(hintsFirst, paymentTx)
+  const firstCandidates = uniqueStrings([captureId, ...hinted])
 
   try {
     return await cyberSourcePost<RefundResp>(pathCaptureRefund(firstCandidates[0] || captureId), makeBody())
@@ -364,7 +372,8 @@ export async function refundCyberSourceCaptureForEntry(params: {
     }
 
     const tssIds = await searchTssTransactionIdsByPaymentReference(params.paymentReference)
-    const captureCandidates = uniqueStrings([...hintsFirst, ...tssIds, captureId])
+    const tssFiltered = excludeAuthPaymentIdFromCaptureCandidates(tssIds, paymentTx)
+    const captureCandidates = uniqueStrings([captureId, ...hinted, ...tssFiltered])
 
     return tryAllCaptureRefunds(captureCandidates, makeBody)
   }
