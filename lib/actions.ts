@@ -2601,7 +2601,9 @@ export async function cancelEntry(entryId: string) {
     )
   }
 
-  const priorRefunds = (details.cybersourceRefundEvents as Array<{ entryId: string }> | undefined) || []
+  const priorRefunds = Array.isArray(details.cybersourceRefundEvents)
+    ? (details.cybersourceRefundEvents as Array<{ entryId: string }>)
+    : []
   if (priorRefunds.some((r) => r.entryId === entryId)) {
     throw new Error('Esta entrada ya tiene un reembolso registrado.')
   }
@@ -2681,13 +2683,29 @@ export async function cancelEntry(entryId: string) {
     }),
   ])
 
-  await createLog('PAYMENT_REFUNDED', user.id, undefined, {
-    entryId,
-    saleLogId: saleLog.id,
-    paymentReference,
-    refundAmount: refundAmountStr,
-    refundId,
-  })
+  try {
+    await createLog('PAYMENT_REFUNDED', user.id, undefined, {
+      entryId,
+      saleLogId: saleLog.id,
+      paymentReference,
+      refundAmount: refundAmountStr,
+      refundId,
+    })
+  } catch (auditErr) {
+    console.error('[cancelEntry] Audit log PAYMENT_REFUNDED failed (¿migración enum en BD?)', auditErr)
+    try {
+      await createLog('EVENT_UPDATED', user.id, undefined, {
+        type: 'PAYMENT_REFUNDED',
+        entryId,
+        saleLogId: saleLog.id,
+        paymentReference,
+        refundAmount: refundAmountStr,
+        refundId,
+      })
+    } catch (fallbackErr) {
+      console.error('[cancelEntry] Fallback audit log failed', fallbackErr)
+    }
+  }
 
   revalidatePath('/admin/entradas')
 }
