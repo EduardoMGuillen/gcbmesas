@@ -254,18 +254,19 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
     )
   })
 
-  // Nunca usar authId como captureId: el reembolso es POST /pts/v2/captures/{captureId}/refunds
+  // Preferir id real de captura; si CyberSource no lo expone en esta respuesta, se usa authId para no bloquear la venta (el reembolso resuelve id vía GET /payments o /payments/refunds).
   const captureIdResolved = extractCaptureIdFromCaptureResponse(captureResponse)
-  if (!captureIdResolved) {
-    throw new Error(
-      'CyberSource: la captura no devolvió id de captura (id en cuerpo o _links.self). No se puede guardar reembolso.'
+  const captureIdForMerge = captureIdResolved || authId
+  if (!captureIdResolved && authId) {
+    console.warn(
+      '[CyberSource] Captura sin id explícito; usando id de autorización para auditoría. Reembolso puede resolver el id de captura al cancelar.'
     )
   }
 
   // Return a merged response that confirm-payment route can interpret the same way
   return {
     ...authResponse,
-    captureId: captureIdResolved,
+    captureId: captureIdForMerge,
     captureStatus: String(captureResponse?.status || '').toUpperCase(),
   }
 }
