@@ -6,7 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
 import { LogAction } from '@prisma/client'
 import { Prisma } from '@prisma/client'
-import { CyberSourceApiError, getCyberSourceEnvLabel } from './cybersource'
+import { CyberSourceApiError, getCyberSourceApiHostForLogs, getCyberSourceEnvLabel } from './cybersource'
 import {
   findOnlineSaleLogForEntry,
   perEntryRefundAmount,
@@ -2614,6 +2614,7 @@ async function persistRefundFailureAuditLog(params: {
       refundAmount: params.refundAmount,
       at: new Date().toISOString(),
       cybersourceEnv: getCyberSourceEnvLabel(),
+      cybersourceApiHost: getCyberSourceApiHostForLogs(),
     }
     if (params.captureId) {
       details.captureIdPrefix = `${params.captureId.slice(0, 8)}…`
@@ -2630,7 +2631,7 @@ async function persistRefundFailureAuditLog(params: {
           : JSON.stringify(err.responseBody ?? {}).slice(0, 2000)
       if (err.status === 404) {
         details.refund404Hint =
-          '404 con id correcto suele ser entorno (CYBERSOURCE_ENV=test vs venta en live) o credenciales de otro merchant. Debe coincidir con Business Center.'
+          'Si cybersourceApiHost es apitest.cybersource.com, CYBERSOURCE_ENV no está en live/production. Si es api.cybersource.com y sigue 404: mismo merchant que la venta, o reembolso no permitido para ese adquirente (soporte CyberSource).'
       }
     } else if (err instanceof Error) {
       details.errorMessage = err.message

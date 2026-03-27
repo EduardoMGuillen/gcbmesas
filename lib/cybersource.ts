@@ -22,9 +22,31 @@ export class CyberSourceApiError extends Error {
   }
 }
 
+/** Solo `live` excluía otros valores usados en producción (p. ej. `production`) y apuntaba por error a apitest. */
+function isCyberSourceLiveEnv(): boolean {
+  const env = (process.env.CYBERSOURCE_ENV || 'test').trim().toLowerCase()
+  return (
+    env === 'live' ||
+    env === 'production' ||
+    env === 'prod' ||
+    env === '1' ||
+    env === 'true'
+  )
+}
+
 function getCyberSourceBaseUrl() {
-  const env = (process.env.CYBERSOURCE_ENV || 'test').toLowerCase()
-  return env === 'live' ? 'https://api.cybersource.com' : 'https://apitest.cybersource.com'
+  return isCyberSourceLiveEnv()
+    ? 'https://api.cybersource.com'
+    : 'https://apitest.cybersource.com'
+}
+
+/** Host efectivo de la API (para logs: debe ser api.cybersource.com en ventas live). */
+export function getCyberSourceApiHostForLogs(): string {
+  try {
+    return new URL(getCyberSourceBaseUrl()).host
+  } catch {
+    return 'unknown'
+  }
 }
 
 function getSharedSecretBuffer(sharedSecretRaw: string): Buffer {
@@ -109,7 +131,8 @@ async function cyberSourceRequest<TResponse>(
   })
 
   const headers: Record<string, string> = {
-    Accept: 'application/json',
+    // SDK de CyberSource usa hal+json; alinear evita rechazos raros en algunos recursos PTS.
+    Accept: 'application/hal+json, application/json;q=0.9',
     Host: host,
     Date: date,
     'v-c-date': date,
@@ -233,6 +256,6 @@ export function extractFirstCaptureIdFromPaymentHal(p: unknown): string | null {
 
 /** Valor efectivo de entorno REST (mismo criterio que getCyberSourceBaseUrl). */
 export function getCyberSourceEnvLabel(): 'live' | 'test' {
-  return (process.env.CYBERSOURCE_ENV || 'test').toLowerCase() === 'live' ? 'live' : 'test'
+  return isCyberSourceLiveEnv() ? 'live' : 'test'
 }
 
