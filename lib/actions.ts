@@ -2595,6 +2595,51 @@ export async function revertEntryToActive(entryId: string) {
 
 export type CancelEntryResult = { ok: true } | { ok: false; message: string }
 
+/** Fallo de reembolso CyberSource persistido en `logs` (Admin → Logs); no depende de Vercel Runtime Logs. */
+async function persistRefundFailureAuditLog(params: {
+  userId: string | undefined
+  entryId: string
+  saleLogId: string
+  paymentReference: string
+  captureId: string
+  refundAmount: string
+  error: unknown
+}) {
+  try {
+    const details: Record<string, unknown> = {
+      type: 'CYBERSOURCE_REFUND_FAILED',
+      entryId: params.entryId,
+      saleLogId: params.saleLogId,
+      paymentReference: params.paymentReference,
+      refundAmount: params.refundAmount,
+      at: new Date().toISOString(),
+    }
+    if (params.captureId) {
+      details.captureIdPrefix = `${params.captureId.slice(0, 8)}…`
+    }
+    const err = params.error
+    if (err instanceof CyberSourceApiError) {
+      details.httpStatus = err.status
+      details.endpoint = err.endpoint
+      details.requestId = err.requestId
+      details.cybersourceMessage = err.message
+      details.responseBody =
+        typeof err.responseBody === 'string'
+          ? err.responseBody.slice(0, 2000)
+          : JSON.stringify(err.responseBody ?? {}).slice(0, 2000)
+    } else if (err instanceof Error) {
+      details.errorMessage = err.message
+      details.errorName = err.name
+    } else {
+      details.errorMessage = String(err)
+    }
+    await createLog('EVENT_UPDATED', params.userId, undefined, details)
+    revalidatePath('/admin/logs')
+  } catch {
+    // sin bloquear cancelEntry
+  }
+}
+
 /** Devuelve resultado en lugar de lanzar: en producción las server actions que lanzan suelen mostrar digest genérico. */
 export async function cancelEntry(entryId: string): Promise<CancelEntryResult> {
   try {
@@ -2686,11 +2731,29 @@ export async function cancelEntry(entryId: string): Promise<CancelEntryResult> {
             : (e.responseBody as any)?.errorInformation?.reason ||
               (e.responseBody as any)?.message ||
               e.message
+        await persistRefundFailureAuditLog({
+          userId: user.id,
+          entryId,
+          saleLogId: saleLog.id,
+          paymentReference,
+          captureId,
+          refundAmount: refundAmountStr,
+          error: e,
+        })
         return {
           ok: false,
           message: `CyberSource no pudo procesar el reembolso (${e.status}): ${reason}`,
         }
       }
+      await persistRefundFailureAuditLog({
+        userId: user.id,
+        entryId,
+        saleLogId: saleLog.id,
+        paymentReference,
+        captureId,
+        refundAmount: refundAmountStr,
+        error: e,
+      })
       throw e
     }
 
