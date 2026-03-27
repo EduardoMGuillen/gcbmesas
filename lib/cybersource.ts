@@ -231,3 +231,8 @@ export function extractFirstCaptureIdFromPaymentHal(p: unknown): string | null {
   return all[0] ?? null
 }
 
+/** Valor efectivo de entorno REST (mismo criterio que getCyberSourceBaseUrl). */
+export function getCyberSourceEnvLabel(): 'live' | 'test' {
+  return (process.env.CYBERSOURCE_ENV || 'test').toLowerCase() === 'live' ? 'live' : 'test'
+}
+

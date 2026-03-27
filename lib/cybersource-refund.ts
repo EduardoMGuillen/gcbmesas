@@ -8,6 +8,7 @@ import {
   cyberSourceGet,
   CyberSourceApiError,
   extractAllCaptureIdsFromPaymentHal,
+  extractFirstCaptureIdFromPaymentHal,
 } from './cybersource'
 
 /** Ventas recientes online; evita $queryRaw (diferencias json/jsonb / drivers). */
@@ -171,6 +172,31 @@ function excludeAuthPaymentIdFromCaptureCandidates(ids: string[], paymentTx: str
   const p = paymentTx.trim()
   if (!p) return ids
   return ids.filter((id) => id.trim() !== p)
+}
+
+/**
+ * Id de captura según GET /pts/v2/payments/{authId} (enlace HAL). Si 404, el servidor no ve esa venta:
+ * casi siempre CYBERSOURCE_ENV (test vs live) o credenciales de otro merchant.
+ */
+async function fetchCaptureIdFromAuthorizedPaymentOrThrow(paymentTx: string): Promise<string | null> {
+  const pid = paymentTx.trim()
+  if (!pid) return null
+  try {
+    const body = await cyberSourceGet<unknown>(`/pts/v2/payments/${encodeURIComponent(pid)}`)
+    return extractFirstCaptureIdFromPaymentHal(body)
+  } catch (e) {
+    if (e instanceof CyberSourceApiError && e.status === 404) {
+      throw new CyberSourceApiError({
+        message:
+          'CyberSource no encontró el pago (GET /payments/{id}). Suele ser CYBERSOURCE_ENV=test en el servidor con venta en producción (o al revés), o credenciales de otro comercio que en Business Center.',
+        status: 404,
+        requestId: e.requestId,
+        responseBody: e.responseBody,
+        endpoint: e.endpoint,
+      })
+    }
+    throw e
+  }
 }
 
 async function collectCaptureIdHints(paymentTx: string, captureId: string): Promise<string[]> {
@@ -360,9 +386,18 @@ export async function refundCyberSourceCaptureForEntry(params: {
       attemptSuffix: `${++attempt}-${Date.now().toString(36)}`,
     })
 
+  let fromPaymentApi: string | null = null
+  if (paymentTx) {
+    fromPaymentApi = await fetchCaptureIdFromAuthorizedPaymentOrThrow(paymentTx)
+  }
+
   const hintsFirst = await collectCaptureIdHints(paymentTx, captureId)
   const hinted = excludeAuthPaymentIdFromCaptureCandidates(hintsFirst, paymentTx)
-  const firstCandidates = uniqueStrings([captureId, ...hinted])
+  const firstCandidates = uniqueStrings([
+    ...(fromPaymentApi ? [fromPaymentApi] : []),
+    captureId,
+    ...hinted,
+  ])
 
   try {
     return await cyberSourcePost<RefundResp>(pathCaptureRefund(firstCandidates[0] || captureId), makeBody())
@@ -373,7 +408,12 @@ export async function refundCyberSourceCaptureForEntry(params: {
 
     const tssIds = await searchTssTransactionIdsByPaymentReference(params.paymentReference)
     const tssFiltered = excludeAuthPaymentIdFromCaptureCandidates(tssIds, paymentTx)
-    const captureCandidates = uniqueStrings([captureId, ...hinted, ...tssFiltered])
+    const captureCandidates = uniqueStrings([
+      ...(fromPaymentApi ? [fromPaymentApi] : []),
+      captureId,
+      ...hinted,
+      ...tssFiltered,
+    ])
 
     return tryAllCaptureRefunds(captureCandidates, makeBody)
   }
