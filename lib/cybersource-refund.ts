@@ -63,15 +63,53 @@ function buildRefundBody(params: {
 
 type RefundResp = { id?: string; status?: string }
 
+/** Recorre _links/links (HAL) y saca todos los ids de recurso /pts/v2/captures/{id}. */
+function extractAllCaptureIdsFromHalLinks(p: unknown): string[] {
+  const out: string[] = []
+  if (!p || typeof p !== 'object') return out
+  const top = p as Record<string, unknown>
+  const raw = (top._links ?? top.links) as Record<string, unknown> | undefined
+  if (!raw || typeof raw !== 'object') return out
+  const pushFromHref = (href: string) => {
+    const m = href.match(/\/pts\/v2\/captures\/([^/?\s]+)/)
+    if (m?.[1]) out.push(m[1].trim())
+  }
+  for (const v of Object.values(raw)) {
+    if (v && typeof v === 'object' && 'href' in (v as object)) {
+      pushFromHref(String((v as { href?: string }).href || ''))
+    }
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        if (item && typeof item === 'object' && 'href' in item) {
+          pushFromHref(String((item as { href?: string }).href || ''))
+        }
+      }
+    }
+  }
+  return uniqueStrings(out)
+}
+
 function extractCaptureIdFromPaymentLinks(p: unknown): string | null {
-  if (!p || typeof p !== 'object') return null
-  const links = (p as Record<string, unknown>)._links as
-    | { capture?: { href?: string } }
-    | undefined
-  const href = typeof links?.capture?.href === 'string' ? links.capture.href : ''
-  if (!href) return null
-  const m = href.match(/\/pts\/v2\/captures\/([^/?\s]+)/)
-  return m?.[1]?.trim() ?? null
+  const all = extractAllCaptureIdsFromHalLinks(p)
+  return all[0] ?? null
+}
+
+/** TSS GET /tss/v2/transactions/{id} puede traer transacciones relacionadas (p. ej. captura). */
+function extractCaptureIdsFromTssTransactionLinks(t: unknown): string[] {
+  const out: string[] = []
+  if (!t || typeof t !== 'object') return out
+  const raw = (t as Record<string, unknown>)._links as Record<string, unknown> | undefined
+  if (!raw || typeof raw !== 'object') return out
+  const rel = raw.relatedTransactions
+  const arr = Array.isArray(rel) ? rel : rel ? [rel] : []
+  for (const item of arr) {
+    if (item && typeof item === 'object' && 'href' in item) {
+      const href = String((item as { href?: string }).href || '')
+      const m = href.match(/\/pts\/v2\/captures\/([^/?\s]+)/)
+      if (m?.[1]) out.push(m[1].trim())
+    }
+  }
+  return uniqueStrings(out)
 }
 
 function extractCaptureIdFromPaymentDetail(p: unknown): string | null {
@@ -159,6 +197,7 @@ async function collectCaptureIdHints(paymentTx: string, captureId: string): Prom
   ])
   for (const d of [dPay, dCap]) {
     if (!d) continue
+    for (const x of extractAllCaptureIdsFromHalLinks(d)) hints.push(x)
     const fromCapLink = extractCaptureIdFromPaymentLinks(d)
     if (fromCapLink) hints.push(fromCapLink)
     const c = extractCaptureIdFromPaymentDetail(d)
@@ -168,6 +207,7 @@ async function collectCaptureIdHints(paymentTx: string, captureId: string): Prom
   }
   for (const t of [tPay, tCap]) {
     if (!t) continue
+    for (const x of extractCaptureIdsFromTssTransactionLinks(t)) hints.push(x)
     const j = findCaptureIdInJson(t, 0)
     if (j) hints.push(j)
   }
@@ -334,18 +374,18 @@ export async function refundCyberSourceCaptureForEntry(params: {
       attemptSuffix: `${++attempt}-${Date.now().toString(36)}`,
     })
 
+  const hintsFirst = await collectCaptureIdHints(paymentTx, captureId)
+  const firstCandidates = uniqueStrings([...hintsFirst, captureId])
+
   try {
-    return await cyberSourcePost<RefundResp>(pathCaptureRefund(captureId), makeBody())
+    return await cyberSourcePost<RefundResp>(pathCaptureRefund(firstCandidates[0] || captureId), makeBody())
   } catch (firstErr) {
     if (!isNotFound(firstErr)) {
       throw firstErr
     }
 
-    const [tssIds, hints] = await Promise.all([
-      searchTssTransactionIdsByPaymentReference(params.paymentReference),
-      collectCaptureIdHints(paymentTx, captureId),
-    ])
-    const captureCandidates = uniqueStrings([...tssIds, ...hints, captureId])
+    const tssIds = await searchTssTransactionIdsByPaymentReference(params.paymentReference)
+    const captureCandidates = uniqueStrings([...hintsFirst, ...tssIds, captureId])
 
     return tryAllCaptureRefunds(captureCandidates, makeBody)
   }
