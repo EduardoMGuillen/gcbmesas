@@ -1,9 +1,14 @@
 /**
- * Solo reembolsos / cancelación online. No tocar confirm-payment ni cybersource-sdk-direct (flujo de cobro con tarjeta).
+ * Reembolsos / cancelación online. El id de captura correcto debe guardarse al vender (confirm-payment + SDK).
  */
 import type { Log } from '@prisma/client'
 import { prisma } from './prisma'
-import { cyberSourcePost, cyberSourceGet, CyberSourceApiError } from './cybersource'
+import {
+  cyberSourcePost,
+  cyberSourceGet,
+  CyberSourceApiError,
+  extractAllCaptureIdsFromPaymentHal,
+} from './cybersource'
 
 /** Ventas recientes online; evita $queryRaw (diferencias json/jsonb / drivers). */
 const ONLINE_SALE_LOG_SCAN = 800
@@ -63,34 +68,8 @@ function buildRefundBody(params: {
 
 type RefundResp = { id?: string; status?: string }
 
-/** Recorre _links/links (HAL) y saca todos los ids de recurso /pts/v2/captures/{id}. */
-function extractAllCaptureIdsFromHalLinks(p: unknown): string[] {
-  const out: string[] = []
-  if (!p || typeof p !== 'object') return out
-  const top = p as Record<string, unknown>
-  const raw = (top._links ?? top.links) as Record<string, unknown> | undefined
-  if (!raw || typeof raw !== 'object') return out
-  const pushFromHref = (href: string) => {
-    const m = href.match(/\/pts\/v2\/captures\/([^/?\s]+)/)
-    if (m?.[1]) out.push(m[1].trim())
-  }
-  for (const v of Object.values(raw)) {
-    if (v && typeof v === 'object' && 'href' in (v as object)) {
-      pushFromHref(String((v as { href?: string }).href || ''))
-    }
-    if (Array.isArray(v)) {
-      for (const item of v) {
-        if (item && typeof item === 'object' && 'href' in item) {
-          pushFromHref(String((item as { href?: string }).href || ''))
-        }
-      }
-    }
-  }
-  return uniqueStrings(out)
-}
-
 function extractCaptureIdFromPaymentLinks(p: unknown): string | null {
-  const all = extractAllCaptureIdsFromHalLinks(p)
+  const all = extractAllCaptureIdsFromPaymentHal(p)
   return all[0] ?? null
 }
 
@@ -197,7 +176,7 @@ async function collectCaptureIdHints(paymentTx: string, captureId: string): Prom
   ])
   for (const d of [dPay, dCap]) {
     if (!d) continue
-    for (const x of extractAllCaptureIdsFromHalLinks(d)) hints.push(x)
+    for (const x of extractAllCaptureIdsFromPaymentHal(d)) hints.push(x)
     const fromCapLink = extractCaptureIdFromPaymentLinks(d)
     if (fromCapLink) hints.push(fromCapLink)
     const c = extractCaptureIdFromPaymentDetail(d)
