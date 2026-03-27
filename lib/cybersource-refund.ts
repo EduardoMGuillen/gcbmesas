@@ -63,9 +63,22 @@ function buildRefundBody(params: {
 
 type RefundResp = { id?: string; status?: string }
 
+function extractCaptureIdFromPaymentLinks(p: unknown): string | null {
+  if (!p || typeof p !== 'object') return null
+  const links = (p as Record<string, unknown>)._links as
+    | { capture?: { href?: string } }
+    | undefined
+  const href = typeof links?.capture?.href === 'string' ? links.capture.href : ''
+  if (!href) return null
+  const m = href.match(/\/pts\/v2\/captures\/([^/?\s]+)/)
+  return m?.[1]?.trim() ?? null
+}
+
 function extractCaptureIdFromPaymentDetail(p: unknown): string | null {
   if (!p || typeof p !== 'object') return null
   const o = p as Record<string, unknown>
+  const fromLinks = extractCaptureIdFromPaymentLinks(p)
+  if (fromLinks) return fromLinks
   const app = o.applicationInformation
   if (typeof o.id === 'string' && app && typeof app === 'object') {
     const t = String((app as Record<string, unknown>).applicationType || '').toUpperCase()
@@ -146,6 +159,8 @@ async function collectCaptureIdHints(paymentTx: string, captureId: string): Prom
   ])
   for (const d of [dPay, dCap]) {
     if (!d) continue
+    const fromCapLink = extractCaptureIdFromPaymentLinks(d)
+    if (fromCapLink) hints.push(fromCapLink)
     const c = extractCaptureIdFromPaymentDetail(d)
     if (c) hints.push(c)
     const j = findCaptureIdInJson(d, 0)
@@ -161,10 +176,6 @@ async function collectCaptureIdHints(paymentTx: string, captureId: string): Prom
 
 function pathCaptureRefund(captureId: string) {
   return `/pts/v2/captures/${encodeURIComponent(captureId.trim())}/refunds`
-}
-
-function pathPaymentRefund(paymentId: string) {
-  return `/pts/v2/payments/${encodeURIComponent(paymentId.trim())}/refunds`
 }
 
 function isNotFound(e: unknown): boolean {
@@ -188,14 +199,39 @@ function splitTransactionSummaries(data: unknown): unknown[] {
   return Array.isArray(arr) ? arr : []
 }
 
-function extractIdsFromSummaries(summaries: unknown[]): string[] {
-  const out: string[] = []
+/** Prioriza filas TSS que parecen captura / liquidación (ics_credit, etc.) frente a solo autorización. */
+function scoreSummaryForCaptureRefund(row: unknown): number {
+  let score = 0
+  const apps = (row as { applicationInformation?: { applications?: unknown[] } })?.applicationInformation
+    ?.applications
+  if (!Array.isArray(apps)) return 0
+  for (const a of apps) {
+    if (!a || typeof a !== 'object') continue
+    const name = String((a as { name?: unknown }).name || '').toLowerCase()
+    if (
+      name.includes('credit') ||
+      name.includes('capture') ||
+      name.includes('settlement') ||
+      name.includes('bill') ||
+      name.includes('ics_bill')
+    ) {
+      score += 4
+    }
+    if (name.includes('auth') && !name.includes('reversal')) score -= 1
+  }
+  return score
+}
+
+function extractOrderedCaptureIdsFromSummaries(summaries: unknown[]): string[] {
+  const scored: { id: string; score: number }[] = []
   for (const row of summaries) {
     if (!row || typeof row !== 'object') continue
     const id = typeof (row as { id?: unknown }).id === 'string' ? (row as { id: string }).id.trim() : ''
-    if (id) out.push(id)
+    if (!id) continue
+    scored.push({ id, score: scoreSummaryForCaptureRefund(row) })
   }
-  return out
+  scored.sort((a, b) => b.score - a.score)
+  return uniqueStrings(scored.map((s) => s.id))
 }
 
 /**
@@ -226,7 +262,7 @@ async function runTssSearch(query: string): Promise<string[]> {
         if (summaries.length > 0) break
       }
     }
-    return uniqueStrings(extractIdsFromSummaries(summaries))
+    return extractOrderedCaptureIdsFromSummaries(summaries)
   } catch {
     return []
   }
@@ -250,9 +286,12 @@ async function searchTssTransactionIdsByPaymentReference(paymentReference: strin
   return uniqueStrings([...capIds, ...captureIds, ...mainIds])
 }
 
-async function tryAllCaptureThenPayment(
+/**
+ * Solo POST /pts/v2/captures/{id}/refunds. El cobro usa captura separada (capture:false + capture);
+ * /pts/v2/payments/{id}/refunds es para auth+captura en un solo POST /payments; con el id de autorización devuelve 404.
+ */
+async function tryAllCaptureRefunds(
   captureCandidates: string[],
-  paymentCandidates: string[],
   makeBody: () => ReturnType<typeof buildRefundBody>
 ): Promise<RefundResp> {
   let lastErr: unknown = new Error('Reembolso no intentado')
@@ -267,22 +306,12 @@ async function tryAllCaptureThenPayment(
     }
   }
 
-  for (const pid of paymentCandidates) {
-    if (!pid) continue
-    try {
-      return await cyberSourcePost<RefundResp>(pathPaymentRefund(pid), makeBody())
-    } catch (e) {
-      lastErr = e
-      if (!isNotFound(e)) throw e
-    }
-  }
-
   throw lastErr
 }
 
 /**
  * 1) Un solo intento con captureId del log (rápido si es correcto).
- * 2) Si 404: búsqueda TSS por clientReference (ref, -CAP, -CAPTURE), GET /payments y TSS por id; reintenta captura y luego /payments/refunds.
+ * 2) Si 404: TSS por clientReference, GET /payments (enlace capture) y TSS por id; reintenta solo /captures/{id}/refunds.
  */
 export async function refundCyberSourceCaptureForEntry(params: {
   captureId: string
@@ -317,8 +346,7 @@ export async function refundCyberSourceCaptureForEntry(params: {
       collectCaptureIdHints(paymentTx, captureId),
     ])
     const captureCandidates = uniqueStrings([...tssIds, ...hints, captureId])
-    const paymentCandidates = uniqueStrings([...tssIds, paymentTx, captureId])
 
-    return tryAllCaptureThenPayment(captureCandidates, paymentCandidates, makeBody)
+    return tryAllCaptureRefunds(captureCandidates, makeBody)
   }
 }
