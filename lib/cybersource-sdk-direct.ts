@@ -254,12 +254,32 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
     )
   })
 
+  // Nunca usar authId como captureId: el reembolso es POST /pts/v2/captures/{captureId}/refunds
+  const captureIdResolved = extractCaptureIdFromCaptureResponse(captureResponse)
+  if (!captureIdResolved) {
+    throw new Error(
+      'CyberSource: la captura no devolvió id de captura (id en cuerpo o _links.self). No se puede guardar reembolso.'
+    )
+  }
+
   // Return a merged response that confirm-payment route can interpret the same way
   return {
     ...authResponse,
-    captureId: String(captureResponse?.id || authId),
+    captureId: captureIdResolved,
     captureStatus: String(captureResponse?.status || '').toUpperCase(),
   }
+}
+
+/** Id de captura real para /pts/v2/captures/{id}/refunds (no confundir con el id del pago/autorización). */
+function extractCaptureIdFromCaptureResponse(captureResponse: any): string {
+  const direct = String(captureResponse?.id ?? '').trim()
+  if (direct) return direct
+  const selfHref = captureResponse?._links?.self?.href || captureResponse?.links?.self?.href
+  if (typeof selfHref === 'string') {
+    const m = selfHref.match(/\/captures\/([^/?]+)/)
+    if (m?.[1]) return m[1].trim()
+  }
+  return ''
 }
 
 // ─── Payer Authentication (3DS) via SDK ────────────────────────────────────
