@@ -2675,6 +2675,7 @@ export async function cancelEntry(entryId: string): Promise<CancelEntryResult> {
           refundAmount: refundAmountStr,
           paymentReference,
           entryId,
+          paymentTransactionId: String(details.cybersourceTransactionId || '').trim() || null,
         })
       }
     } catch (e) {
