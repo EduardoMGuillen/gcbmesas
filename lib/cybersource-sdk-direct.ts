@@ -1,4 +1,4 @@
-import { CyberSourceApiError } from '@/lib/cybersource'
+import { CyberSourceApiError, extractCaptureIdFromCaptureApiResponse } from '@/lib/cybersource'
 
 type DirectPaymentParams = {
   paymentReference: string
@@ -254,10 +254,11 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
     )
   })
 
-  // Return a merged response that confirm-payment route can interpret the same way
+  const captureIdResolved = extractCaptureIdFromCaptureApiResponse(captureResponse)
+  // No usar authId como captureId: el reembolso va a /captures/{id}; el id de autorización devuelve 404.
   return {
     ...authResponse,
-    captureId: String(captureResponse?.id || authId),
+    captureId: captureIdResolved ?? '',
     captureStatus: String(captureResponse?.status || '').toUpperCase(),
   }
 }

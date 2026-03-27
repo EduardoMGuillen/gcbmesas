@@ -6,7 +6,13 @@ import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
 import { Prisma } from '@prisma/client'
-import { CyberSourceApiError, cyberSourceGet, cyberSourcePost } from '@/lib/cybersource'
+import {
+  CyberSourceApiError,
+  cyberSourceGet,
+  cyberSourcePost,
+  extractCaptureIdFromCaptureApiResponse,
+  extractFirstCaptureIdFromPaymentHal,
+} from '@/lib/cybersource'
 import { cyberSourceDirectPaymentViaSdk, cyberSourceUnifiedPaymentViaSdk } from '@/lib/cybersource-sdk-direct'
 import { assertEventEntryCapacity } from '@/lib/actions'
 
@@ -338,10 +344,13 @@ export async function POST(req: NextRequest) {
           amountDetails: { totalAmount: amountToCapture, currency, taxAmount: '0.00' },
         },
       })
-      captureId = String(captureResponse?.id || '') || null
+      captureId =
+        extractCaptureIdFromCaptureApiResponse(captureResponse) ||
+        String(captureResponse?.id || '').trim() ||
+        null
       captureStatus = String(captureResponse?.status || '').toUpperCase() || null
       const okCaptureStatuses = ['PENDING', 'TRANSMITTED', 'COMPLETED', 'SUCCESS', 'CAPTURED']
-      if (!captureStatus || !okCaptureStatuses.includes(captureStatus)) {
+      if (!captureStatus || !okCaptureStatuses.includes(captureStatus) || !captureId) {
         await prisma.log.update({
           where: { id: pendingLog.id },
           data: {
@@ -363,9 +372,42 @@ export async function POST(req: NextRequest) {
         )
       }
     } else if (!isMockMode && !isDirectMode && transactionId) {
-      // Unified mode: SDK already did auth + capture internally, results are in paymentResponse
-      captureId = String((paymentResponse as any)?.captureId || transactionId) || null
+      let resolved = String((paymentResponse as any)?.captureId || '').trim()
+      if (!resolved) {
+        try {
+          const pay = await cyberSourceGet<unknown>(
+            `/pts/v2/payments/${encodeURIComponent(transactionId)}`
+          )
+          resolved = extractFirstCaptureIdFromPaymentHal(pay) || ''
+        } catch {
+          resolved = ''
+        }
+      }
+      captureId = resolved || null
       captureStatus = String((paymentResponse as any)?.captureStatus || status) || null
+    }
+
+    if (!isMockMode && transactionId && !captureId) {
+      await prisma.log.update({
+        where: { id: pendingLog.id },
+        data: {
+          details: {
+            ...pendingDetails,
+            status: 'REJECTED',
+            decision: 'NO_CAPTURE_ID',
+            reasonCode: 'missing_capture_id',
+            transactionId: transactionId || null,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      })
+      return NextResponse.json(
+        {
+          error:
+            'No se pudo registrar el id de captura del pago. No se emitieron entradas; si ves un cargo, contacta soporte con tu referencia.',
+        },
+        { status: 502 }
+      )
     }
 
     let entries: any[] = []

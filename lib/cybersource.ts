@@ -177,3 +177,57 @@ export async function cyberSourceGet<TResponse>(
   return cyberSourceRequest<TResponse>('GET', resourcePath)
 }
 
+export function dedupeCyberSourceIds(ids: string[]): string[] {
+  const out: string[] = []
+  for (const x of ids) {
+    const t = x.trim()
+    if (t && !out.includes(t)) out.push(t)
+  }
+  return out
+}
+
+/** Respuesta POST /pts/v2/payments/{id}/captures o SDK capturePayment: id de recurso captura (no el payment id). */
+export function extractCaptureIdFromCaptureApiResponse(captureResponse: unknown): string | null {
+  if (!captureResponse || typeof captureResponse !== 'object') return null
+  const o = captureResponse as Record<string, unknown>
+  const id = typeof o.id === 'string' ? o.id.trim() : ''
+  if (id) return id
+  const links = (o._links ?? o.links) as Record<string, unknown> | undefined
+  const self = links?.self as { href?: string } | undefined
+  const href = typeof self?.href === 'string' ? self.href : ''
+  const m = href.match(/\/pts\/v2\/captures\/([^/?\s]+)/)
+  return m?.[1]?.trim() ?? null
+}
+
+/** GET /pts/v2/payments/{id}: enlaces HAL hacia /pts/v2/captures/... */
+export function extractAllCaptureIdsFromPaymentHal(p: unknown): string[] {
+  const out: string[] = []
+  if (!p || typeof p !== 'object') return out
+  const raw = ((p as Record<string, unknown>)._links ?? (p as Record<string, unknown>).links) as
+    | Record<string, unknown>
+    | undefined
+  if (!raw || typeof raw !== 'object') return out
+  const pushFromHref = (href: string) => {
+    const m = href.match(/\/pts\/v2\/captures\/([^/?\s]+)/)
+    if (m?.[1]) out.push(m[1].trim())
+  }
+  for (const v of Object.values(raw)) {
+    if (v && typeof v === 'object' && 'href' in (v as object)) {
+      pushFromHref(String((v as { href?: string }).href || ''))
+    }
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        if (item && typeof item === 'object' && 'href' in item) {
+          pushFromHref(String((item as { href?: string }).href || ''))
+        }
+      }
+    }
+  }
+  return dedupeCyberSourceIds(out)
+}
+
+export function extractFirstCaptureIdFromPaymentHal(p: unknown): string | null {
+  const all = extractAllCaptureIdsFromPaymentHal(p)
+  return all[0] ?? null
+}
+
