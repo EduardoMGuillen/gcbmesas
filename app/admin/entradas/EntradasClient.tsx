@@ -1407,7 +1407,7 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
                     {entry.status === 'ACTIVE' && (
                       <>
                         <button onClick={() => handleMarkUsed(entry.id)} disabled={isPending} className="text-xs px-2.5 sm:px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50">Marcar Usada</button>
-                        <button onClick={() => handleCancel(entry.id)} disabled={isPending} className="text-xs px-2.5 sm:px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors disabled:opacity-50">Cancelar</button>
+                        <button onClick={() => handleCancel(entry.id)} disabled={isPending} className="text-xs px-2.5 sm:px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors disabled:opacity-50">Cancelar/Reembolsar</button>
                       </>
                     )}
                     {entry.status === 'USED' && (
