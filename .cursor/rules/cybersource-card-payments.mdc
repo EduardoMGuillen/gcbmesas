@@ -1,0 +1,8 @@
+---
+description: Do not modify CyberSource card payment / checkout code unless the user explicitly asks.
+globs:
+  - app/api/cybersource/confirm-payment/**
+  - lib/cybersource-sdk-direct.ts
+---
+
+Refunds and cancellations belong in `lib/cybersource-refund.ts` and `cancelEntry` in `lib/actions.ts`. Do not change `confirm-payment` or `cybersource-sdk-direct.ts` for refund fixes.

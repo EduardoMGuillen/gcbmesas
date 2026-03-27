@@ -1,3 +1,6 @@
+/**
+ * Solo reembolsos / cancelación online. No tocar confirm-payment ni cybersource-sdk-direct (flujo de cobro con tarjeta).
+ */
 import type { Log } from '@prisma/client'
 import { prisma } from './prisma'
 import { cyberSourcePost, cyberSourceGet, CyberSourceApiError } from './cybersource'
@@ -40,10 +43,13 @@ function buildRefundBody(params: {
   entryId: string
   refundAmount: string
   currency: string
+  attemptSuffix: string
 }) {
+  const base = `${params.paymentReference}-R-${params.entryId.slice(-8)}-${params.attemptSuffix}`
+  const code = base.length > 50 ? base.slice(0, 50) : base
   return {
     clientReferenceInformation: {
-      code: `${params.paymentReference}-REFUND-${params.entryId.slice(-8)}`,
+      code,
     },
     orderInformation: {
       amountDetails: {
@@ -57,21 +63,22 @@ function buildRefundBody(params: {
 
 type RefundResp = { id?: string; status?: string }
 
-/** Busca un id de captura en la respuesta GET /pts/v2/payments/{id} (HAL, enlaces, etc.). */
 function extractCaptureIdFromPaymentDetail(p: unknown): string | null {
   if (!p || typeof p !== 'object') return null
   const o = p as Record<string, unknown>
-  if (typeof o.id === 'string' && typeof o.applicationInformation === 'object' && o.applicationInformation) {
-    const app = o.applicationInformation as Record<string, unknown>
-    if (String(app.applicationType || '').toUpperCase() === 'CAPTURE') {
+  const app = o.applicationInformation
+  if (typeof o.id === 'string' && app && typeof app === 'object') {
+    const t = String((app as Record<string, unknown>).applicationType || '').toUpperCase()
+    if (t === 'CAPTURE' || t.includes('CAPTURE')) {
       return o.id.trim()
     }
   }
   const selfHref =
-    (o._links as Record<string, unknown> | undefined)?.self &&
-    typeof (o._links as { self?: { href?: string } }).self?.href === 'string'
+    typeof (o._links as { self?: { href?: string } } | undefined)?.self?.href === 'string'
       ? (o._links as { self: { href: string } }).self.href
-      : undefined
+      : typeof (o.links as { self?: { href?: string } } | undefined)?.self?.href === 'string'
+        ? (o.links as { self: { href: string } }).self.href
+        : undefined
   if (typeof selfHref === 'string') {
     const m = selfHref.match(/\/captures\/([^/?]+)/)
     if (m?.[1]) return m[1].trim()
@@ -80,7 +87,7 @@ function extractCaptureIdFromPaymentDetail(p: unknown): string | null {
 }
 
 function findCaptureIdInJson(obj: unknown, depth: number): string | null {
-  if (depth > 18) return null
+  if (depth > 22) return null
   if (typeof obj === 'string') {
     const m = obj.match(/\/pts\/v2\/captures\/([^/?\s]+)/)
     return m?.[1]?.trim() ?? null
@@ -100,15 +107,56 @@ function findCaptureIdInJson(obj: unknown, depth: number): string | null {
   return null
 }
 
-async function tryResolveCaptureIdFromPayment(paymentId: string): Promise<string | null> {
-  const pid = paymentId.trim()
+async function safeGetPayment(id: string): Promise<unknown | null> {
+  const pid = id.trim()
   if (!pid) return null
   try {
-    const detail = await cyberSourceGet<unknown>(`/pts/v2/payments/${encodeURIComponent(pid)}`)
-    return extractCaptureIdFromPaymentDetail(detail)
+    return await cyberSourceGet<unknown>(`/pts/v2/payments/${encodeURIComponent(pid)}`)
   } catch {
     return null
   }
+}
+
+async function safeGetTssTransaction(id: string): Promise<unknown | null> {
+  const pid = id.trim()
+  if (!pid) return null
+  try {
+    return await cyberSourceGet<unknown>(`/tss/v2/transactions/${encodeURIComponent(pid)}`)
+  } catch {
+    return null
+  }
+}
+
+function uniqueStrings(ids: (string | undefined | null)[]): string[] {
+  const out: string[] = []
+  for (const x of ids) {
+    const t = typeof x === 'string' ? x.trim() : ''
+    if (t && !out.includes(t)) out.push(t)
+  }
+  return out
+}
+
+async function collectCaptureIdHints(paymentTx: string, captureId: string): Promise<string[]> {
+  const hints: string[] = []
+  const [dPay, dCap, tPay, tCap] = await Promise.all([
+    paymentTx ? safeGetPayment(paymentTx) : Promise.resolve(null),
+    captureId && captureId !== paymentTx ? safeGetPayment(captureId) : Promise.resolve(null),
+    paymentTx ? safeGetTssTransaction(paymentTx) : Promise.resolve(null),
+    captureId && captureId !== paymentTx ? safeGetTssTransaction(captureId) : Promise.resolve(null),
+  ])
+  for (const d of [dPay, dCap]) {
+    if (!d) continue
+    const c = extractCaptureIdFromPaymentDetail(d)
+    if (c) hints.push(c)
+    const j = findCaptureIdInJson(d, 0)
+    if (j) hints.push(j)
+  }
+  for (const t of [tPay, tCap]) {
+    if (!t) continue
+    const j = findCaptureIdInJson(t, 0)
+    if (j) hints.push(j)
+  }
+  return uniqueStrings(hints)
 }
 
 function pathCaptureRefund(captureId: string) {
@@ -119,11 +167,43 @@ function pathPaymentRefund(paymentId: string) {
   return `/pts/v2/payments/${encodeURIComponent(paymentId.trim())}/refunds`
 }
 
+function isNotFound(e: unknown): boolean {
+  return e instanceof CyberSourceApiError && e.status === 404
+}
+
+async function tryAllCaptureThenPayment(
+  captureCandidates: string[],
+  paymentCandidates: string[],
+  makeBody: () => ReturnType<typeof buildRefundBody>
+): Promise<RefundResp> {
+  let lastErr: unknown = new Error('Reembolso no intentado')
+
+  for (const cid of captureCandidates) {
+    if (!cid) continue
+    try {
+      return await cyberSourcePost<RefundResp>(pathCaptureRefund(cid), makeBody())
+    } catch (e) {
+      lastErr = e
+      if (!isNotFound(e)) throw e
+    }
+  }
+
+  for (const pid of paymentCandidates) {
+    if (!pid) continue
+    try {
+      return await cyberSourcePost<RefundResp>(pathPaymentRefund(pid), makeBody())
+    } catch (e) {
+      lastErr = e
+      if (!isNotFound(e)) throw e
+    }
+  }
+
+  throw lastErr
+}
+
 /**
- * Reembolso CyberSource:
- * - Captura separada: POST /pts/v2/captures/{captureId}/refunds
- * - Cobro en una sola llamada /payments (auth+capture juntos): POST /pts/v2/payments/{paymentId}/refunds
- * Si el log guardó mal el id, con 404 se hace GET /pts/v2/payments/{id} para resolver el id de captura y se reintenta.
+ * 1) Un solo intento con captureId del log (rápido si es correcto).
+ * 2) Si 404: GET /payments y TSS para extraer ids de captura; reintenta captura y luego /payments/refunds.
  */
 export async function refundCyberSourceCaptureForEntry(params: {
   captureId: string
@@ -133,69 +213,30 @@ export async function refundCyberSourceCaptureForEntry(params: {
   entryId: string
   paymentTransactionId?: string | null
 }) {
-  const body = buildRefundBody({
-    paymentReference: params.paymentReference,
-    entryId: params.entryId,
-    refundAmount: params.refundAmount,
-    currency: params.currency,
-  })
-
   const captureId = params.captureId.trim()
   const paymentTx = params.paymentTransactionId?.trim() || ''
 
-  const tryCapture = async (id: string) =>
-    cyberSourcePost<RefundResp>(pathCaptureRefund(id), body)
-
-  const tryPayment = async (id: string) =>
-    cyberSourcePost<RefundResp>(pathPaymentRefund(id), body)
-
-  const tryPaymentIdsUnique = new Set<string>()
-  if (paymentTx) tryPaymentIdsUnique.add(paymentTx)
-  if (captureId) tryPaymentIdsUnique.add(captureId)
-  const uniquePaymentIds = Array.from(tryPaymentIdsUnique)
+  let attempt = 0
+  const makeBody = () =>
+    buildRefundBody({
+      paymentReference: params.paymentReference,
+      entryId: params.entryId,
+      refundAmount: params.refundAmount,
+      currency: params.currency,
+      attemptSuffix: `${++attempt}-${Date.now().toString(36)}`,
+    })
 
   try {
-    return await tryCapture(captureId)
+    return await cyberSourcePost<RefundResp>(pathCaptureRefund(captureId), makeBody())
   } catch (firstErr) {
-    if (!(firstErr instanceof CyberSourceApiError) || firstErr.status !== 404) {
+    if (!isNotFound(firstErr)) {
       throw firstErr
     }
 
-    if (paymentTx) {
-      const resolved = await tryResolveCaptureIdFromPayment(paymentTx)
-      if (resolved && resolved !== captureId) {
-        try {
-          return await tryCapture(resolved)
-        } catch (e2) {
-          if (!(e2 instanceof CyberSourceApiError) || e2.status !== 404) {
-            throw e2
-          }
-        }
-      }
-    }
+    const hints = await collectCaptureIdHints(paymentTx, captureId)
+    const captureCandidates = uniqueStrings([...hints, captureId])
+    const paymentCandidates = uniqueStrings([paymentTx, captureId])
 
-    const resolvedFromCapture = captureId ? await tryResolveCaptureIdFromPayment(captureId) : null
-    if (resolvedFromCapture && resolvedFromCapture !== captureId) {
-      try {
-        return await tryCapture(resolvedFromCapture)
-      } catch (e3) {
-        if (!(e3 instanceof CyberSourceApiError) || e3.status !== 404) {
-          throw e3
-        }
-      }
-    }
-
-    let lastErr: unknown = firstErr
-    for (const paymentId of uniquePaymentIds) {
-      try {
-        return await tryPayment(paymentId)
-      } catch (err) {
-        lastErr = err
-        if (!(err instanceof CyberSourceApiError) || err.status !== 404) {
-          throw err
-        }
-      }
-    }
-    throw lastErr
+    return tryAllCaptureThenPayment(captureCandidates, paymentCandidates, makeBody)
   }
 }
