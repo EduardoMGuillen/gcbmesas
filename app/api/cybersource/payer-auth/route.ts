@@ -229,7 +229,18 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    if (!normalizedConsumerAuth?.cavv) {
+    const brand = String(resolvedCardType || '').toLowerCase()
+    const isAmex =
+      brand === '003' || brand.includes('amex') || brand.includes('american') || brand.includes('ax')
+
+    // Para VISA/MC seguimos exigiendo CAVV; para AMEX aceptamos respuesta 3DS siempre
+    // que al menos traiga ECI/XID, porque algunos emisores no devuelven cavv estándar.
+    const hasCavv = Boolean(normalizedConsumerAuth?.cavv)
+    const hasEciOrXid = Boolean(
+      (normalizedConsumerAuth as any)?.eci || (normalizedConsumerAuth as any)?.xid
+    )
+
+    if (!hasCavv && !(isAmex && hasEciOrXid)) {
       return NextResponse.json({
         enabled: true,
         status: 'failed',
@@ -237,8 +248,11 @@ export async function POST(req: NextRequest) {
         consumerAuthenticationInformation: null,
         paymentCardType: resolvedCardType || null,
         reason: enrollmentDsError
-          ? `Error en servidor de directorio 3DS (${enrollmentDsError}): ${enrollmentCai.directoryServerErrorDescription || 'El merchant puede no estar registrado para 3DS2 en el ambiente de prueba.'}`
-          : 'Payer Authentication no devolvió CAVV. La tarjeta puede no soportar 3DS en este ambiente.',
+          ? `Error en servidor de directorio 3DS (${enrollmentDsError}): ${
+              enrollmentCai.directoryServerErrorDescription ||
+              'El merchant puede no estar registrado para 3DS2 en el ambiente de prueba.'
+            }`
+          : 'Payer Authentication no devolvió datos 3DS suficientes (CAVV/ECI/XID). La tarjeta puede no soportar 3DS en este ambiente.',
         directoryServerErrorCode: enrollmentDsError || null,
         veresEnrolled: enrollmentCai.veresEnrolled || null,
       })
