@@ -338,12 +338,21 @@ export async function POST(req: NextRequest) {
     let captureStatus: string | null = null
     if (!isMockMode && isDirectMode && transactionId) {
       // Direct mode: SDK did auth-only (capture:false), do explicit capture here
-      const captureResponse = await cyberSourcePost<any>(`/pts/v2/payments/${transactionId}/captures`, {
+      const captureBody: any = {
         clientReferenceInformation: { code: `${paymentReference}-CAPTURE` },
         orderInformation: {
           amountDetails: { totalAmount: amountToCapture, currency, taxAmount: '0.00' },
         },
-      })
+      }
+      // Para cumplir con el adquirente, volvemos a enviar los campos 3DS (ECI, CAVV, XID, ids 3DS)
+      // también en la captura, no solo en la autorización.
+      if (normalizedConsumerAuth) {
+        captureBody.consumerAuthenticationInformation = normalizedConsumerAuth
+      }
+      const captureResponse = await cyberSourcePost<any>(
+        `/pts/v2/payments/${transactionId}/captures`,
+        captureBody
+      )
       captureId =
         extractCaptureIdFromCaptureApiResponse(captureResponse) ||
         String(captureResponse?.id || '').trim() ||
