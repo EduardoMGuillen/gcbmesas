@@ -1,4 +1,4 @@
-import { getPublicEvents } from '@/lib/actions'
+import { getPublicEvents } from '@/lib/public-events'
 import Link from 'next/link'
 import Image from 'next/image'
 import { PublicSiteVantaBackground } from '@/components/PublicSiteVantaBackground'

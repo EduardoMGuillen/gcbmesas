@@ -47,6 +47,8 @@ enum LogAction {
   ENTRY_USED
   PAYMENT_REFUNDED
   ATTENDANCE_MARK
+  /// Auditoría CyberSource (3DS, adquirente) por transacción — ver details.type
+  CYBERSOURCE_PAYMENT_AUDIT
 }
 
 enum AttendanceMarkType {

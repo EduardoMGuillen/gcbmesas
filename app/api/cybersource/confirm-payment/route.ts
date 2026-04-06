@@ -15,6 +15,7 @@ import {
   pickNumericEciFromConsumerAuth,
 } from '@/lib/cybersource'
 import { cyberSourceDirectPaymentViaSdk, cyberSourceUnifiedPaymentViaSdk } from '@/lib/cybersource-sdk-direct'
+import { persistCyberSourcePaymentAudit } from '@/lib/cybersource-payment-audit'
 import { assertEventEntryCapacity } from '@/lib/actions'
 
 function maskMerchantId(merchantId: string | undefined) {
@@ -60,6 +61,27 @@ function isMastercardCardType(paymentCardType: unknown): boolean {
   const s = String(paymentCardType || '').toLowerCase()
   const digits = s.replace(/\D/g, '')
   return digits === '002' || s.includes('master')
+}
+
+/** Alineado con payer-auth: vbv / spa / aesk según marca (evita usar siempre aesk si falta commerceIndicator en el body). */
+function commerceIndicatorForBrand(cardType: string): string {
+  const t = String(cardType || '').toLowerCase()
+  if (t === '001' || t.includes('visa')) return 'vbv'
+  if (t === '002' || t.includes('mastercard') || t.includes('master')) return 'spa'
+  if (t === '003' || t.includes('amex') || t.includes('american')) return 'aesk'
+  return 'aesk'
+}
+
+function resolveCommerceIndicator(
+  fromBody: unknown,
+  has3dsPayload: boolean,
+  paymentCardType: unknown
+): string {
+  const fromClient = String(fromBody || '').trim().toLowerCase()
+  if (fromClient) return fromClient
+  if (!has3dsPayload) return 'internet'
+  const brand = commerceIndicatorForBrand(String(paymentCardType || ''))
+  return brand || 'aesk'
 }
 
 function normalizeConsumerAuthenticationInformation(raw: any, paymentCardType?: string) {
@@ -281,6 +303,21 @@ export async function POST(req: NextRequest) {
       paymentCardType
     )
 
+    const amountStr = (
+      Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)
+    ).toFixed(2)
+    const resolvedCommerceIndicator = resolveCommerceIndicator(
+      commerceIndicator,
+      Boolean(normalizedConsumerAuth),
+      paymentCardType
+    )
+    const commerceIndicatorFromClient =
+      typeof commerceIndicator === 'string' && commerceIndicator.trim()
+        ? commerceIndicator.trim()
+        : null
+    const paymentCardTypeStr =
+      typeof paymentCardType === 'string' && paymentCardType.trim() ? paymentCardType.trim() : null
+
     const paymentResponse = isMockMode
       ? {
           status: 'AUTHORIZED',
@@ -290,7 +327,7 @@ export async function POST(req: NextRequest) {
       : isDirectMode
         ? await cyberSourceDirectPaymentViaSdk({
             paymentReference,
-            amount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
+            amount: amountStr,
             currency,
             cardNumber: cardDigits,
             cardExpMonth: String(cardExpMonth),
@@ -304,25 +341,15 @@ export async function POST(req: NextRequest) {
             billToPostalCode: String(billToPostalCode),
             billToCountry: String(billToCountry).toUpperCase(),
           })
-        : await (async () => {
-            const transientTokenString = String(transientToken)
-
-            const normalizedCommerceIndicator = String(
-              commerceIndicator || (normalizedConsumerAuth ? 'aesk' : 'internet')
-            )
-              .trim()
-              .toLowerCase()
-
-            return cyberSourceUnifiedPaymentViaSdk({
-              paymentReference,
-              transientToken: transientTokenString,
-              amount: (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2),
-              currency,
-              commerceIndicator: normalizedCommerceIndicator || 'internet',
-              billTo: resolvedBillTo,
-              consumerAuthInfo: normalizedConsumerAuth ?? null,
-            })
-          })()
+        : await cyberSourceUnifiedPaymentViaSdk({
+            paymentReference,
+            transientToken: String(transientToken),
+            amount: amountStr,
+            currency,
+            commerceIndicator: resolvedCommerceIndicator,
+            billTo: resolvedBillTo,
+            consumerAuthInfo: normalizedConsumerAuth ?? null,
+          })
 
     const status = String(paymentResponse?.status || '').toUpperCase()
     const transactionId = String(paymentResponse?.id || '')
@@ -341,13 +368,35 @@ export async function POST(req: NextRequest) {
           },
         },
       })
+      await persistCyberSourcePaymentAudit({
+        outcome: 'REJECTED_AUTH',
+        paymentReference,
+        eventId: event.id,
+        eventName: event.name,
+        clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+        amount: amountStr,
+        currency,
+        paymentMode: isDirectMode ? 'direct' : 'unified',
+        mock: isMockMode,
+        commerceIndicatorFromClient,
+        commerceIndicatorResolved: resolvedCommerceIndicator,
+        paymentCardType: paymentCardTypeStr,
+        hadRawConsumerAuthFromClient: Boolean(consumerAuthenticationInformation),
+        normalizedConsumerAuth: normalizedConsumerAuth,
+        cybersourceDecision: status,
+        cybersourceReasonCode: reasonCode,
+        transactionId: transactionId || null,
+        captureId: null,
+        captureStatus: null,
+        extraNote: 'Autorización CyberSource no exitosa.',
+      })
       return NextResponse.json(
         { error: `Pago rechazado por CyberSource (${reasonCode || status || 'sin-codigo'}).` },
         { status: 402 }
       )
     }
 
-    const amountToCapture = (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2)
+    const amountToCapture = amountStr
     let captureId: string | null = null
     let captureStatus: string | null = null
     if (!isMockMode && isDirectMode && transactionId) {
@@ -363,11 +412,7 @@ export async function POST(req: NextRequest) {
       if (normalizedConsumerAuth) {
         captureBody.consumerAuthenticationInformation = normalizedConsumerAuth
         captureBody.processingInformation = {
-          commerceIndicator: String(
-            commerceIndicator || (normalizedConsumerAuth ? 'aesk' : 'internet')
-          )
-            .trim()
-            .toLowerCase() || 'internet',
+          commerceIndicator: resolvedCommerceIndicator,
         }
       }
       const captureResponse = await cyberSourcePost<any>(
@@ -395,6 +440,28 @@ export async function POST(req: NextRequest) {
               updatedAt: new Date().toISOString(),
             },
           },
+        })
+        await persistCyberSourcePaymentAudit({
+          outcome: 'REJECTED_CAPTURE',
+          paymentReference,
+          eventId: event.id,
+          eventName: event.name,
+          clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+          amount: amountStr,
+          currency,
+          paymentMode: 'direct',
+          mock: false,
+          commerceIndicatorFromClient,
+          commerceIndicatorResolved: resolvedCommerceIndicator,
+          paymentCardType: paymentCardTypeStr,
+          hadRawConsumerAuthFromClient: Boolean(consumerAuthenticationInformation),
+          normalizedConsumerAuth: normalizedConsumerAuth,
+          cybersourceDecision: status,
+          cybersourceReasonCode: reasonCode,
+          transactionId: transactionId || null,
+          captureId,
+          captureStatus: captureStatus || 'FAILED',
+          extraNote: 'Captura REST rechazada tras autorización OK.',
         })
         return NextResponse.json(
           { error: `Captura rechazada por CyberSource (${captureStatus || 'sin-estado'}).` },
@@ -430,6 +497,28 @@ export async function POST(req: NextRequest) {
             updatedAt: new Date().toISOString(),
           },
         },
+      })
+      await persistCyberSourcePaymentAudit({
+        outcome: 'REJECTED_NO_CAPTURE_ID',
+        paymentReference,
+        eventId: event.id,
+        eventName: event.name,
+        clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+        amount: amountStr,
+        currency,
+        paymentMode: isDirectMode ? 'direct' : 'unified',
+        mock: false,
+        commerceIndicatorFromClient,
+        commerceIndicatorResolved: resolvedCommerceIndicator,
+        paymentCardType: paymentCardTypeStr,
+        hadRawConsumerAuthFromClient: Boolean(consumerAuthenticationInformation),
+        normalizedConsumerAuth: normalizedConsumerAuth,
+        cybersourceDecision: status,
+        cybersourceReasonCode: reasonCode,
+        transactionId: transactionId || null,
+        captureId: null,
+        captureStatus: null,
+        extraNote: 'Autorización OK pero no se resolvió captureId (unified o HAL).',
       })
       return NextResponse.json(
         {
@@ -504,6 +593,29 @@ export async function POST(req: NextRequest) {
           cybersourceCaptureStatus: captureStatus,
         },
       },
+    })
+
+    await persistCyberSourcePaymentAudit({
+      outcome: isMockMode ? 'MOCK' : 'SUCCESS',
+      paymentReference,
+      eventId: event.id,
+      eventName: event.name,
+      clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+      amount: amountStr,
+      currency,
+      paymentMode: isDirectMode ? 'direct' : 'unified',
+      mock: isMockMode,
+      commerceIndicatorFromClient,
+      commerceIndicatorResolved: resolvedCommerceIndicator,
+      paymentCardType: paymentCardTypeStr,
+      hadRawConsumerAuthFromClient: Boolean(consumerAuthenticationInformation),
+      normalizedConsumerAuth: normalizedConsumerAuth,
+      cybersourceDecision: status,
+      cybersourceReasonCode: reasonCode,
+      transactionId: transactionId || null,
+      captureId: captureId ?? null,
+      captureStatus: captureStatus ?? null,
+      extraNote: isMockMode ? 'Pago simulado (CYBERSOURCE_MOCK).' : null,
     })
 
     await prisma.log.update({
