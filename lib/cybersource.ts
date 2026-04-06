@@ -22,9 +22,31 @@ export class CyberSourceApiError extends Error {
   }
 }
 
+/** Solo `live` excluía otros valores usados en producción (p. ej. `production`) y apuntaba por error a apitest. */
+function isCyberSourceLiveEnv(): boolean {
+  const env = (process.env.CYBERSOURCE_ENV || 'test').trim().toLowerCase()
+  return (
+    env === 'live' ||
+    env === 'production' ||
+    env === 'prod' ||
+    env === '1' ||
+    env === 'true'
+  )
+}
+
 function getCyberSourceBaseUrl() {
-  const env = (process.env.CYBERSOURCE_ENV || 'test').toLowerCase()
-  return env === 'live' ? 'https://api.cybersource.com' : 'https://apitest.cybersource.com'
+  return isCyberSourceLiveEnv()
+    ? 'https://api.cybersource.com'
+    : 'https://apitest.cybersource.com'
+}
+
+/** Host efectivo de la API (para logs: debe ser api.cybersource.com en ventas live). */
+export function getCyberSourceApiHostForLogs(): string {
+  try {
+    return new URL(getCyberSourceBaseUrl()).host
+  } catch {
+    return 'unknown'
+  }
 }
 
 function getSharedSecretBuffer(sharedSecretRaw: string): Buffer {
@@ -109,7 +131,8 @@ async function cyberSourceRequest<TResponse>(
   })
 
   const headers: Record<string, string> = {
-    Accept: 'application/json',
+    // SDK de CyberSource usa hal+json; alinear evita rechazos raros en algunos recursos PTS.
+    Accept: 'application/hal+json, application/json;q=0.9',
     Host: host,
     Date: date,
     'v-c-date': date,
@@ -178,8 +201,8 @@ export async function cyberSourceGet<TResponse>(
 }
 
 /**
- * Payer-auth responses may include `ecommerceIndicator` with scheme codes (vbv / spa / aesk).
- * Those must not be sent as payment `consumerAuthenticationInformation.eciRaw` — only numeric ECI.
+ * Payer-auth puede devolver `ecommerceIndicator` con códigos de esquema (vbv / spa / aesk).
+ * No deben enviarse como `consumerAuthenticationInformation.eciRaw` en el pago — solo ECI numérico.
  */
 export function pickNumericEciFromConsumerAuth(
   raw: Record<string, unknown> | null | undefined
@@ -192,5 +215,64 @@ export function pickNumericEciFromConsumerAuth(
     if (/^\d{1,2}$/.test(s)) return s.length === 1 ? `0${s}` : s
   }
   return undefined
+}
+
+export function dedupeCyberSourceIds(ids: string[]): string[] {
+  const out: string[] = []
+  for (const x of ids) {
+    const t = x.trim()
+    if (t && !out.includes(t)) out.push(t)
+  }
+  return out
+}
+
+/** Respuesta POST /pts/v2/payments/{id}/captures o SDK capturePayment: id de recurso captura (no el payment id). */
+export function extractCaptureIdFromCaptureApiResponse(captureResponse: unknown): string | null {
+  if (!captureResponse || typeof captureResponse !== 'object') return null
+  const o = captureResponse as Record<string, unknown>
+  const id = typeof o.id === 'string' ? o.id.trim() : ''
+  if (id) return id
+  const links = (o._links ?? o.links) as Record<string, unknown> | undefined
+  const self = links?.self as { href?: string } | undefined
+  const href = typeof self?.href === 'string' ? self.href : ''
+  const m = href.match(/\/pts\/v2\/captures\/([^/?\s]+)/)
+  return m?.[1]?.trim() ?? null
+}
+
+/** GET /pts/v2/payments/{id}: enlaces HAL hacia /pts/v2/captures/... */
+export function extractAllCaptureIdsFromPaymentHal(p: unknown): string[] {
+  const out: string[] = []
+  if (!p || typeof p !== 'object') return out
+  const raw = ((p as Record<string, unknown>)._links ?? (p as Record<string, unknown>).links) as
+    | Record<string, unknown>
+    | undefined
+  if (!raw || typeof raw !== 'object') return out
+  const pushFromHref = (href: string) => {
+    const m = href.match(/\/pts\/v2\/captures\/([^/?\s]+)/)
+    if (m?.[1]) out.push(m[1].trim())
+  }
+  for (const v of Object.values(raw)) {
+    if (v && typeof v === 'object' && 'href' in (v as object)) {
+      pushFromHref(String((v as { href?: string }).href || ''))
+    }
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        if (item && typeof item === 'object' && 'href' in item) {
+          pushFromHref(String((item as { href?: string }).href || ''))
+        }
+      }
+    }
+  }
+  return dedupeCyberSourceIds(out)
+}
+
+export function extractFirstCaptureIdFromPaymentHal(p: unknown): string | null {
+  const all = extractAllCaptureIdsFromPaymentHal(p)
+  return all[0] ?? null
+}
+
+/** Valor efectivo de entorno REST (mismo criterio que getCyberSourceBaseUrl). */
+export function getCyberSourceEnvLabel(): 'live' | 'test' {
+  return isCyberSourceLiveEnv() ? 'live' : 'test'
 }
 

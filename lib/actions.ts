@@ -6,6 +6,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
 import { LogAction } from '@prisma/client'
 import { Prisma } from '@prisma/client'
+import { CyberSourceApiError, getCyberSourceApiHostForLogs, getCyberSourceEnvLabel } from './cybersource'
+import {
+  findOnlineSaleLogForEntry,
+  perEntryRefundAmount,
+  refundCyberSourceCaptureForEntry,
+} from './cybersource-refund'
 
 // Helper to create log
 async function createLog(
@@ -2053,9 +2059,12 @@ export async function createEvent(data: {
   description?: string
   coverImage?: string
   paypalPrice?: number
+  maxEntries?: number | null
 }) {
   const user = await getCurrentUser()
   ensureEntradasAdminOnly(user.role)
+
+  const maxEntries = normalizeMaxEntriesInput(data.maxEntries)
 
   const event = await prisma.event.create({
     data: {
@@ -2065,6 +2074,7 @@ export async function createEvent(data: {
       description: data.description || null,
       coverImage: data.coverImage || null,
       paypalPrice: data.paypalPrice || null,
+      ...(maxEntries !== undefined ? { maxEntries } : {}),
       createdByUserId: user.id,
     },
   })
@@ -2094,7 +2104,16 @@ export async function getEvents(onlyActive = false) {
 
 export async function updateEvent(
   id: string,
-  data: { name?: string; date?: string; coverPrice?: number; isActive?: boolean; description?: string; coverImage?: string; paypalPrice?: number }
+  data: {
+    name?: string
+    date?: string
+    coverPrice?: number
+    isActive?: boolean
+    description?: string
+    coverImage?: string
+    paypalPrice?: number
+    maxEntries?: number | null
+  }
 ) {
   const user = await getCurrentUser()
   ensureEntradasAdminOnly(user.role)
@@ -2107,6 +2126,16 @@ export async function updateEvent(
   if (data.description !== undefined) updateData.description = data.description || null
   if (data.coverImage !== undefined) updateData.coverImage = data.coverImage || null
   if (data.paypalPrice !== undefined) updateData.paypalPrice = data.paypalPrice || null
+  if (data.maxEntries !== undefined) {
+    const next = normalizeMaxEntriesInput(data.maxEntries)
+    updateData.maxEntries = next
+    if (next != null && next >= 1) {
+      const sold = await getEventSoldEntriesCount(id)
+      if (next < sold) {
+        throw new Error(`El límite no puede ser menor a las entradas ya vendidas (${sold}).`)
+      }
+    }
+  }
 
   const event = await prisma.event.update({
     where: { id },
@@ -2144,6 +2173,41 @@ export async function deleteEvent(id: string) {
 
 // ========== ENTRY ACTIONS ==========
 
+type PrismaDbClient = typeof prisma | Prisma.TransactionClient
+
+export async function getEventSoldEntriesCount(eventId: string, db: PrismaDbClient = prisma): Promise<number> {
+  const agg = await db.entry.aggregate({
+    where: { eventId, status: { not: 'CANCELLED' } },
+    _sum: { numberOfEntries: true },
+  })
+  return Number(agg._sum.numberOfEntries ?? 0)
+}
+
+/** null/<1 en maxEntries = sin límite. */
+export async function assertEventEntryCapacity(
+  event: { id: string; maxEntries: number | null },
+  additionalEntries: number,
+  db: PrismaDbClient = prisma
+): Promise<void> {
+  if (event.maxEntries == null || event.maxEntries < 1) return
+  const sold = await getEventSoldEntriesCount(event.id, db)
+  const remaining = event.maxEntries - sold
+  if (additionalEntries > remaining) {
+    throw new Error(
+      remaining <= 0
+        ? 'Cupo de entradas agotado para este evento.'
+        : `Solo quedan ${remaining} entrada(s) disponible(s) para este evento.`
+    )
+  }
+}
+
+function normalizeMaxEntriesInput(value: number | null | undefined): number | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  if (!Number.isFinite(value) || value < 1) return null
+  return Math.floor(value)
+}
+
 function generateQRToken(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   let token = ''
@@ -2173,34 +2237,42 @@ export async function createEntry(data: {
 
   const totalPrice = Number(event.coverPrice) * data.numberOfEntries
 
-  // Generate unique QR token
-  let qrToken = generateQRToken()
-  let attempts = 0
-  while (attempts < 10) {
-    const existing = await prisma.entry.findUnique({
-      where: { qrToken },
-      select: { id: true },
-    })
-    if (!existing) break
-    qrToken = generateQRToken()
-    attempts++
-  }
-
-  const entry = await prisma.entry.create({
-    data: {
-      eventId: data.eventId,
-      clientName: data.clientName,
-      clientEmail: data.clientEmail,
-      clientPhone: data.clientPhone?.trim() || null,
-      numberOfEntries: data.numberOfEntries,
-      totalPrice,
-      qrToken,
-      createdByUserId: user.id,
+  const entry = await prisma.$transaction(
+    async (tx) => {
+      await assertEventEntryCapacity(event, data.numberOfEntries, tx)
+      let qrToken = generateQRToken()
+      let attempts = 0
+      while (attempts < 10) {
+        const existing = await tx.entry.findUnique({
+          where: { qrToken },
+          select: { id: true },
+        })
+        if (!existing) break
+        qrToken = generateQRToken()
+        attempts++
+      }
+      return tx.entry.create({
+        data: {
+          eventId: data.eventId,
+          clientName: data.clientName,
+          clientEmail: data.clientEmail,
+          clientPhone: data.clientPhone?.trim() || null,
+          numberOfEntries: data.numberOfEntries,
+          totalPrice,
+          qrToken,
+          createdByUserId: user.id,
+        },
+        include: {
+          event: true,
+        },
+      })
     },
-    include: {
-      event: true,
-    },
-  })
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5000,
+      timeout: 15000,
+    }
+  )
 
   await createLog('ENTRY_SOLD', user.id, undefined, {
     entryId: entry.id,
@@ -2232,39 +2304,50 @@ export async function createBulkEntries(data: {
   if (!event.isActive) throw new Error('Este evento no está activo')
 
   const pricePerEntry = Number(event.coverPrice)
-  const entries = []
+  const qty = data.guestNames.length
 
-  for (const guestName of data.guestNames) {
-    let qrToken = generateQRToken()
-    let attempts = 0
-    while (attempts < 10) {
-      const existing = await prisma.entry.findUnique({
-        where: { qrToken },
-        select: { id: true },
-      })
-      if (!existing) break
-      qrToken = generateQRToken()
-      attempts++
+  const entries = await prisma.$transaction(
+    async (tx) => {
+      await assertEventEntryCapacity(event, qty, tx)
+      const created = []
+      for (const guestName of data.guestNames) {
+        let qrToken = generateQRToken()
+        let attempts = 0
+        while (attempts < 10) {
+          const existing = await tx.entry.findUnique({
+            where: { qrToken },
+            select: { id: true },
+          })
+          if (!existing) break
+          qrToken = generateQRToken()
+          attempts++
+        }
+
+        const entry = await tx.entry.create({
+          data: {
+            eventId: data.eventId,
+            clientName: guestName.trim(),
+            clientEmail: data.clientEmail.trim(),
+            clientPhone: data.clientPhone?.trim() || null,
+            numberOfEntries: 1,
+            totalPrice: pricePerEntry,
+            qrToken,
+            createdByUserId: user.id,
+          },
+          include: {
+            event: true,
+          },
+        })
+        created.push(entry)
+      }
+      return created
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5000,
+      timeout: 15000,
     }
-
-    const entry = await prisma.entry.create({
-      data: {
-        eventId: data.eventId,
-        clientName: guestName.trim(),
-        clientEmail: data.clientEmail.trim(),
-        clientPhone: data.clientPhone?.trim() || null,
-        numberOfEntries: 1,
-        totalPrice: pricePerEntry,
-        qrToken,
-        createdByUserId: user.id,
-      },
-      include: {
-        event: true,
-      },
-    })
-
-    entries.push(entry)
-  }
+  )
 
   await createLog('ENTRY_SOLD', user.id, undefined, {
     eventId: data.eventId,
@@ -2309,7 +2392,7 @@ export async function getEntradasDashboardData() {
   const user = await getCurrentUser()
   ensureEntradasAdminOnly(user.role)
 
-  const [events, recentEntries, todayStats] = await Promise.all([
+  const [events, recentEntries, todayStats, soldByEvent] = await Promise.all([
     prisma.event.findMany({
       orderBy: { date: 'desc' },
       include: {
@@ -2335,28 +2418,64 @@ export async function getEntradasDashboardData() {
       _sum: { totalPrice: true, numberOfEntries: true },
       _count: true,
     }),
+    prisma.entry.groupBy({
+      by: ['eventId'],
+      where: { status: { not: 'CANCELLED' } },
+      _sum: { numberOfEntries: true },
+    }),
   ])
 
-  return {
+  const soldMap = new Map(
+    soldByEvent.map((r) => [r.eventId, Number(r._sum.numberOfEntries ?? 0)])
+  )
+
+  const payload = {
     events: events.map((e: any) => ({
-      ...e,
+      id: e.id,
+      name: e.name,
+      date: e.date,
+      description: e.description,
+      coverImage: e.coverImage,
       coverPrice: Number(e.coverPrice),
-      paypalPrice: e.paypalPrice ? Number(e.paypalPrice) : null,
+      paypalPrice: e.paypalPrice != null ? Number(e.paypalPrice) : null,
+      maxEntries: e.maxEntries,
+      isActive: e.isActive,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+      createdByUserId: e.createdByUserId,
+      _count: e._count,
+      createdBy: e.createdBy,
+      entriesSoldSum: soldMap.get(e.id) ?? 0,
     })),
     recentEntries: recentEntries.map((e: any) => ({
-      ...e,
+      id: e.id,
+      eventId: e.eventId,
+      clientName: e.clientName,
+      clientEmail: e.clientEmail,
+      clientPhone: e.clientPhone,
+      numberOfEntries: e.numberOfEntries,
       totalPrice: Number(e.totalPrice),
+      qrToken: e.qrToken,
+      status: e.status,
+      emailSent: e.emailSent,
+      whatsappSent: e.whatsappSent,
+      createdAt: e.createdAt,
+      createdByUserId: e.createdByUserId,
       event: {
-        ...e.event,
+        name: e.event.name,
+        date: e.event.date,
         coverPrice: Number(e.event.coverPrice),
       },
+      createdBy: e.createdBy,
     })),
     todayStats: {
-      totalSales: Number(todayStats._sum.totalPrice || 0),
-      totalEntries: Number(todayStats._sum.numberOfEntries || 0),
+      totalSales: Number(todayStats._sum.totalPrice ?? 0),
+      totalEntries: Number(todayStats._sum.numberOfEntries ?? 0),
       totalTransactions: todayStats._count,
     },
   }
+
+  return JSON.parse(JSON.stringify(payload)) as typeof payload
 }
 
 const TAQUILLA_HISTORY_ROLES = ['ADMIN', 'TAQUILLA', 'MESERO', 'CAJERO'] as const
@@ -2474,23 +2593,241 @@ export async function revertEntryToActive(entryId: string) {
   revalidatePath('/admin/entradas')
 }
 
-export async function cancelEntry(entryId: string) {
-  const user = await getCurrentUser()
-  ensureEntradasAdminOnly(user.role)
+export type CancelEntryResult = { ok: true } | { ok: false; message: string }
 
-  const entry = await prisma.entry.findUnique({
-    where: { id: entryId },
-  })
+/** Fallo de reembolso CyberSource persistido en `logs` (Admin → Logs); no depende de Vercel Runtime Logs. */
+async function persistRefundFailureAuditLog(params: {
+  userId: string | undefined
+  entryId: string
+  saleLogId: string
+  paymentReference: string
+  captureId: string
+  refundAmount: string
+  error: unknown
+}) {
+  try {
+    const details: Record<string, unknown> = {
+      type: 'CYBERSOURCE_REFUND_FAILED',
+      entryId: params.entryId,
+      saleLogId: params.saleLogId,
+      paymentReference: params.paymentReference,
+      refundAmount: params.refundAmount,
+      at: new Date().toISOString(),
+      cybersourceEnv: getCyberSourceEnvLabel(),
+      cybersourceApiHost: getCyberSourceApiHostForLogs(),
+    }
+    if (params.captureId) {
+      details.captureIdPrefix = `${params.captureId.slice(0, 8)}…`
+    }
+    const err = params.error
+    if (err instanceof CyberSourceApiError) {
+      details.httpStatus = err.status
+      details.endpoint = err.endpoint
+      details.requestId = err.requestId
+      details.cybersourceMessage = err.message
+      details.responseBody =
+        typeof err.responseBody === 'string'
+          ? err.responseBody.slice(0, 2000)
+          : JSON.stringify(err.responseBody ?? {}).slice(0, 2000)
+      if (err.status === 404) {
+        details.refund404Hint =
+          'Si cybersourceApiHost es apitest.cybersource.com, CYBERSOURCE_ENV no está en live/production. Si es api.cybersource.com y sigue 404: mismo merchant que la venta, o reembolso no permitido para ese adquirente (soporte CyberSource).'
+      }
+    } else if (err instanceof Error) {
+      details.errorMessage = err.message
+      details.errorName = err.name
+    } else {
+      details.errorMessage = String(err)
+    }
+    await createLog('EVENT_UPDATED', params.userId, undefined, details)
+    revalidatePath('/admin/logs')
+  } catch {
+    // sin bloquear cancelEntry
+  }
+}
 
-  if (!entry) throw new Error('Entrada no encontrada')
-  if (entry.status === 'USED') throw new Error('No se puede cancelar una entrada ya utilizada')
+/** Devuelve resultado en lugar de lanzar: en producción las server actions que lanzan suelen mostrar digest genérico. */
+export async function cancelEntry(entryId: string): Promise<CancelEntryResult> {
+  try {
+    const user = await getCurrentUser()
+    ensureEntradasAdminOnly(user.role)
 
-  await prisma.entry.update({
-    where: { id: entryId },
-    data: { status: 'CANCELLED' },
-  })
+    const entry = await prisma.entry.findUnique({
+      where: { id: entryId },
+    })
 
-  revalidatePath('/admin/entradas')
+    if (!entry) return { ok: false, message: 'Entrada no encontrada' }
+    if (entry.status === 'USED') return { ok: false, message: 'No se puede cancelar una entrada ya utilizada' }
+    if (entry.status === 'CANCELLED') return { ok: false, message: 'Esta entrada ya fue cancelada' }
+
+    const saleLog = await findOnlineSaleLogForEntry(entryId)
+
+    if (!saleLog) {
+      await prisma.entry.update({
+        where: { id: entryId },
+        data: { status: 'CANCELLED' },
+      })
+      revalidatePath('/admin/entradas')
+      return { ok: true }
+    }
+
+    const details =
+      saleLog.details && typeof saleLog.details === 'object'
+        ? (saleLog.details as Record<string, unknown>)
+        : {}
+    const entryIds = details.entryIds as string[] | undefined
+    if (!entryIds?.length) {
+      return {
+        ok: false,
+        message:
+          'Esta venta online no tiene datos de reembolso automático (ventas anteriores). Reembolsa manualmente en CyberSource o contacta soporte.',
+      }
+    }
+
+    const priorRefunds = Array.isArray(details.cybersourceRefundEvents)
+      ? (details.cybersourceRefundEvents as Array<{ entryId: string }>)
+      : []
+    if (priorRefunds.some((r) => r.entryId === entryId)) {
+      return { ok: false, message: 'Esta entrada ya tiene un reembolso registrado.' }
+    }
+
+    const idx = entryIds.indexOf(entryId)
+    if (idx < 0) {
+      return { ok: false, message: 'Inconsistencia entre la entrada y el registro de venta. Contacta soporte.' }
+    }
+
+    const isMock =
+      process.env.CYBERSOURCE_MOCK === 'true' ||
+      String(details.cybersourceTransactionId || '').startsWith('mock_')
+
+    const captureId = String(details.cybersourceCaptureId || '').trim()
+    if (!isMock && !captureId) {
+      return {
+        ok: false,
+        message:
+          'No hay ID de captura de CyberSource para esta venta. No se puede reembolsar de forma automática.',
+      }
+    }
+
+    const totalPrice = Number(details.totalPrice ?? 0)
+    const refundAmountStr = perEntryRefundAmount(totalPrice, idx, entryIds.length)
+    const currency = String(details.currency || 'HNL')
+    const paymentReference = String(details.paymentReference || 'ref')
+
+    let refundResponse: { id?: string; status?: string }
+
+    try {
+      if (isMock) {
+        refundResponse = { id: `mock_refund_${entryId}`, status: 'PENDING' }
+      } else {
+        refundResponse = await refundCyberSourceCaptureForEntry({
+          captureId,
+          currency,
+          refundAmount: refundAmountStr,
+          paymentReference,
+          entryId,
+          paymentTransactionId: String(details.cybersourceTransactionId || '').trim() || null,
+        })
+      }
+    } catch (e) {
+      if (e instanceof CyberSourceApiError) {
+        const reason =
+          typeof e.responseBody === 'string'
+            ? e.responseBody
+            : (e.responseBody as any)?.errorInformation?.reason ||
+              (e.responseBody as any)?.message ||
+              e.message
+        await persistRefundFailureAuditLog({
+          userId: user.id,
+          entryId,
+          saleLogId: saleLog.id,
+          paymentReference,
+          captureId,
+          refundAmount: refundAmountStr,
+          error: e,
+        })
+        return {
+          ok: false,
+          message: `CyberSource no pudo procesar el reembolso (${e.status}): ${reason}`,
+        }
+      }
+      await persistRefundFailureAuditLog({
+        userId: user.id,
+        entryId,
+        saleLogId: saleLog.id,
+        paymentReference,
+        captureId,
+        refundAmount: refundAmountStr,
+        error: e,
+      })
+      throw e
+    }
+
+    const refundId = String(refundResponse?.id || '')
+    const newEvent = {
+      entryId,
+      refundId,
+      amount: refundAmountStr,
+      at: new Date().toISOString(),
+      status: String(refundResponse?.status || 'OK'),
+    }
+
+    const nextRefundEvents = [...priorRefunds, newEvent]
+
+    const mergedDetails = JSON.parse(
+      JSON.stringify({
+        ...details,
+        cybersourceRefundEvents: nextRefundEvents,
+      })
+    ) as Prisma.InputJsonValue
+
+    await prisma.$transaction([
+      prisma.log.update({
+        where: { id: saleLog.id },
+        data: { details: mergedDetails },
+      }),
+      prisma.entry.update({
+        where: { id: entryId },
+        data: { status: 'CANCELLED' },
+      }),
+    ])
+
+    try {
+      await createLog('PAYMENT_REFUNDED', user.id, undefined, {
+        entryId,
+        saleLogId: saleLog.id,
+        paymentReference,
+        refundAmount: refundAmountStr,
+        refundId,
+      })
+    } catch (auditErr) {
+      console.error('[cancelEntry] Audit log PAYMENT_REFUNDED failed (¿migración enum en BD?)', auditErr)
+      try {
+        await createLog('EVENT_UPDATED', user.id, undefined, {
+          type: 'PAYMENT_REFUNDED',
+          entryId,
+          saleLogId: saleLog.id,
+          paymentReference,
+          refundAmount: refundAmountStr,
+          refundId,
+        })
+      } catch (fallbackErr) {
+        console.error('[cancelEntry] Fallback audit log failed', fallbackErr)
+      }
+    }
+
+    revalidatePath('/admin/entradas')
+    return { ok: true }
+  } catch (e: unknown) {
+    const message =
+      e instanceof Error
+        ? e.message
+        : typeof e === 'string'
+          ? e
+          : 'No se pudo cancelar la entrada. Intenta de nuevo.'
+    console.error('[cancelEntry] failed', e)
+    return { ok: false, message }
+  }
 }
 
 export async function validateEntryByToken(token: string) {
@@ -2562,7 +2899,7 @@ export async function getPublicEvents() {
 }
 
 export async function getPublicEventById(id: string) {
-  return prisma.event.findFirst({
+  const event = await prisma.event.findFirst({
     where: { id, isActive: true },
     select: {
       id: true,
@@ -2572,8 +2909,12 @@ export async function getPublicEventById(id: string) {
       coverImage: true,
       coverPrice: true,
       paypalPrice: true,
+      maxEntries: true,
     },
   })
+  if (!event) return null
+  const entriesSoldSum = await getEventSoldEntriesCount(event.id)
+  return { ...event, entriesSoldSum }
 }
 
 export async function createPublicEntry(data: {
@@ -2590,32 +2931,43 @@ export async function createPublicEntry(data: {
   if (!event.paypalPrice) throw new Error('Este evento no acepta pagos en línea')
 
   const totalPrice = Number(event.paypalPrice) * data.numberOfEntries
-  const entries = []
 
-  for (let i = 0; i < data.numberOfEntries; i++) {
-    let qrToken = generateQRToken()
-    let attempts = 0
-    while (attempts < 10) {
-      const existing = await prisma.entry.findUnique({ where: { qrToken }, select: { id: true } })
-      if (!existing) break
-      qrToken = generateQRToken()
-      attempts++
+  const entries = await prisma.$transaction(
+    async (tx) => {
+      await assertEventEntryCapacity(event, data.numberOfEntries, tx)
+      const created = []
+      for (let i = 0; i < data.numberOfEntries; i++) {
+        let qrToken = generateQRToken()
+        let attempts = 0
+        while (attempts < 10) {
+          const existing = await tx.entry.findUnique({ where: { qrToken }, select: { id: true } })
+          if (!existing) break
+          qrToken = generateQRToken()
+          attempts++
+        }
+
+        const entry = await tx.entry.create({
+          data: {
+            eventId: data.eventId,
+            clientName: data.clientName.trim(),
+            clientEmail: data.clientEmail.trim(),
+            clientPhone: data.clientPhone?.trim() || null,
+            numberOfEntries: 1,
+            totalPrice: Number(event.coverPrice),
+            qrToken,
+          },
+          include: { event: true },
+        })
+        created.push(entry)
+      }
+      return created
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5000,
+      timeout: 15000,
     }
-
-    const entry = await prisma.entry.create({
-      data: {
-        eventId: data.eventId,
-        clientName: data.clientName.trim(),
-        clientEmail: data.clientEmail.trim(),
-        clientPhone: data.clientPhone?.trim() || null,
-        numberOfEntries: 1,
-        totalPrice: Number(event.coverPrice),
-        qrToken,
-      },
-      include: { event: true },
-    })
-    entries.push(entry)
-  }
+  )
 
   await prisma.log.create({
     data: {

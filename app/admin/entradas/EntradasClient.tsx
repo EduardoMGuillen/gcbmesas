@@ -26,6 +26,8 @@ type EventItem = {
   coverImage: string | null
   coverPrice: number
   paypalPrice: number | null
+  maxEntries: number | null
+  entriesSoldSum: number
   isActive: boolean
   createdAt: string | Date
   _count: { entries: number }
@@ -343,10 +345,18 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
 
   const selectedEvent = events.find((e) => e.id === eventId)
   const totalPrice = selectedEvent ? selectedEvent.coverPrice * numberOfEntries : 0
+  const remainingAtDoor =
+    selectedEvent && selectedEvent.maxEntries != null && selectedEvent.maxEntries >= 1
+      ? Math.max(0, selectedEvent.maxEntries - selectedEvent.entriesSoldSum)
+      : null
+  const doorSoldOut = remainingAtDoor !== null && remainingAtDoor < 1
 
   // Keep guestNames array in sync with numberOfEntries
   const updateNumberOfEntries = (n: number) => {
-    const newN = Math.max(1, n)
+    let newN = Math.max(1, n)
+    if (remainingAtDoor != null && remainingAtDoor >= 1) {
+      newN = Math.min(newN, remainingAtDoor)
+    }
     setNumberOfEntries(newN)
     setGuestNames((prev) => {
       if (newN > prev.length) {
@@ -371,6 +381,7 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
 
     if (!eventId) { setError('Selecciona un evento'); return }
     if (!clientEmail.trim()) { setError('Ingresa el email del cliente'); return }
+    if (doorSoldOut) { setError('Cupo agotado para este evento.'); return }
     if (numberOfEntries < 1) { setError('Mínimo 1 entrada'); return }
 
     // Validate all guest names
@@ -551,6 +562,12 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
                 </option>
               ))}
             </select>
+            {doorSoldOut && (
+              <p className="text-sm text-amber-400 mt-2">Cupo agotado: no quedan entradas disponibles para este evento.</p>
+            )}
+            {remainingAtDoor != null && remainingAtDoor >= 1 && (
+              <p className="text-xs text-dark-300 mt-2">Quedan {remainingAtDoor} entrada{remainingAtDoor !== 1 ? 's' : ''} disponibles.</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-300 mb-2">Email del Cliente</label>
@@ -565,7 +582,14 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => updateNumberOfEntries(numberOfEntries - 1)} className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors">-</button>
               <input type="number" min={1} value={numberOfEntries} onChange={(e) => updateNumberOfEntries(parseInt(e.target.value) || 1)} className="w-20 text-center px-3 py-2.5 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <button type="button" onClick={() => updateNumberOfEntries(numberOfEntries + 1)} className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors">+</button>
+              <button
+                type="button"
+                onClick={() => updateNumberOfEntries(numberOfEntries + 1)}
+                disabled={doorSoldOut || (remainingAtDoor != null && numberOfEntries >= remainingAtDoor)}
+                className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+              >
+                +
+              </button>
             </div>
           </div>
           {/* Guest names */}
@@ -598,7 +622,7 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
             </div>
           )}
           {error && <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">{error}</div>}
-          <button type="submit" disabled={isPending} className="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+          <button type="submit" disabled={isPending || doorSoldOut} className="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors">
             {isPending ? 'Procesando...' : 'Registrar Venta'}
           </button>
         </form>
@@ -948,10 +972,22 @@ function EventosTab({ events }: { events: EventItem[] }) {
   const [description, setDescription] = useState('')
   const [coverImage, setCoverImage] = useState('')
   const [onlinePrice, setOnlinePrice] = useState('')
+  const [maxEntriesLimit, setMaxEntriesLimit] = useState('')
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
 
-  const resetForm = () => { setName(''); setDate(''); setCoverPrice(''); setDescription(''); setCoverImage(''); setOnlinePrice(''); setEditingId(null); setShowForm(false); setError('') }
+  const resetForm = () => {
+    setName('')
+    setDate('')
+    setCoverPrice('')
+    setDescription('')
+    setCoverImage('')
+    setOnlinePrice('')
+    setMaxEntriesLimit('')
+    setEditingId(null)
+    setShowForm(false)
+    setError('')
+  }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -983,6 +1019,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
     setDescription(ev.description || '')
     setCoverImage(ev.coverImage || '')
     setOnlinePrice(ev.paypalPrice ? ev.paypalPrice.toString() : '')
+    setMaxEntriesLimit(ev.maxEntries != null && ev.maxEntries >= 1 ? String(ev.maxEntries) : '')
     setShowForm(true)
   }
 
@@ -993,6 +1030,19 @@ function EventosTab({ events }: { events: EventItem[] }) {
     if (!date) { setError('Selecciona una fecha'); return }
     if (!coverPrice || parseFloat(coverPrice) <= 0) { setError('Ingresa un precio válido'); return }
 
+    const limitTrim = maxEntriesLimit.trim()
+    let maxEntries: number | null | undefined
+    if (limitTrim === '') {
+      maxEntries = editingId ? null : undefined
+    } else {
+      const n = parseInt(limitTrim, 10)
+      if (!Number.isFinite(n) || n < 1) {
+        setError('Límite de entradas debe ser un número entero mayor o igual a 1')
+        return
+      }
+      maxEntries = n
+    }
+
     startTransition(async () => {
       try {
         const eventData = {
@@ -1002,6 +1052,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
           description: description.trim() || undefined,
           coverImage: coverImage.trim() || undefined,
           paypalPrice: onlinePrice ? parseFloat(onlinePrice) : undefined,
+          ...(maxEntries !== undefined ? { maxEntries } : {}),
         }
         if (editingId) {
           await updateEvent(editingId, eventData)
@@ -1090,6 +1141,20 @@ function EventosTab({ events }: { events: EventItem[] }) {
                 <label className="block text-sm font-medium text-dark-300 mb-2">Precio Online (LPS) <span className="text-white/30 font-normal">(opcional - para venta en linea)</span></label>
                 <input type="number" step="0.01" min="0" value={onlinePrice} onChange={(e) => setOnlinePrice(e.target.value)} placeholder="200.00" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Límite de entradas <span className="text-white/30 font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={maxEntriesLimit}
+                  onChange={(e) => setMaxEntriesLimit(e.target.value)}
+                  placeholder="Sin límite"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <p className="text-xs text-dark-300 mt-1">Vacío = sin límite. Suma cover + online (excluye canceladas).</p>
+              </div>
             </div>
             {error && <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">{error}</div>}
             <div className="flex gap-3">
@@ -1116,7 +1181,13 @@ function EventosTab({ events }: { events: EventItem[] }) {
               <div className="space-y-1 text-sm mb-4">
                 <p className="text-dark-300">Cover: <span className="text-primary-400 font-semibold">L {ev.coverPrice.toFixed(2)}</span></p>
                 {ev.paypalPrice && <p className="text-dark-300">Online: <span className="text-blue-400 font-semibold">L {ev.paypalPrice.toFixed(2)}</span></p>}
-                <p className="text-dark-300">Entradas vendidas: <span className="text-white font-medium">{ev._count.entries}</span></p>
+                <p className="text-dark-300">
+                  Entradas vendidas:{' '}
+                  <span className="text-white font-medium">
+                    {ev.entriesSoldSum}
+                    {ev.maxEntries != null && ev.maxEntries >= 1 ? ` / ${ev.maxEntries}` : ''}
+                  </span>
+                </p>
                 {ev.description && <p className="text-dark-300 truncate" title={ev.description}>{ev.description}</p>}
               </div>
               <div className="flex gap-2 flex-wrap">
@@ -1176,7 +1247,13 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
     if (!confirm('¿Cancelar esta entrada?')) return
     setError(''); setActionMsg('')
     startTransition(async () => {
-      try { await cancelEntry(entryId); setActionMsg('Entrada cancelada'); router.refresh() } catch (err: any) { setError(err.message) }
+      const result = await cancelEntry(entryId)
+      if (!result.ok) {
+        setError(result.message)
+        return
+      }
+      setActionMsg('Entrada cancelada')
+      router.refresh()
     })
   }
 
@@ -1330,7 +1407,7 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
                     {entry.status === 'ACTIVE' && (
                       <>
                         <button onClick={() => handleMarkUsed(entry.id)} disabled={isPending} className="text-xs px-2.5 sm:px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50">Marcar Usada</button>
-                        <button onClick={() => handleCancel(entry.id)} disabled={isPending} className="text-xs px-2.5 sm:px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors disabled:opacity-50">Cancelar</button>
+                        <button onClick={() => handleCancel(entry.id)} disabled={isPending} className="text-xs px-2.5 sm:px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors disabled:opacity-50">Cancelar/Reembolsar</button>
                       </>
                     )}
                     {entry.status === 'USED' && (

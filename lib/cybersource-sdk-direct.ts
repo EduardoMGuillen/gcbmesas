@@ -1,4 +1,4 @@
-import { CyberSourceApiError } from '@/lib/cybersource'
+import { CyberSourceApiError, extractCaptureIdFromCaptureApiResponse } from '@/lib/cybersource'
 
 type DirectPaymentParams = {
   paymentReference: string
@@ -42,6 +42,11 @@ function getRunEnvironmentHost() {
   return env === 'live' ? 'api.cybersource.com' : 'apitest.cybersource.com'
 }
 
+/** orderInformation.amountDetails: total unchanged; explicit zero tax for acquirer/reporting. */
+function csAmountDetails(totalAmount: string, currency: string) {
+  return { totalAmount, currency, taxAmount: '0.00' }
+}
+
 export async function cyberSourceDirectPaymentViaSdk(params: DirectPaymentParams): Promise<any> {
   const merchantId = process.env.CYBERSOURCE_MERCHANT_ID?.trim()
   const keyId = process.env.CYBERSOURCE_KEY_ID?.trim()
@@ -81,10 +86,7 @@ export async function cyberSourceDirectPaymentViaSdk(params: DirectPaymentParams
     },
   }
   requestObj.orderInformation = {
-    amountDetails: {
-      totalAmount: params.amount,
-      currency: params.currency,
-    },
+    amountDetails: csAmountDetails(params.amount, params.currency),
     billTo: {
       firstName: params.cardHolderName.trim().split(' ')[0] || 'John',
       lastName: params.cardHolderName.trim().split(' ').slice(1).join(' ') || 'Doe',
@@ -207,10 +209,7 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
   // billTo triggers country validation on the payments endpoint in some environments.
   // The card/billing data is already embedded in the Microform transient token.
   requestObj.orderInformation = {
-    amountDetails: {
-      totalAmount: params.amount,
-      currency: params.currency,
-    },
+    amountDetails: csAmountDetails(params.amount, params.currency),
   }
 
   const paymentsApi = new sdk.PaymentsApi(configObject, apiClient)
@@ -236,7 +235,7 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
   const captureRequestObj = new sdk.CapturePaymentRequest()
   captureRequestObj.clientReferenceInformation = { code: `${params.paymentReference}-CAP` }
   captureRequestObj.orderInformation = {
-    amountDetails: { totalAmount: params.amount, currency: params.currency },
+    amountDetails: csAmountDetails(params.amount, params.currency),
   }
   // Acquirer expects the same 3DS proof on capture as on auth (ECI / CAVV / XID + DS txn IDs).
   // CapturePaymentRequest in the Node SDK omits this property in typings, but the REST API accepts it.
@@ -263,10 +262,11 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
     )
   })
 
-  // Return a merged response that confirm-payment route can interpret the same way
+  const captureIdResolved = extractCaptureIdFromCaptureApiResponse(captureResponse)
+  // No usar authId como captureId: el reembolso va a /captures/{id}; el id de autorización devuelve 404.
   return {
     ...authResponse,
-    captureId: String(captureResponse?.id || authId),
+    captureId: captureIdResolved ?? '',
     captureStatus: String(captureResponse?.status || '').toUpperCase(),
   }
 }
@@ -351,7 +351,7 @@ export async function cyberSourcePayerAuthSetupViaSdk(params: PayerAuthSetupPara
   // Setup only needs amount to initiate device fingerprinting; billTo is for enrollment.
   // Sending billTo here triggers country validation on the risk endpoint and can cause 400.
   requestObj.orderInformation = {
-    amountDetails: { totalAmount: params.amount, currency: params.currency },
+    amountDetails: csAmountDetails(params.amount, params.currency),
   }
   if (params.cardType) {
     requestObj.paymentInformation = { card: { type: params.cardType } }
@@ -382,7 +382,7 @@ export async function cyberSourcePayerAuthEnrollViaSdk(params: PayerAuthEnrollPa
   // billTo triggers country validation on the risk endpoint → 400 for some countries.
   // The billing address is sent separately in the payment authorization step.
   requestObj.orderInformation = {
-    amountDetails: { totalAmount: params.amount, currency: params.currency },
+    amountDetails: csAmountDetails(params.amount, params.currency),
   }
   if (params.cardType) {
     requestObj.paymentInformation = { card: { type: params.cardType } }

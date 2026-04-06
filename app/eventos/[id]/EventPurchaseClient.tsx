@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import QRCode from 'qrcode'
 
 type EventData = {
@@ -11,6 +12,8 @@ type EventData = {
   coverImage: string | null
   coverPrice: number
   onlinePrice: number
+  maxEntries: number | null
+  entriesSoldSum: number
 }
 
 type PurchaseSuccess = {
@@ -113,6 +116,14 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
 
   const totalPrice = event.onlinePrice * numberOfEntries
 
+  const remainingOnline =
+    event.maxEntries != null && event.maxEntries >= 1
+      ? Math.max(0, event.maxEntries - event.entriesSoldSum)
+      : null
+  const onlineSoldOut = remainingOnline !== null && remainingOnline < 1
+  const maxQtyThisCheckout =
+    remainingOnline === null ? 10 : Math.min(10, Math.max(1, remainingOnline))
+
   const eventDateStr = new Date(event.date).toLocaleDateString('es-HN', {
     weekday: 'long',
     year: 'numeric',
@@ -122,7 +133,10 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   })
 
   const handleQtyChange = (newQty: number) => {
-    setNumberOfEntries(newQty)
+    if (onlineSoldOut) return
+    let capped = Math.max(1, newQty)
+    capped = Math.min(capped, maxQtyThisCheckout)
+    setNumberOfEntries(capped)
     setClientNames((prev) => {
       const updated = [...prev]
       while (updated.length < newQty) updated.push('')
@@ -618,6 +632,28 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     return <ConfirmationView success={success} event={event} />
   }
 
+  if (onlineSoldOut) {
+    return (
+      <div className="max-w-xl mx-auto text-center py-16 px-4">
+        <h3 className="text-xl font-semibold text-white mb-2">Cupo agotado</h3>
+        <p className="text-white/50 text-sm mb-6">
+          Las entradas en línea para este evento ya no están disponibles.
+        </p>
+        <Link
+          href="/eventos"
+          className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full transition-all hover:scale-105"
+          style={{
+            background: 'linear-gradient(45deg, #00ffff, #a855f7)',
+            color: '#0a0a15',
+            boxShadow: '0 4px 20px rgba(0,255,255,0.2)',
+          }}
+        >
+          Ver otros eventos
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* 3DS Challenge Modal — shown when the issuing bank requires an ACS step-up */}
@@ -737,19 +773,27 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               <input
                 type="number"
                 min={1}
-                max={10}
+                max={maxQtyThisCheckout}
                 value={numberOfEntries}
-                onChange={(e) => handleQtyChange(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                onChange={(e) =>
+                  handleQtyChange(Math.max(1, Math.min(maxQtyThisCheckout, parseInt(e.target.value) || 1)))
+                }
                 className="w-24 text-center px-3 py-2.5 rounded-lg text-white focus:outline-none text-base font-semibold"
                 style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
               />
               <button
                 type="button"
-                onClick={() => handleQtyChange(Math.min(10, numberOfEntries + 1))}
-                className="w-11 h-11 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors text-lg font-semibold"
+                disabled={numberOfEntries >= maxQtyThisCheckout}
+                onClick={() => handleQtyChange(Math.min(maxQtyThisCheckout, numberOfEntries + 1))}
+                className="w-11 h-11 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors text-lg font-semibold disabled:opacity-35 disabled:pointer-events-none"
                 style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
               >+</button>
             </div>
+            {remainingOnline != null && remainingOnline <= 10 && (
+              <p className="text-xs mt-2" style={{ color: mutedText }}>
+                Quedan {remainingOnline} entrada{remainingOnline !== 1 ? 's' : ''} disponibles en línea.
+              </p>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -937,7 +981,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
               <div
                 className="h-full rounded-full"
                 style={{
-                  width: `${Math.min(100, Math.max(35, (numberOfEntries / 10) * 100))}%`,
+                  width: `${Math.min(100, Math.max(35, (numberOfEntries / maxQtyThisCheckout) * 100))}%`,
                   background: goldGradient,
                 }}
               />
