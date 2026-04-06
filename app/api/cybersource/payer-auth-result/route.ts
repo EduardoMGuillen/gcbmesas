@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { CyberSourceApiError } from '@/lib/cybersource'
+import { CyberSourceApiError, pickNumericEciFromConsumerAuth } from '@/lib/cybersource'
 import { cyberSourcePayerAuthValidateViaSdk } from '@/lib/cybersource-sdk-direct'
 
 function commerceIndicatorForBrand(cardType: string): string {
@@ -17,7 +17,7 @@ function normalizeConsumerAuthenticationInformation(raw: any) {
     authenticationTransactionId: raw.authenticationTransactionId ? String(raw.authenticationTransactionId) : undefined,
     cavv: cryptogram ? String(cryptogram) : undefined,
     xid: raw.xid ? String(raw.xid) : undefined,
-    eci: (raw.eci || raw.ecommerceIndicator) ? String(raw.eci || raw.ecommerceIndicator) : undefined,
+    eci: pickNumericEciFromConsumerAuth(raw),
     ucafCollectionIndicator: raw.ucafCollectionIndicator ? String(raw.ucafCollectionIndicator) : undefined,
     ucafAuthenticationData: (raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv)
       ? String(raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv)

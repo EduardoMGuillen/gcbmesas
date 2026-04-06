@@ -238,6 +238,14 @@ export async function cyberSourceUnifiedPaymentViaSdk(params: UnifiedPaymentPara
   captureRequestObj.orderInformation = {
     amountDetails: { totalAmount: params.amount, currency: params.currency },
   }
+  // Acquirer expects the same 3DS proof on capture as on auth (ECI / CAVV / XID + DS txn IDs).
+  // CapturePaymentRequest in the Node SDK omits this property in typings, but the REST API accepts it.
+  if (params.consumerAuthInfo && Object.keys(params.consumerAuthInfo).length > 0) {
+    ;(captureRequestObj as any).consumerAuthenticationInformation = params.consumerAuthInfo
+  }
+  captureRequestObj.processingInformation = {
+    commerceIndicator: params.commerceIndicator || 'internet',
+  }
 
   const captureApi = new sdk.CaptureApi(configObject, new sdk.ApiClient())
 

@@ -5,7 +5,12 @@ import { revalidatePath } from 'next/cache'
 import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
-import { CyberSourceApiError, cyberSourceGet, cyberSourcePost } from '@/lib/cybersource'
+import {
+  CyberSourceApiError,
+  cyberSourceGet,
+  cyberSourcePost,
+  pickNumericEciFromConsumerAuth,
+} from '@/lib/cybersource'
 import { cyberSourceDirectPaymentViaSdk, cyberSourceUnifiedPaymentViaSdk } from '@/lib/cybersource-sdk-direct'
 
 function maskMerchantId(merchantId: string | undefined) {
@@ -47,7 +52,13 @@ function parseJwtPayload(token: string): any | null {
   }
 }
 
-function normalizeConsumerAuthenticationInformation(raw: any) {
+function isMastercardCardType(paymentCardType: unknown): boolean {
+  const s = String(paymentCardType || '').toLowerCase()
+  const digits = s.replace(/\D/g, '')
+  return digits === '002' || s.includes('master')
+}
+
+function normalizeConsumerAuthenticationInformation(raw: any, paymentCardType?: string) {
   if (!raw || typeof raw !== 'object') return null
   // For the PAYMENT step only authenticationTransactionId (CyberSource internal enrollment ID)
   // must be excluded — it triggers CyberSource to look for paymentAccountInformation.card.number → 400.
@@ -55,16 +66,18 @@ function normalizeConsumerAuthenticationInformation(raw: any) {
   // so the authorization carries the correct ECI/CAVV and is marked as 3DS-authenticated.
   // SDK field name: "eciRaw" (not "eci").
   const normalized: Record<string, string> = {}
+  const mc = isMastercardCardType(paymentCardType)
   const cryptogram = raw.cavv || raw.authenticationValue || raw.ucafAuthenticationData
-  if (cryptogram)     normalized.cavv        = String(cryptogram)
-  if (raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv) {
+  if (cryptogram) normalized.cavv = String(cryptogram)
+  if (mc && (raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv)) {
     normalized.ucafAuthenticationData = String(raw.ucafAuthenticationData || raw.authenticationValue || raw.cavv)
   }
-  if (raw.eci)        normalized.eciRaw      = String(raw.eci)       // SDK field is eciRaw
-  if (raw.eciRaw)     normalized.eciRaw      = String(raw.eciRaw)
-  if (raw.ucafCollectionIndicator) normalized.ucafCollectionIndicator = String(raw.ucafCollectionIndicator)
-  if (!normalized.eciRaw && raw.ucafCollectionIndicator) normalized.eciRaw = String(raw.ucafCollectionIndicator)
-  if (raw.xid)        normalized.xid         = String(raw.xid)
+  if (mc && raw.ucafCollectionIndicator) {
+    normalized.ucafCollectionIndicator = String(raw.ucafCollectionIndicator)
+  }
+  const eciNumeric = pickNumericEciFromConsumerAuth(raw)
+  if (eciNumeric) normalized.eciRaw = eciNumeric
+  if (raw.xid) normalized.xid = String(raw.xid)
   if (raw.paresStatus) normalized.paresStatus = String(raw.paresStatus)
   if (raw.acsTransactionId)            normalized.acsTransactionId            = String(raw.acsTransactionId)
   if (raw.threeDSServerTransactionId)  normalized.threeDSServerTransactionId  = String(raw.threeDSServerTransactionId)
@@ -247,7 +260,10 @@ export async function POST(req: NextRequest) {
       phoneNumber: String(pendingDetails?.clientPhone || '00000000').trim() || '00000000',
     }
 
-    const normalizedConsumerAuth = normalizeConsumerAuthenticationInformation(consumerAuthenticationInformation)
+    const normalizedConsumerAuth = normalizeConsumerAuthenticationInformation(
+      consumerAuthenticationInformation,
+      paymentCardType
+    )
 
     const paymentResponse = isMockMode
       ? {

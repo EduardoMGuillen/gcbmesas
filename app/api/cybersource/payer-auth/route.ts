@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { CyberSourceApiError } from '@/lib/cybersource'
+import { CyberSourceApiError, pickNumericEciFromConsumerAuth } from '@/lib/cybersource'
 import {
   cyberSourcePayerAuthSetupViaSdk,
   cyberSourcePayerAuthEnrollViaSdk,
@@ -24,14 +24,13 @@ function parseJwtPayload(token: string): any | null {
 function normalizeConsumerAuthenticationInformation(raw: any) {
   if (!raw || typeof raw !== 'object') return null
   const cryptogram = raw.cavv || raw.authenticationValue || raw.ucafAuthenticationData
-  const eciLike = raw.eci || raw.eciRaw || raw.ecommerceIndicator
   const normalized = {
     authenticationTransactionId: raw.authenticationTransactionId ? String(raw.authenticationTransactionId) : undefined,
     // Mastercard and some 3DS2 responses use authenticationValue/UCAF instead of cavv.
     cavv: cryptogram ? String(cryptogram) : undefined,
     xid: raw.xid ? String(raw.xid) : undefined,
-    // CyberSource can return ECI as eci/eciRaw, ecommerceIndicator (vbv/spa/aesk), or MC collection indicator.
-    eci: eciLike ? String(eciLike) : undefined,
+    // Never map ecommerceIndicator (vbv/spa/aesk) into eci — Amex/Visa need numeric ECI (e.g. 05) for the acquirer.
+    eci: pickNumericEciFromConsumerAuth(raw),
     // Mastercard requires this field in authorization when available.
     ucafCollectionIndicator: raw.ucafCollectionIndicator ? String(raw.ucafCollectionIndicator) : undefined,
     // Mastercard can require UCAF auth data explicitly in payment auth payload.

@@ -177,3 +177,20 @@ export async function cyberSourceGet<TResponse>(
   return cyberSourceRequest<TResponse>('GET', resourcePath)
 }
 
+/**
+ * Payer-auth responses may include `ecommerceIndicator` with scheme codes (vbv / spa / aesk).
+ * Those must not be sent as payment `consumerAuthenticationInformation.eciRaw` — only numeric ECI.
+ */
+export function pickNumericEciFromConsumerAuth(
+  raw: Record<string, unknown> | null | undefined
+): string | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  for (const key of ['eci', 'eciRaw'] as const) {
+    const v = raw[key]
+    if (v == null || v === '') continue
+    const s = String(v).trim()
+    if (/^\d{1,2}$/.test(s)) return s.length === 1 ? `0${s}` : s
+  }
+  return undefined
+}
+
