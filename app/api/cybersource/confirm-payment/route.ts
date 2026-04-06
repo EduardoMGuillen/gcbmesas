@@ -5,13 +5,17 @@ import { revalidatePath } from 'next/cache'
 import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
+import { Prisma } from '@prisma/client'
 import {
   CyberSourceApiError,
   cyberSourceGet,
   cyberSourcePost,
+  extractCaptureIdFromCaptureApiResponse,
+  extractFirstCaptureIdFromPaymentHal,
   pickNumericEciFromConsumerAuth,
 } from '@/lib/cybersource'
 import { cyberSourceDirectPaymentViaSdk, cyberSourceUnifiedPaymentViaSdk } from '@/lib/cybersource-sdk-direct'
+import { assertEventEntryCapacity } from '@/lib/actions'
 
 function maskMerchantId(merchantId: string | undefined) {
   if (!merchantId) return null
@@ -79,9 +83,11 @@ function normalizeConsumerAuthenticationInformation(raw: any, paymentCardType?: 
   if (eciNumeric) normalized.eciRaw = eciNumeric
   if (raw.xid) normalized.xid = String(raw.xid)
   if (raw.paresStatus) normalized.paresStatus = String(raw.paresStatus)
-  if (raw.acsTransactionId)            normalized.acsTransactionId            = String(raw.acsTransactionId)
-  if (raw.threeDSServerTransactionId)  normalized.threeDSServerTransactionId  = String(raw.threeDSServerTransactionId)
-  if (raw.directoryServerTransactionId) normalized.directoryServerTransactionId = String(raw.directoryServerTransactionId)
+  if (raw.acsTransactionId) normalized.acsTransactionId = String(raw.acsTransactionId)
+  if (raw.threeDSServerTransactionId) normalized.threeDSServerTransactionId = String(raw.threeDSServerTransactionId)
+  if (raw.directoryServerTransactionId) {
+    normalized.directoryServerTransactionId = String(raw.directoryServerTransactionId)
+  }
   // For a frictionless success without explicit paresStatus, default to "Y"
   if (!normalized.paresStatus && (normalized.cavv || normalized.eciRaw)) {
     normalized.paresStatus = 'Y'
@@ -245,6 +251,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Evento no encontrado o sin precio online' }, { status: 404 })
     }
 
+    const qtyNeeded = Number(pendingDetails?.numberOfEntries || numberOfEntries)
+    try {
+      await assertEventEntryCapacity(event, qtyNeeded)
+    } catch (capErr: any) {
+      return NextResponse.json(
+        { error: capErr?.message || 'Sin cupo para este evento.' },
+        { status: 409 }
+      )
+    }
+
     const fallbackFullName = String(cardHolderName || names[0] || 'Cliente General').trim()
     const fallbackFirstName = fallbackFullName.split(' ')[0] || 'Cliente'
     const fallbackLastName = fallbackFullName.split(' ').slice(1).join(' ') || 'General'
@@ -336,16 +352,35 @@ export async function POST(req: NextRequest) {
     let captureStatus: string | null = null
     if (!isMockMode && isDirectMode && transactionId) {
       // Direct mode: SDK did auth-only (capture:false), do explicit capture here
-      const captureResponse = await cyberSourcePost<any>(`/pts/v2/payments/${transactionId}/captures`, {
+      const captureBody: any = {
         clientReferenceInformation: { code: `${paymentReference}-CAPTURE` },
         orderInformation: {
-          amountDetails: { totalAmount: amountToCapture, currency },
+          amountDetails: { totalAmount: amountToCapture, currency, taxAmount: '0.00' },
         },
-      })
-      captureId = String(captureResponse?.id || '') || null
+      }
+      // Para cumplir con el adquirente, volvemos a enviar los campos 3DS (ECI, CAVV, XID, ids 3DS)
+      // también en la captura, no solo en la autorización.
+      if (normalizedConsumerAuth) {
+        captureBody.consumerAuthenticationInformation = normalizedConsumerAuth
+        captureBody.processingInformation = {
+          commerceIndicator: String(
+            commerceIndicator || (normalizedConsumerAuth ? 'aesk' : 'internet')
+          )
+            .trim()
+            .toLowerCase() || 'internet',
+        }
+      }
+      const captureResponse = await cyberSourcePost<any>(
+        `/pts/v2/payments/${transactionId}/captures`,
+        captureBody
+      )
+      captureId =
+        extractCaptureIdFromCaptureApiResponse(captureResponse) ||
+        String(captureResponse?.id || '').trim() ||
+        null
       captureStatus = String(captureResponse?.status || '').toUpperCase() || null
       const okCaptureStatuses = ['PENDING', 'TRANSMITTED', 'COMPLETED', 'SUCCESS', 'CAPTURED']
-      if (!captureStatus || !okCaptureStatuses.includes(captureStatus)) {
+      if (!captureStatus || !okCaptureStatuses.includes(captureStatus) || !captureId) {
         await prisma.log.update({
           where: { id: pendingLog.id },
           data: {
@@ -367,28 +402,86 @@ export async function POST(req: NextRequest) {
         )
       }
     } else if (!isMockMode && !isDirectMode && transactionId) {
-      // Unified mode: SDK already did auth + capture internally, results are in paymentResponse
-      captureId = String((paymentResponse as any)?.captureId || transactionId) || null
+      let resolved = String((paymentResponse as any)?.captureId || '').trim()
+      if (!resolved) {
+        try {
+          const pay = await cyberSourceGet<unknown>(
+            `/pts/v2/payments/${encodeURIComponent(transactionId)}`
+          )
+          resolved = extractFirstCaptureIdFromPaymentHal(pay) || ''
+        } catch {
+          resolved = ''
+        }
+      }
+      captureId = resolved || null
       captureStatus = String((paymentResponse as any)?.captureStatus || status) || null
     }
 
-    const entries = []
-    for (let i = 0; i < Number(pendingDetails?.numberOfEntries || numberOfEntries); i++) {
-      const qrToken = generateToken()
-      const entryName = (names[i] || names[0]).trim()
-      const entry = await prisma.entry.create({
+    if (!isMockMode && transactionId && !captureId) {
+      await prisma.log.update({
+        where: { id: pendingLog.id },
         data: {
-          eventId: event.id,
-          clientName: entryName,
-          clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
-          clientPhone: String(pendingDetails?.clientPhone || '').trim() || null,
-          numberOfEntries: 1,
-          totalPrice: Number(event.coverPrice),
-          qrToken,
+          details: {
+            ...pendingDetails,
+            status: 'REJECTED',
+            decision: 'NO_CAPTURE_ID',
+            reasonCode: 'missing_capture_id',
+            transactionId: transactionId || null,
+            updatedAt: new Date().toISOString(),
+          },
         },
-        include: { event: true },
       })
-      entries.push(entry)
+      return NextResponse.json(
+        {
+          error:
+            'No se pudo registrar el id de captura del pago. No se emitieron entradas; si ves un cargo, contacta soporte con tu referencia.',
+        },
+        { status: 502 }
+      )
+    }
+
+    let entries: any[] = []
+    try {
+      entries = await prisma.$transaction(
+        async (tx) => {
+          await assertEventEntryCapacity(event, qtyNeeded, tx)
+          const created = []
+          for (let i = 0; i < qtyNeeded; i++) {
+            const qrToken = generateToken()
+            const entryName = (names[i] || names[0]).trim()
+            const entry = await tx.entry.create({
+              data: {
+                eventId: event.id,
+                clientName: entryName,
+                clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+                clientPhone: String(pendingDetails?.clientPhone || '').trim() || null,
+                numberOfEntries: 1,
+                totalPrice: Number(event.coverPrice),
+                qrToken,
+              },
+              include: { event: true },
+            })
+            created.push(entry)
+          }
+          return created
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 5000,
+          timeout: 15000,
+        }
+      )
+    } catch (txErr: any) {
+      console.error('[CyberSource] Entry creation failed after successful payment:', txErr)
+      return NextResponse.json(
+        {
+          error:
+            txErr?.message?.includes('Cupo') || txErr?.message?.includes('disponible')
+              ? txErr.message
+              : 'No se pudieron emitir las entradas. Contacta soporte con tu referencia de pago.',
+        },
+        { status: 409 }
+      )
     }
 
     await prisma.log.create({
@@ -403,6 +496,7 @@ export async function POST(req: NextRequest) {
           paymentReference,
           source: 'online_cybersource',
           currency,
+          entryIds: entries.map((e: { id: string }) => e.id),
           cybersourceDecision: status,
           cybersourceReasonCode: reasonCode,
           cybersourceTransactionId: transactionId || null,

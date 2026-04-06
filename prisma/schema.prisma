@@ -45,6 +45,7 @@ enum LogAction {
   EVENT_UPDATED
   ENTRY_SOLD
   ENTRY_USED
+  PAYMENT_REFUNDED
   ATTENDANCE_MARK
 }
 
@@ -213,6 +214,8 @@ model Event {
   coverImage      String?
   coverPrice      Decimal  @db.Decimal(10, 2)
   paypalPrice     Decimal? @db.Decimal(10, 2)
+  /// Máximo de entradas vendibles (suma de numberOfEntries, excl. canceladas). null = sin límite.
+  maxEntries      Int?
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
