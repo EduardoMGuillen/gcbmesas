@@ -91,6 +91,9 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   const [billingPostalCode, setBillingPostalCode] = useState('')
   const [billingCountry, setBillingCountry] = useState('HN')
   const microformRef = useRef<any>(null)
+  /** Flex Field instances — must call .unload() before React removes #cybs-card-* hosts (avoids removeChild crashes). */
+  const microformFieldRefs = useRef<{ number: any; cvv: any } | null>(null)
+  const challengeCompleteLockRef = useRef(false)
 
   // 3DS challenge state
   const [show3dsChallenge, setShow3dsChallenge] = useState(false)
@@ -171,6 +174,52 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     billingCountry.trim().length === 2
   const microformProfileValid = cardHolderName.trim().length > 0 && billingValid
 
+  const teardownUnifiedMicroform = useCallback(() => {
+    const fields = microformFieldRefs.current
+    if (fields) {
+      try {
+        if (typeof fields.number?.unload === 'function') fields.number.unload()
+      } catch {
+        /* ignore */
+      }
+      try {
+        if (typeof fields.cvv?.unload === 'function') fields.cvv.unload()
+      } catch {
+        /* ignore */
+      }
+      microformFieldRefs.current = null
+    }
+    microformRef.current = null
+    const clearHost = (id: string) => {
+      const el = document.getElementById(id)
+      if (!el) return
+      try {
+        el.replaceChildren()
+      } catch {
+        try {
+          el.innerHTML = ''
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    clearHost('cybs-card-number')
+    clearHost('cybs-card-cvv')
+  }, [])
+
+  const scheduleClose3dsModal = useCallback(() => {
+    try {
+      if (challengeIframeRef.current) {
+        challengeIframeRef.current.src = 'about:blank'
+      }
+    } catch {
+      /* ignore */
+    }
+    requestAnimationFrame(() => {
+      setShow3dsChallenge(false)
+    })
+  }, [])
+
   const loadUnifiedScript = async (src: string, integrity?: string | null) => {
     if ((window as any).Flex) return
     await new Promise<void>((resolve, reject) => {
@@ -191,6 +240,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     clientLibrary: string
     clientLibraryIntegrity?: string | null
   }) => {
+    teardownUnifiedMicroform()
     setShowUnified(true)
     setMicroformReady(false)
     setMicroformPaymentReference(params.paymentReference)
@@ -233,6 +283,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
         setMicroformCardType(typeFromField)
       }
     })
+    microformFieldRefs.current = { number: numberField, cvv: securityCodeField }
     microformRef.current = microform
     setMicroformReady(true)
   }
@@ -294,13 +345,15 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     }).catch((err: any) => {
       // Fix #6: on expiry, reset the microform so user can re-enter card without reloading the page
       if (err?.expired) {
-        setShowUnified(false)
-        setMicroformReady(false)
-        setMicroformPaymentReference('')
-        setMicroformExpMonth('')
-        setMicroformExpYear('')
-        setMicroformCardType('')
-        microformRef.current = null
+        teardownUnifiedMicroform()
+        requestAnimationFrame(() => {
+          setShowUnified(false)
+          setMicroformReady(false)
+          setMicroformPaymentReference('')
+          setMicroformExpMonth('')
+          setMicroformExpYear('')
+          setMicroformCardType('')
+        })
       }
       throw err
     })
@@ -451,14 +504,20 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
     })
     const result = await confirmRes.json()
     if (!confirmRes.ok) throw new Error(result.error || 'Error al confirmar el pago')
-    setSuccess(result)
+    teardownUnifiedMicroform()
+    requestAnimationFrame(() => setSuccess(result))
   }
 
   // Called when the ACS step-up iframe fires the CYBS_3DS_COMPLETE postMessage
   const handleChallengeComplete = useCallback(async () => {
-    setShow3dsChallenge(false)
+    if (challengeCompleteLockRef.current) return
+    challengeCompleteLockRef.current = true
+    scheduleClose3dsModal()
     const pending = challengePendingRef.current
-    if (!pending) return
+    if (!pending) {
+      challengeCompleteLockRef.current = false
+      return
+    }
     challengePendingRef.current = null
 
     setProcessing(true)
@@ -500,9 +559,10 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
       setError(err.message || 'Error al completar el pago con 3DS.')
     } finally {
       setProcessing(false)
+      challengeCompleteLockRef.current = false
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [challengeAuthTransactionId, event.id])
+  }, [challengeAuthTransactionId, event.id, scheduleClose3dsModal])
 
   // Listen for the postMessage fired by the 3DS callback route
   useEffect(() => {
@@ -521,6 +581,8 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
       challengeFormRef.current.submit()
     }
   }, [show3dsChallenge, challengeStepUpUrl])
+
+  useEffect(() => () => teardownUnifiedMicroform(), [teardownUnifiedMicroform])
 
   const startCheckout = async () => {
     setProcessing(true)
@@ -709,8 +771,9 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
           <button
             type="button"
             onClick={() => {
-              setShow3dsChallenge(false)
+              scheduleClose3dsModal()
               challengePendingRef.current = null
+              challengeCompleteLockRef.current = false
               setError('Verificación 3DS cancelada. Puedes intentarlo de nuevo.')
             }}
             style={{

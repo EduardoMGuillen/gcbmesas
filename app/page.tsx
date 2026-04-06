@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getPublicEvents } from '@/lib/actions'
+import { getPublicEvents } from '@/lib/public-events'
 import LandingPage from './_components/LandingPage'
 
 export const dynamic = 'force-dynamic'
@@ -26,10 +26,13 @@ export default async function Home() {
   }
 
   const rawEvents = await getPublicEvents()
-  const events = rawEvents.map(e => ({
-    ...e,
-    paypalPrice: e.paypalPrice?.toString() ?? null,
-    coverPrice:  e.coverPrice?.toString()  ?? null,
+  const events = rawEvents.map((e) => ({
+    id: e.id,
+    name: e.name,
+    date: e.date,
+    description: e.description,
+    coverImage: e.coverImage,
+    paypalPrice: e.paypalPrice != null ? e.paypalPrice.toString() : null,
   }))
 
   return <LandingPage events={events} />

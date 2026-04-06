@@ -33,6 +33,7 @@ const actionLabels: Record<LogAction, string> = {
   ENTRY_USED: 'Entrada Utilizada',
   PAYMENT_REFUNDED: 'Reembolso de pago',
   ATTENDANCE_MARK: 'Marcaje de Asistencia',
+  CYBERSOURCE_PAYMENT_AUDIT: 'CyberSource · Auditoría de pago',
 }
 
 function getActionLabel(action: string): string {
