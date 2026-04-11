@@ -6,6 +6,8 @@ import {
   registerStaffPushSubscription,
   refreshAndroidWebFcmTokenIfPossible,
   resyncStaffPushSubscriptionIfGranted,
+  isStaffPushCapacitorAndroid,
+  resyncCapacitorAndroidPushIfPossible,
 } from '@/lib/client-push-subscribe'
 
 type Status = 'idle' | 'loading' | 'granted' | 'denied' | 'unsupported' | 'error'
@@ -46,20 +48,41 @@ export function PushSubscriptionButton() {
     void resyncStaffPushSubscriptionIfGranted()
   }, [session?.user?.id])
 
-  // Comprobar permiso y suscripción existente
+  // Comprobar permiso y suscripción existente (APK: no usar PushManager; muchas WebViews no lo tienen)
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      setStatus('unsupported')
-      return
-    }
-    const perm = Notification.permission
-    if (perm === 'denied') {
-      setStatus('denied')
-      return
-    }
-    if (perm === 'granted') {
-      void (async () => {
+
+    void (async () => {
+      if (isStaffPushCapacitorAndroid()) {
+        try {
+          const { PushNotifications } = await import('@capacitor/push-notifications')
+          const perm = await PushNotifications.checkPermissions()
+          if (perm.receive === 'denied') {
+            setStatus('denied')
+            return
+          }
+          if (perm.receive === 'granted') {
+            const ok = await resyncCapacitorAndroidPushIfPossible()
+            setStatus(ok ? 'granted' : 'idle')
+            return
+          }
+          setStatus('idle')
+        } catch {
+          setStatus('idle')
+        }
+        return
+      }
+
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        setStatus('unsupported')
+        return
+      }
+      const perm = Notification.permission
+      if (perm === 'denied') {
+        setStatus('denied')
+        return
+      }
+      if (perm === 'granted') {
         try {
           const reg = await navigator.serviceWorker.ready
           const sub = await reg.pushManager.getSubscription()
@@ -72,8 +95,8 @@ export function PushSubscriptionButton() {
         } catch {
           // ignore
         }
-      })()
-    }
+      }
+    })()
   }, [])
 
   async function enable() {

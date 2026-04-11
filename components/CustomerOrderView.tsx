@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from 'react'
 import { createCustomerOrder, createOrder, closeAccount, addBalanceToAccount, cancelOrderByCustomer, cancelOrderByMesero } from '@/lib/actions'
 import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount, OPEN_ACCOUNT_SENTINEL } from '@/lib/utils'
+import { isInsufficientBalanceError } from '@/lib/billing-errors'
 import { useRouter } from 'next/navigation'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import Image from 'next/image'
@@ -88,6 +89,11 @@ export function CustomerOrderView({
   const [balanceAmount, setBalanceAmount] = useState('')
   const [showConfirmAddBalance, setShowConfirmAddBalance] = useState(false)
   const [pendingBalanceAmount, setPendingBalanceAmount] = useState(0)
+  const [insufficientBalanceModal, setInsufficientBalanceModal] = useState<{
+    orderTotal: number
+    available: number
+  } | null>(null)
+  const [insufficientTopUpError, setInsufficientTopUpError] = useState('')
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   
@@ -233,6 +239,39 @@ export function CustomerOrderView({
     }
   }
 
+  const selectedOrderTotal = (productId: string, quantityNum: number) => {
+    const p = products.find((x) => x.id === productId)
+    if (!p) return 0
+    return Number(p.price) * quantityNum
+  }
+
+  const finishOrderSuccessMesero = () => {
+    setShowAddProduct(false)
+    setSelectedProduct('')
+    setQuantity('1')
+    setError('')
+    setInsufficientBalanceModal(null)
+    startTransition(() => {
+      router.refresh()
+    })
+    setTimeout(() => {
+      router.refresh()
+    }, 800)
+  }
+
+  const finishOrderSuccessCliente = () => {
+    setShowAddProduct(false)
+    setSelectedProduct('')
+    setQuantity('1')
+    setError('')
+    setInsufficientBalanceModal(null)
+    router.refresh()
+    setTimeout(() => {
+      const currentUrl = window.location.href
+      window.location.href = currentUrl
+    }, 1000)
+  }
+
   const handleAddOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -252,57 +291,78 @@ export function CustomerOrderView({
         return
       }
 
+      const orderTotal = selectedOrderTotal(selectedProduct, quantityNum)
+      const available = Number(account.currentBalance)
+      if (
+        !isOpenAccount(account.initialBalance) &&
+        orderTotal > 0 &&
+        available < orderTotal
+      ) {
+        setInsufficientTopUpError('')
+        setInsufficientBalanceModal({ orderTotal, available })
+        setLoading(false)
+        return
+      }
+
       if (isMesero) {
         await createOrder({
           accountId: account.id,
           productId: selectedProduct,
           quantity: quantityNum,
         })
-        
-        // Cerrar el formulario primero
-        setShowAddProduct(false)
-        setSelectedProduct('')
-        setQuantity('1')
-        setError('')
-        
-        // Refresh inmediato para obtener los datos actualizados del pedido
-        startTransition(() => {
-          router.refresh()
-        })
-        
-        // Refresh adicional después de un delay para asegurar actualización completa
-        setTimeout(() => {
-          router.refresh()
-        }, 800)
+        finishOrderSuccessMesero()
       } else {
-        // Para clientes, asegurar que la acción se complete antes de refrescar
         await createCustomerOrder({
           accountId: account.id,
           productId: selectedProduct,
           quantity: quantityNum,
         })
-        
-        // Cerrar el formulario primero
-        setShowAddProduct(false)
-        setSelectedProduct('')
-        setQuantity('1')
-        setError('')
-        
-        // Para clientes, usar una estrategia más agresiva porque revalidatePath no funciona bien con query params
-        // Opción 1: Refresh inmediato con router.refresh
-        router.refresh()
-        
-        // Opción 2: Refresh usando window.location para forzar recarga completa si router.refresh falla
-        // Usar un delay más largo para dar tiempo a que router.refresh funcione primero
-        setTimeout(() => {
-          // Verificar si la página necesita recarga completa
-          // Si después de 1000ms no se ha actualizado, forzar recarga
-          const currentUrl = window.location.href
-          window.location.href = currentUrl // Forzar recarga completa de la página
-        }, 1000)
+        finishOrderSuccessCliente()
       }
     } catch (err: any) {
-      setError(err.message || 'Error al agregar pedido')
+      const msg = err?.message || ''
+      if (isInsufficientBalanceError(msg)) {
+        const quantityNum = parseInt(quantity, 10) || 1
+        const orderTotal = selectedOrderTotal(selectedProduct, quantityNum)
+        const available = Number(account.currentBalance)
+        setInsufficientTopUpError('')
+        setInsufficientBalanceModal({ orderTotal, available })
+        setError('')
+      } else {
+        setError(msg || 'Error al agregar pedido')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMeseroAddPedidoAmountAndOrder = async () => {
+    if (!insufficientBalanceModal || !isMesero || !selectedProduct) return
+    const quantityNum = parseInt(quantity, 10)
+    if (!quantityNum || quantityNum < 1) return
+
+    const { orderTotal } = insufficientBalanceModal
+    setLoading(true)
+    setInsufficientTopUpError('')
+    try {
+      await addBalanceToAccount(account.id, orderTotal)
+      const nextInitial = Number(account.initialBalance) + orderTotal
+      const nextCurrent = Number(account.currentBalance) + orderTotal
+      setAccount({
+        ...account,
+        initialBalance: nextInitial,
+        currentBalance: nextCurrent,
+      })
+
+      await createOrder({
+        accountId: account.id,
+        productId: selectedProduct,
+        quantity: quantityNum,
+      })
+
+      finishOrderSuccessMesero()
+    } catch (err: any) {
+      setInsufficientTopUpError(err?.message || 'Error al agregar saldo o pedido')
     } finally {
       setLoading(false)
     }
@@ -1023,6 +1083,71 @@ export function CustomerOrderView({
                   {loading ? 'Agregando...' : 'Sí, agregar'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {insufficientBalanceModal && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="insufficient-balance-title"
+        >
+          <div className="bg-dark-100 border border-dark-200 rounded-xl p-6 max-w-md w-full shadow-xl">
+            <h2 id="insufficient-balance-title" className="text-xl font-semibold text-white mb-3">
+              No hay saldo disponible
+            </h2>
+            <p className="text-dark-300 text-sm leading-relaxed mb-2">
+              El pedido suma{' '}
+              <span className="text-white font-semibold">
+                {formatCurrency(insufficientBalanceModal.orderTotal)}
+              </span>{' '}
+              y el saldo disponible es{' '}
+              <span className="text-white font-semibold">
+                {formatCurrency(insufficientBalanceModal.available)}
+              </span>
+              .
+            </p>
+            {!isMesero && (
+              <p className="text-dark-400 text-xs mb-4">
+                Pide al mesero que agregue saldo a la cuenta para poder pedir.
+              </p>
+            )}
+            {insufficientTopUpError && (
+              <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-3 py-2 rounded-lg text-sm">
+                {insufficientTopUpError}
+              </div>
+            )}
+            <div className="flex flex-col gap-3 mt-6">
+              {isMesero && (
+                <button
+                  type="button"
+                  onClick={handleMeseroAddPedidoAmountAndOrder}
+                  disabled={loading}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm sm:text-base"
+                >
+                  {loading
+                    ? 'Procesando...'
+                    : `Agregar ${formatCurrency(insufficientBalanceModal.orderTotal)} (valor del pedido) y registrar pedido`}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setInsufficientBalanceModal(null)
+                  setInsufficientTopUpError('')
+                  setError('')
+                }}
+                className={`w-full font-semibold py-3 px-4 rounded-lg transition-colors ${
+                  isMesero
+                    ? 'bg-dark-200 hover:bg-dark-300 text-white'
+                    : 'bg-primary-600 hover:bg-primary-700 text-white'
+                }`}
+              >
+                {isMesero ? 'Cerrar' : 'Entendido'}
+              </button>
             </div>
           </div>
         </div>

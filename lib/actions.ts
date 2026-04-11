@@ -12,6 +12,7 @@ import {
   perEntryRefundAmount,
   refundCyberSourceCaptureForEntry,
 } from './cybersource-refund'
+import { INSUFFICIENT_BALANCE_MESSAGE } from './billing-errors'
 
 // Helper to create log
 async function createLog(
@@ -1258,7 +1259,7 @@ export async function createOrder(data: {
   const totalPrice = Number(product.price) * quantity
 
   if (Number(account.currentBalance) < totalPrice) {
-    throw new Error('Saldo insuficiente')
+    throw new Error(INSUFFICIENT_BALANCE_MESSAGE)
   }
 
   // Use transaction to ensure atomicity
@@ -1269,7 +1270,7 @@ export async function createOrder(data: {
     })
 
     if (!lockedAccount || Number(lockedAccount.currentBalance) < totalPrice) {
-      throw new Error('Saldo insuficiente')
+      throw new Error(INSUFFICIENT_BALANCE_MESSAGE)
     }
 
     // Create order
@@ -1588,7 +1589,7 @@ export async function createCustomerOrder(data: {
   const totalPrice = Number(product.price) * quantity
 
   if (Number(account.currentBalance) < totalPrice) {
-    throw new Error('Saldo insuficiente')
+    throw new Error(INSUFFICIENT_BALANCE_MESSAGE)
   }
 
   // Use transaction to ensure atomicity
@@ -1599,7 +1600,7 @@ export async function createCustomerOrder(data: {
     })
 
     if (!lockedAccount || Number(lockedAccount.currentBalance) < totalPrice) {
-      throw new Error('Saldo insuficiente')
+      throw new Error(INSUFFICIENT_BALANCE_MESSAGE)
     }
 
     // Create order
