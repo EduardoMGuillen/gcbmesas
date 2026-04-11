@@ -1,5 +1,7 @@
 'use client'
 
+import { Capacitor } from '@capacitor/core'
+
 /**
  * Registro push compartido (mesero / admin / cajero): misma lógica que el panel mesero.
  * - Android APK: Capacitor FCM
@@ -11,10 +13,61 @@ export type RegisterStaffPushResult =
   | { ok: true }
   | { ok: false; message: string; denied?: boolean; unsupported?: boolean }
 
-function isCapacitorAndroid(): boolean {
+/**
+ * APK Android (Capacitor). Usar en UI para no exigir PushManager (muchas WebViews no lo exponen).
+ */
+export function isStaffPushCapacitorAndroid(): boolean {
   if (typeof window === 'undefined') return false
-  const cap = (window as unknown as { Capacitor?: { getPlatform?: () => string } }).Capacitor
-  return cap?.getPlatform?.() === 'android'
+  try {
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
+  } catch {
+    const cap = (window as unknown as { Capacitor?: { getPlatform?: () => string } }).Capacitor
+    return cap?.getPlatform?.() === 'android'
+  }
+}
+
+async function postAndroidFcmTokenToServer(token: string): Promise<RegisterStaffPushResult> {
+  const res = await fetch('/api/push-subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ platform: 'android', token }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    return { ok: false, message: (err as { error?: string }).error || 'Error al registrar' }
+  }
+  return { ok: true }
+}
+
+/** Obtiene token FCM nativo y lo guarda en el servidor (permiso ya concedido). */
+async function registerCapacitorAndroidFcmToken(): Promise<RegisterStaffPushResult> {
+  const { PushNotifications } = await import('@capacitor/push-notifications')
+  await PushNotifications.removeAllListeners()
+  const tokenPromise = new Promise<string>((resolve, reject) => {
+    const timeout = setTimeout(
+      () =>
+        reject(
+          new Error(
+            'Tiempo de espera agotado. En emulador FCM suele fallar: prueba en un móvil real. Si es dispositivo real, revisa que Google Play Services esté actualizado.'
+          )
+        ),
+      45000
+    )
+    void PushNotifications.addListener('registration', (ev: { value: string }) => {
+      clearTimeout(timeout)
+      void PushNotifications.removeAllListeners()
+      resolve(ev.value)
+    })
+    void PushNotifications.addListener('registrationError', (err: { error: string }) => {
+      clearTimeout(timeout)
+      void PushNotifications.removeAllListeners()
+      reject(new Error(err?.error || 'Error al obtener el token de notificaciones'))
+    })
+  })
+  await new Promise((r) => setTimeout(r, 150))
+  await PushNotifications.register()
+  const token = await tokenPromise
+  return postAndroidFcmTokenToServer(token)
 }
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -29,8 +82,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export async function registerStaffPushSubscription(): Promise<RegisterStaffPushResult> {
-  // Android APK: FCM Capacitor
-  if (isCapacitorAndroid()) {
+  // Android APK: FCM Capacitor (mismo backend que FCM web: fcm:token + Firebase Admin)
+  if (isStaffPushCapacitorAndroid()) {
     try {
       const { PushNotifications } = await import('@capacitor/push-notifications')
       const perm = await PushNotifications.requestPermissions()
@@ -41,40 +94,7 @@ export async function registerStaffPushSubscription(): Promise<RegisterStaffPush
           message: 'Permiso denegado. Activa las notificaciones en Ajustes del dispositivo.',
         }
       }
-      const tokenPromise = new Promise<string>((resolve, reject) => {
-        const timeout = setTimeout(
-          () =>
-            reject(
-              new Error(
-                'Tiempo de espera agotado. En emulador FCM suele fallar: prueba en un móvil real. Si es dispositivo real, revisa que Google Play Services esté actualizado.'
-              )
-            ),
-          45000
-        )
-        PushNotifications.addListener('registration', (ev: { value: string }) => {
-          clearTimeout(timeout)
-          resolve(ev.value)
-          PushNotifications.removeAllListeners().catch(() => {})
-        })
-        PushNotifications.addListener('registrationError', (err: { error: string }) => {
-          clearTimeout(timeout)
-          reject(new Error(err?.error || 'Error al obtener el token de notificaciones'))
-          PushNotifications.removeAllListeners().catch(() => {})
-        })
-      })
-      await new Promise((r) => setTimeout(r, 150))
-      await PushNotifications.register()
-      const token = await tokenPromise
-      const res = await fetch('/api/push-subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: 'android', token }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        return { ok: false, message: (err as { error?: string }).error || 'Error al registrar' }
-      }
-      return { ok: true }
+      return await registerCapacitorAndroidFcmToken()
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err)
       return { ok: false, message: errMsg }
@@ -246,8 +266,26 @@ export async function registerStaffPushSubscription(): Promise<RegisterStaffPush
 /**
  * Re-sincroniza la suscripción actual con el usuario de sesión (mismo dispositivo, otro login).
  */
+/** Re-registra el token FCM nativo en el servidor (mismo usuario u otro, APK). */
+export async function resyncCapacitorAndroidPushIfPossible(): Promise<boolean> {
+  if (!isStaffPushCapacitorAndroid()) return false
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications')
+    const perm = await PushNotifications.checkPermissions()
+    if (perm.receive !== 'granted') return false
+    const result = await registerCapacitorAndroidFcmToken()
+    return result.ok === true
+  } catch {
+    return false
+  }
+}
+
 export async function resyncStaffPushSubscriptionIfGranted(): Promise<void> {
   if (typeof window === 'undefined') return
+  if (isStaffPushCapacitorAndroid()) {
+    await resyncCapacitorAndroidPushIfPossible()
+    return
+  }
   if (Notification.permission !== 'granted') return
   await refreshAndroidWebFcmTokenIfPossible()
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
@@ -274,6 +312,7 @@ export async function resyncStaffPushSubscriptionIfGranted(): Promise<void> {
  */
 export async function refreshAndroidWebFcmTokenIfPossible(): Promise<boolean> {
   if (typeof window === 'undefined') return false
+  if (isStaffPushCapacitorAndroid()) return false
   const isAndroidWeb = /Android/i.test(navigator.userAgent)
   if (!isAndroidWeb) return false
   const firebaseWebConfig = (await import('@/lib/firebase-web-config')).getFirebaseWebConfig()
