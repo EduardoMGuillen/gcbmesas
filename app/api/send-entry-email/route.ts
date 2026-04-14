@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { markEntryEmailSent } from '@/lib/actions'
 import { generateQRCode } from '@/lib/utils'
+import { escapeHtml } from '@/lib/html-escape'
 import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
@@ -30,6 +31,8 @@ export async function POST(req: NextRequest) {
     let eventName: string
     let eventDate: string | undefined
     let totalPrice: number
+    let venueName: string | null | undefined
+    let venueAddress: string | null | undefined
 
     if (body.entries && Array.isArray(body.entries)) {
       // New multi-entry format
@@ -38,6 +41,8 @@ export async function POST(req: NextRequest) {
       eventName = body.eventName
       eventDate = body.eventDate
       totalPrice = body.totalPrice
+      venueName = body.venueName
+      venueAddress = body.venueAddress
     } else {
       // Legacy single-entry format (from historial tab)
       entries = [{
@@ -49,6 +54,8 @@ export async function POST(req: NextRequest) {
       eventName = body.eventName
       eventDate = body.eventDate
       totalPrice = body.totalPrice || 0
+      venueName = body.venueName
+      venueAddress = body.venueAddress
     }
 
     if (!entries.length || !clientEmail || !eventName) {
@@ -80,6 +87,21 @@ export async function POST(req: NextRequest) {
     const eventDateStr = eventDate
       ? new Date(eventDate).toLocaleDateString('es-HN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
       : ''
+
+    const venueRowsHtml = [
+      venueName
+        ? `<tr>
+                      <td style="padding:8px 0;color:#94a3b8;font-size:14px;">Lugar</td>
+                      <td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${escapeHtml(venueName)}</td>
+                    </tr>`
+        : '',
+      venueAddress
+        ? `<tr>
+                      <td style="padding:8px 0;color:#94a3b8;font-size:14px;">Dirección</td>
+                      <td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;">${escapeHtml(venueAddress)}</td>
+                    </tr>`
+        : '',
+    ].join('')
 
     const isBulk = entries.length > 1
     const firstGuestName = entries[0].clientName
@@ -152,6 +174,7 @@ export async function POST(req: NextRequest) {
                       <td style="padding:8px 0;color:#94a3b8;font-size:14px;">Fecha</td>
                       <td style="padding:8px 0;color:#c9a84c;font-size:14px;text-align:right;font-weight:bold;text-transform:capitalize;">${eventDateStr}</td>
                     </tr>` : ''}
+                    ${venueRowsHtml}
                     <tr>
                       <td style="padding:8px 0;color:#94a3b8;font-size:14px;">Entradas</td>
                       <td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${entries.length}</td>

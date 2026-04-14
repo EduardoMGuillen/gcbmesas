@@ -12,7 +12,7 @@ export default async function EventoPage({
 }: {
   params: { id: string }
 }) {
-  const event = await getPublicEventById(params.id)
+  const event = await getPublicEventById(params.id, { channel: 'lcb' })
 
   if (!event || !event.paypalPrice) {
     notFound()
@@ -34,6 +34,8 @@ export default async function EventoPage({
     maxEntries: event.maxEntries,
     entriesSoldSum: event.entriesSoldSum,
   }
+
+  const venueLine = [event.venueName, event.venueAddress].filter(Boolean).join(' · ')
 
   return (
     <>
@@ -85,6 +87,9 @@ export default async function EventoPage({
           </nav>
 
           <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex-1 w-full">
+            {venueLine ? (
+              <p className="text-center text-white/45 text-sm mb-6">{venueLine}</p>
+            ) : null}
             {eventHasPassed ? (
               <div className="text-center py-20">
                 <div

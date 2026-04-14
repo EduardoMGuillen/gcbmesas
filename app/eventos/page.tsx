@@ -11,7 +11,7 @@ export const metadata = {
 }
 
 export default async function EventosPage() {
-  const events = await getPublicEvents()
+  const events = await getPublicEvents('lcb')
 
   return (
     <>
@@ -147,6 +147,7 @@ export default async function EventosPage() {
                     timeZone: 'UTC',
                   })
                   const onlinePrice = Number(event.paypalPrice)
+                  const venueLine = [event.venueName, event.venueAddress].filter(Boolean).join(' · ')
 
                   return (
                     <Link
@@ -196,8 +197,11 @@ export default async function EventosPage() {
                             {event.name}
                           </h3>
                           {event.description && (
-                            <p className="text-white/45 text-sm line-clamp-2 mb-3">{event.description}</p>
+                            <p className="text-white/45 text-sm line-clamp-2 mb-2">{event.description}</p>
                           )}
+                          {venueLine ? (
+                            <p className="text-white/35 text-xs line-clamp-2 mb-2">{venueLine}</p>
+                          ) : null}
                           <div className="flex items-center justify-between">
                             <span className="text-white/35 text-xs capitalize">{fullDate}</span>
                             <span className="font-bold text-lg bg-gradient-to-r from-cyan-300 to-fuchsia-300 bg-clip-text text-transparent">

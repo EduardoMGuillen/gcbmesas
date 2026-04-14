@@ -30,6 +30,8 @@ export default async function TaquillaPage() {
       id: true,
       name: true,
       date: true,
+      venueName: true,
+      venueAddress: true,
     },
   })
 

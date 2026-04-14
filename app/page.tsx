@@ -25,7 +25,7 @@ export default async function Home() {
     // Not authenticated — show landing page
   }
 
-  const rawEvents = await getPublicEvents()
+  const rawEvents = await getPublicEvents('lcb')
   const events = rawEvents.map((e) => ({
     id: e.id,
     name: e.name,

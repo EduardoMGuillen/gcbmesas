@@ -219,6 +219,12 @@ model Event {
   /// Máximo de entradas vendibles (suma de numberOfEntries, excl. canceladas). null = sin límite.
   maxEntries      Int?
   isActive        Boolean  @default(true)
+  /// Listado público La Gran Casa Blanca (/eventos, landing).
+  publishOnLcb       Boolean  @default(true)
+  /// Listado público CBTickets (/cbtickets).
+  publishOnCbtickets Boolean  @default(false)
+  venueName          String?
+  venueAddress       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   createdByUserId String?
@@ -228,6 +234,8 @@ model Event {
 
   @@index([isActive])
   @@index([date])
+  @@index([publishOnLcb])
+  @@index([publishOnCbtickets])
   @@map("events")
 }
 

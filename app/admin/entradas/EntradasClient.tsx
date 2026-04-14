@@ -29,9 +29,21 @@ type EventItem = {
   maxEntries: number | null
   entriesSoldSum: number
   isActive: boolean
+  publishOnLcb: boolean
+  publishOnCbtickets: boolean
+  venueName: string | null
+  venueAddress: string | null
   createdAt: string | Date
   _count: { entries: number }
   createdBy?: { name: string | null; username: string } | null
+}
+
+type EventStatRow = {
+  eventId: string
+  name: string
+  date: string | Date
+  entriesSold: number
+  revenueLps: number
 }
 
 type EntryItem = {
@@ -46,16 +58,17 @@ type EntryItem = {
   emailSent: boolean
   whatsappSent: boolean
   createdAt: string | Date
-  event: { name: string; date: string | Date; coverPrice: number }
+  event: { name: string; date: string | Date; coverPrice: number; venueName?: string | null; venueAddress?: string | null }
   createdBy?: { name: string | null; username: string } | null
 }
 
 interface EntradasClientProps {
   events: EventItem[]
   recentEntries: EntryItem[]
+  eventStats: EventStatRow[]
 }
 
-type Tab = 'vender' | 'eventos' | 'historial' | 'escanear'
+type Tab = 'vender' | 'eventos' | 'historial' | 'escanear' | 'estadisticas'
 
 // ==================== SHARED HELPERS ====================
 
@@ -216,6 +229,8 @@ async function handleSendEntryEmail(data: {
   totalPrice: number
   eventName: string
   eventDate: string
+  venueName?: string | null
+  venueAddress?: string | null
 }) {
   // Convert single entry to the new multi-entry format
   const res = await fetch('/api/send-entry-email', {
@@ -227,6 +242,8 @@ async function handleSendEntryEmail(data: {
       eventName: data.eventName,
       eventDate: data.eventDate,
       totalPrice: data.totalPrice,
+      venueName: data.venueName ?? undefined,
+      venueAddress: data.venueAddress ?? undefined,
     }),
   })
   const result = await res.json()
@@ -280,13 +297,14 @@ function buildWhatsAppUrl(data: {
 
 // ==================== MAIN COMPONENT ====================
 
-export function EntradasClient({ events, recentEntries }: EntradasClientProps) {
+export function EntradasClient({ events, recentEntries, eventStats }: EntradasClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('vender')
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'vender', label: 'Vender Entrada', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
     { id: 'escanear', label: 'Escanear', icon: 'M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z' },
     { id: 'eventos', label: 'Eventos', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+    { id: 'estadisticas', label: 'Dashboard', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
     { id: 'historial', label: 'Historial', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
   ]
 
@@ -314,6 +332,7 @@ export function EntradasClient({ events, recentEntries }: EntradasClientProps) {
       {activeTab === 'vender' && <VenderEntrada events={events.filter((e) => e.isActive)} />}
       {activeTab === 'escanear' && <EscanearTab />}
       {activeTab === 'eventos' && <EventosTab events={events} />}
+      {activeTab === 'estadisticas' && <EstadisticasTab rows={eventStats} />}
       {activeTab === 'historial' && <HistorialTab entries={recentEntries} />}
     </div>
   )
@@ -337,6 +356,8 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
     totalPrice: number
     eventName: string
     eventDate: string
+    venueName?: string | null
+    venueAddress?: string | null
   } | null>(null)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
@@ -414,6 +435,8 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
             totalPrice: Number(entry.totalPrice),
             eventName: entry.event.name,
             eventDate: String(entry.event.date),
+            venueName: entry.event.venueName ?? null,
+            venueAddress: entry.event.venueAddress ?? null,
           })
         } else {
           // Multiple entries - create individual entries
@@ -435,6 +458,8 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
             totalPrice: entries.reduce((sum: number, e: any) => sum + Number(e.totalPrice), 0),
             eventName: first.event.name,
             eventDate: String(first.event.date),
+            venueName: first.event.venueName ?? null,
+            venueAddress: first.event.venueAddress ?? null,
           })
         }
         setClientEmail('')
@@ -462,6 +487,8 @@ function VenderEntrada({ events }: { events: EventItem[] }) {
           eventName: success.eventName,
           eventDate: success.eventDate,
           totalPrice: success.totalPrice,
+          venueName: success.venueName ?? undefined,
+          venueAddress: success.venueAddress ?? undefined,
         }),
       }).then(async (res) => {
         const result = await res.json()
@@ -959,6 +986,49 @@ function EscanearTab() {
   )
 }
 
+// ==================== ESTADISTICAS TAB ====================
+
+function EstadisticasTab({ rows }: { rows: EventStatRow[] }) {
+  const sorted = [...rows].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-dark-300">
+        Ventas acumuladas por evento (entradas no canceladas). Incluye taquilla y en línea.
+      </p>
+      {sorted.length === 0 ? (
+        <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center text-white/40">No hay eventos.</div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-dark-200">
+          <table className="w-full text-sm text-left">
+            <thead>
+              <tr className="bg-dark-100 border-b border-dark-200 text-dark-300">
+                <th className="px-4 py-3 font-medium">Evento</th>
+                <th className="px-4 py-3 font-medium">Fecha</th>
+                <th className="px-4 py-3 font-medium text-right">Entradas</th>
+                <th className="px-4 py-3 font-medium text-right">Ingreso (L)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((r) => (
+                <tr key={r.eventId} className="border-b border-dark-200/80 hover:bg-dark-50/50">
+                  <td className="px-4 py-3 text-white font-medium">{r.name}</td>
+                  <td className="px-4 py-3 text-dark-300">
+                    {new Date(r.date).toLocaleDateString('es-HN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}
+                  </td>
+                  <td className="px-4 py-3 text-right text-white">{r.entriesSold}</td>
+                  <td className="px-4 py-3 text-right text-primary-400 font-semibold">
+                    {r.revenueLps.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ==================== EVENTOS TAB ====================
 
 function EventosTab({ events }: { events: EventItem[] }) {
@@ -973,6 +1043,10 @@ function EventosTab({ events }: { events: EventItem[] }) {
   const [coverImage, setCoverImage] = useState('')
   const [onlinePrice, setOnlinePrice] = useState('')
   const [maxEntriesLimit, setMaxEntriesLimit] = useState('')
+  const [publishOnLcb, setPublishOnLcb] = useState(true)
+  const [publishOnCbtickets, setPublishOnCbtickets] = useState(false)
+  const [venueName, setVenueName] = useState('')
+  const [venueAddress, setVenueAddress] = useState('')
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
 
@@ -984,6 +1058,10 @@ function EventosTab({ events }: { events: EventItem[] }) {
     setCoverImage('')
     setOnlinePrice('')
     setMaxEntriesLimit('')
+    setPublishOnLcb(true)
+    setPublishOnCbtickets(false)
+    setVenueName('')
+    setVenueAddress('')
     setEditingId(null)
     setShowForm(false)
     setError('')
@@ -1020,6 +1098,10 @@ function EventosTab({ events }: { events: EventItem[] }) {
     setCoverImage(ev.coverImage || '')
     setOnlinePrice(ev.paypalPrice ? ev.paypalPrice.toString() : '')
     setMaxEntriesLimit(ev.maxEntries != null && ev.maxEntries >= 1 ? String(ev.maxEntries) : '')
+    setPublishOnLcb(ev.publishOnLcb !== false)
+    setPublishOnCbtickets(ev.publishOnCbtickets === true)
+    setVenueName(ev.venueName?.trim() || '')
+    setVenueAddress(ev.venueAddress?.trim() || '')
     setShowForm(true)
   }
 
@@ -1052,6 +1134,10 @@ function EventosTab({ events }: { events: EventItem[] }) {
           description: description.trim() || undefined,
           coverImage: coverImage.trim() || undefined,
           paypalPrice: onlinePrice ? parseFloat(onlinePrice) : undefined,
+          publishOnLcb,
+          publishOnCbtickets,
+          venueName: venueName.trim() || null,
+          venueAddress: venueAddress.trim() || null,
           ...(maxEntries !== undefined ? { maxEntries } : {}),
         }
         if (editingId) {
@@ -1108,6 +1194,38 @@ function EventosTab({ events }: { events: EventItem[] }) {
             <div>
               <label className="block text-sm font-medium text-dark-300 mb-2">Descripcion <span className="text-white/30 font-normal">(opcional - lugar, hora, detalles)</span></label>
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Ej: Doors open 9PM. Dress code: casual elegante." className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">Lugar <span className="text-white/30 font-normal">(opcional)</span></label>
+                <input
+                  type="text"
+                  value={venueName}
+                  onChange={(e) => setVenueName(e.target.value)}
+                  placeholder="Ej: Casa Blanca"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">Dirección <span className="text-white/30 font-normal">(opcional)</span></label>
+                <input
+                  type="text"
+                  value={venueAddress}
+                  onChange={(e) => setVenueAddress(e.target.value)}
+                  placeholder="Ej: San Pedro Sula"
+                  className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 p-4 rounded-xl bg-dark-50/50 border border-dark-200">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={publishOnLcb} onChange={(e) => setPublishOnLcb(e.target.checked)} className="w-4 h-4 rounded border-dark-200" />
+                <span className="text-sm text-white">Publicar en La Gran Casa Blanca (/eventos)</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={publishOnCbtickets} onChange={(e) => setPublishOnCbtickets(e.target.checked)} className="w-4 h-4 rounded border-dark-200" />
+                <span className="text-sm text-white">Publicar en CBTickets (/cbtickets)</span>
+              </label>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -1179,6 +1297,19 @@ function EventosTab({ events }: { events: EventItem[] }) {
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${ev.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{ev.isActive ? 'Activo' : 'Inactivo'}</span>
               </div>
               <div className="space-y-1 text-sm mb-4">
+                <div className="flex flex-wrap gap-1.5 mb-1">
+                  {ev.publishOnLcb !== false && (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 font-medium">Casa Blanca</span>
+                  )}
+                  {ev.publishOnCbtickets && (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-fuchsia-500/15 text-fuchsia-300 font-medium">CBTickets</span>
+                  )}
+                </div>
+                {(ev.venueName || ev.venueAddress) && (
+                  <p className="text-dark-300 text-xs line-clamp-2">
+                    {[ev.venueName, ev.venueAddress].filter(Boolean).join(' · ')}
+                  </p>
+                )}
                 <p className="text-dark-300">Cover: <span className="text-primary-400 font-semibold">L {ev.coverPrice.toFixed(2)}</span></p>
                 {ev.paypalPrice && <p className="text-dark-300">Online: <span className="text-blue-400 font-semibold">L {ev.paypalPrice.toFixed(2)}</span></p>}
                 <p className="text-dark-300">
@@ -1269,6 +1400,8 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
         totalPrice: entry.totalPrice,
         eventName: entry.event.name,
         eventDate: String(entry.event.date),
+        venueName: entry.event.venueName ?? null,
+        venueAddress: entry.event.venueAddress ?? null,
       })
       setActionMsg(`Email enviado a ${entry.clientEmail}`)
       router.refresh()

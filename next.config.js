@@ -38,6 +38,11 @@ const nextConfig = {
       },
     ]
   },
+  async redirects() {
+    const dest = process.env.CBTICKETS_REDIRECT_URL?.trim()
+    if (!dest) return []
+    return [{ source: '/CBTickets', destination: dest, basePath: false, permanent: false }]
+  },
 }
 
 module.exports = nextConfig

@@ -17,6 +17,7 @@ import {
 import { cyberSourceDirectPaymentViaSdk, cyberSourceUnifiedPaymentViaSdk } from '@/lib/cybersource-sdk-direct'
 import { persistCyberSourcePaymentAudit } from '@/lib/cybersource-payment-audit'
 import { assertEventEntryCapacity } from '@/lib/actions'
+import { escapeHtml } from '@/lib/html-escape'
 
 function maskMerchantId(merchantId: string | undefined) {
   if (!merchantId) return null
@@ -659,6 +660,15 @@ export async function POST(req: NextRequest) {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
       })
 
+      const venueRowsHtml = [
+        event.venueName
+          ? `<tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Lugar</td><td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${escapeHtml(event.venueName)}</td></tr>`
+          : '',
+        event.venueAddress
+          ? `<tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Dirección</td><td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;">${escapeHtml(event.venueAddress)}</td></tr>`
+          : '',
+      ].join('')
+
       const isBulk = entries.length > 1
 
       const qrSectionsHtml = qrData.map((qr: any) => `
@@ -701,6 +711,7 @@ export async function POST(req: NextRequest) {
                     <table style="width:100%;border-collapse:collapse;">
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Evento</td><td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${eventName}</td></tr>
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Fecha</td><td style="padding:8px 0;color:#c9a84c;font-size:14px;text-align:right;font-weight:bold;text-transform:capitalize;">${eventDateStr}</td></tr>
+                      ${venueRowsHtml}
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Entradas</td><td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${entries.length}</td></tr>
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Total Pagado</td><td style="padding:8px 0;color:#3b82f6;font-size:18px;text-align:right;font-weight:bold;">L ${totalPriceLps.toFixed(2)} HNL</td></tr>
                       <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Referencia</td><td style="padding:8px 0;color:#64748b;font-size:12px;text-align:right;">${paymentReference}</td></tr>

@@ -2053,6 +2053,17 @@ export async function getReportData(fromStr: string, toStr: string) {
 
 // ========== EVENT ACTIONS ==========
 
+function assertOnlinePublishChannels(
+  paypalPrice: number | null | undefined,
+  publishOnLcb: boolean,
+  publishOnCbtickets: boolean
+) {
+  const online = paypalPrice != null && Number(paypalPrice) > 0
+  if (online && !publishOnLcb && !publishOnCbtickets) {
+    throw new Error('Activa al menos un canal de publicación (Casa Blanca o CBTickets) para venta en línea.')
+  }
+}
+
 export async function createEvent(data: {
   name: string
   date: string
@@ -2061,11 +2072,18 @@ export async function createEvent(data: {
   coverImage?: string
   paypalPrice?: number
   maxEntries?: number | null
+  publishOnLcb?: boolean
+  publishOnCbtickets?: boolean
+  venueName?: string | null
+  venueAddress?: string | null
 }) {
   const user = await getCurrentUser()
   ensureEntradasAdminOnly(user.role)
 
   const maxEntries = normalizeMaxEntriesInput(data.maxEntries)
+  const publishOnLcb = data.publishOnLcb !== false
+  const publishOnCbtickets = data.publishOnCbtickets === true
+  assertOnlinePublishChannels(data.paypalPrice ?? null, publishOnLcb, publishOnCbtickets)
 
   const event = await prisma.event.create({
     data: {
@@ -2075,6 +2093,10 @@ export async function createEvent(data: {
       description: data.description || null,
       coverImage: data.coverImage || null,
       paypalPrice: data.paypalPrice || null,
+      publishOnLcb,
+      publishOnCbtickets,
+      venueName: data.venueName?.trim() || null,
+      venueAddress: data.venueAddress?.trim() || null,
       ...(maxEntries !== undefined ? { maxEntries } : {}),
       createdByUserId: user.id,
     },
@@ -2088,6 +2110,8 @@ export async function createEvent(data: {
   })
 
   revalidatePath('/admin/entradas')
+  revalidatePath('/eventos')
+  revalidatePath('/cbtickets')
   return event
 }
 
@@ -2114,6 +2138,10 @@ export async function updateEvent(
     coverImage?: string
     paypalPrice?: number
     maxEntries?: number | null
+    publishOnLcb?: boolean
+    publishOnCbtickets?: boolean
+    venueName?: string | null
+    venueAddress?: string | null
   }
 ) {
   const user = await getCurrentUser()
@@ -2127,6 +2155,10 @@ export async function updateEvent(
   if (data.description !== undefined) updateData.description = data.description || null
   if (data.coverImage !== undefined) updateData.coverImage = data.coverImage || null
   if (data.paypalPrice !== undefined) updateData.paypalPrice = data.paypalPrice || null
+  if (data.publishOnLcb !== undefined) updateData.publishOnLcb = data.publishOnLcb
+  if (data.publishOnCbtickets !== undefined) updateData.publishOnCbtickets = data.publishOnCbtickets
+  if (data.venueName !== undefined) updateData.venueName = data.venueName?.trim() || null
+  if (data.venueAddress !== undefined) updateData.venueAddress = data.venueAddress?.trim() || null
   if (data.maxEntries !== undefined) {
     const next = normalizeMaxEntriesInput(data.maxEntries)
     updateData.maxEntries = next
@@ -2135,6 +2167,28 @@ export async function updateEvent(
       if (next < sold) {
         throw new Error(`El límite no puede ser menor a las entradas ya vendidas (${sold}).`)
       }
+    }
+  }
+
+  if (
+    data.publishOnLcb !== undefined ||
+    data.publishOnCbtickets !== undefined ||
+    data.paypalPrice !== undefined
+  ) {
+    const current = await prisma.event.findUnique({
+      where: { id },
+      select: {
+        paypalPrice: true,
+        publishOnLcb: true,
+        publishOnCbtickets: true,
+      },
+    })
+    if (current) {
+      const nextPaypal =
+        data.paypalPrice !== undefined ? data.paypalPrice : current.paypalPrice != null ? Number(current.paypalPrice) : null
+      const nextLcb = data.publishOnLcb !== undefined ? data.publishOnLcb : current.publishOnLcb
+      const nextCb = data.publishOnCbtickets !== undefined ? data.publishOnCbtickets : current.publishOnCbtickets
+      assertOnlinePublishChannels(nextPaypal, nextLcb, nextCb)
     }
   }
 
@@ -2149,6 +2203,8 @@ export async function updateEvent(
   })
 
   revalidatePath('/admin/entradas')
+  revalidatePath('/eventos')
+  revalidatePath('/cbtickets')
   return event
 }
 
@@ -2170,6 +2226,8 @@ export async function deleteEvent(id: string) {
   })
 
   revalidatePath('/admin/entradas')
+  revalidatePath('/eventos')
+  revalidatePath('/cbtickets')
 }
 
 // ========== ENTRY ACTIONS ==========
@@ -2382,7 +2440,7 @@ export async function getEntries(filters?: {
     where,
     orderBy: { createdAt: 'desc' },
     include: {
-      event: { select: { name: true, date: true, coverPrice: true } },
+      event: { select: { name: true, date: true, coverPrice: true, venueName: true, venueAddress: true } },
       createdBy: { select: { name: true, username: true } },
     },
     take: 200,
@@ -2405,7 +2463,7 @@ export async function getEntradasDashboardData() {
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: {
-        event: { select: { name: true, date: true, coverPrice: true } },
+        event: { select: { name: true, date: true, coverPrice: true, venueName: true, venueAddress: true } },
         createdBy: { select: { name: true, username: true } },
       },
     }),
@@ -2422,13 +2480,16 @@ export async function getEntradasDashboardData() {
     prisma.entry.groupBy({
       by: ['eventId'],
       where: { status: { not: 'CANCELLED' } },
-      _sum: { numberOfEntries: true },
+      _sum: { numberOfEntries: true, totalPrice: true },
     }),
   ])
 
-  const soldMap = new Map(
-    soldByEvent.map((r) => [r.eventId, Number(r._sum.numberOfEntries ?? 0)])
-  )
+  const soldMap = new Map<string, number>()
+  const revenueByEventMap = new Map<string, number>()
+  for (const r of soldByEvent) {
+    soldMap.set(r.eventId, Number(r._sum.numberOfEntries ?? 0))
+    revenueByEventMap.set(r.eventId, Number(r._sum.totalPrice ?? 0))
+  }
 
   const payload = {
     events: events.map((e: any) => ({
@@ -2441,12 +2502,23 @@ export async function getEntradasDashboardData() {
       paypalPrice: e.paypalPrice != null ? Number(e.paypalPrice) : null,
       maxEntries: e.maxEntries,
       isActive: e.isActive,
+      publishOnLcb: e.publishOnLcb,
+      publishOnCbtickets: e.publishOnCbtickets,
+      venueName: e.venueName,
+      venueAddress: e.venueAddress,
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
       createdByUserId: e.createdByUserId,
       _count: e._count,
       createdBy: e.createdBy,
       entriesSoldSum: soldMap.get(e.id) ?? 0,
+    })),
+    eventStats: events.map((e: any) => ({
+      eventId: e.id,
+      name: e.name,
+      date: e.date,
+      entriesSold: soldMap.get(e.id) ?? 0,
+      revenueLps: revenueByEventMap.get(e.id) ?? 0,
     })),
     recentEntries: recentEntries.map((e: any) => ({
       id: e.id,
@@ -2466,6 +2538,8 @@ export async function getEntradasDashboardData() {
         name: e.event.name,
         date: e.event.date,
         coverPrice: Number(e.event.coverPrice),
+        venueName: e.event.venueName ?? null,
+        venueAddress: e.event.venueAddress ?? null,
       },
       createdBy: e.createdBy,
     })),
@@ -2835,7 +2909,16 @@ export async function validateEntryByToken(token: string) {
   const entry = await prisma.entry.findUnique({
     where: { qrToken: token },
     include: {
-      event: { select: { name: true, date: true, coverPrice: true, coverImage: true } },
+      event: {
+        select: {
+          name: true,
+          date: true,
+          coverPrice: true,
+          coverImage: true,
+          venueName: true,
+          venueAddress: true,
+        },
+      },
     },
   })
 
@@ -2856,6 +2939,8 @@ export async function validateEntryByToken(token: string) {
       date: entry.event.date,
       coverPrice: Number(entry.event.coverPrice),
       coverImage: entry.event.coverImage,
+      venueName: entry.event.venueName,
+      venueAddress: entry.event.venueAddress,
     },
   }
 }
