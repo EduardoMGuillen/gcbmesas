@@ -744,7 +744,15 @@ function EscanearTab() {
     totalPrice: number
     status: 'ACTIVE' | 'USED' | 'CANCELLED'
     createdAt: string | Date
-    event: { name: string; date: string | Date; coverPrice: number }
+    event: {
+      name: string
+      date: string | Date
+      coverPrice: number
+      description?: string | null
+      coverImage?: string | null
+      venueName?: string | null
+      venueAddress?: string | null
+    }
   } | null>(null)
   const [actionMsg, setActionMsg] = useState('')
 
@@ -960,7 +968,37 @@ function EscanearTab() {
                   <span className={`text-xl font-bold ${sc.text}`}>{sc.label}</span>
                 </div>
                 <div className="p-6 space-y-4">
-                  <h3 className="text-xl font-bold text-white text-center">{scannedEntry.event.name}</h3>
+                  <div className="text-center space-y-2">
+                    <h3 className="text-xl font-bold text-white">{scannedEntry.event.name}</h3>
+                    <p className="text-sm text-dark-300">
+                      {new Date(scannedEntry.event.date).toLocaleDateString('es-HN', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        timeZone: 'UTC',
+                      })}
+                    </p>
+                    {[scannedEntry.event.venueName, scannedEntry.event.venueAddress].filter(Boolean).length > 0 ? (
+                      <p className="text-xs text-dark-400">
+                        {[scannedEntry.event.venueName, scannedEntry.event.venueAddress].filter(Boolean).join(' · ')}
+                      </p>
+                    ) : null}
+                    {scannedEntry.event.coverImage ? (
+                      <div className="rounded-lg overflow-hidden border border-dark-200 max-h-40 mx-auto max-w-xs">
+                        <img
+                          src={scannedEntry.event.coverImage}
+                          alt=""
+                          className="w-full h-40 object-cover object-top"
+                        />
+                      </div>
+                    ) : null}
+                    {scannedEntry.event.description ? (
+                      <p className="text-left text-xs text-dark-300 leading-relaxed whitespace-pre-wrap border-t border-dark-200 pt-3 mt-1">
+                        {scannedEntry.event.description}
+                      </p>
+                    ) : null}
+                  </div>
                   <div className="bg-dark-50 border border-dark-200 rounded-xl p-4 space-y-3">
                     <div className="flex justify-between"><span className="text-sm text-dark-300">Cliente</span><span className="text-white font-medium">{scannedEntry.clientName}</span></div>
                     <div className="border-t border-dark-200" />

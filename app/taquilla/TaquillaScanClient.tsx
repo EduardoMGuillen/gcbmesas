@@ -28,6 +28,10 @@ type ScannedEntry = {
     id: string
     name: string
     date: string | Date
+    description: string | null
+    coverImage: string | null
+    venueName: string | null
+    venueAddress: string | null
   }
 }
 
@@ -180,6 +184,10 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
             id: entry.event.id,
             name: entry.event.name,
             date: entry.event.date,
+            description: entry.event.description ?? null,
+            coverImage: entry.event.coverImage ?? null,
+            venueName: entry.event.venueName ?? null,
+            venueAddress: entry.event.venueAddress ?? null,
           },
         })
       } catch (err: any) {
@@ -460,6 +468,34 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
               {scannedEntry.status}
             </div>
             <h2 className="text-xl font-semibold text-white">{scannedEntry.event.name}</h2>
+            <p className="text-sm text-dark-300">
+              {new Date(scannedEntry.event.date).toLocaleDateString('es-HN', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                timeZone: 'UTC',
+              })}
+            </p>
+            {[scannedEntry.event.venueName, scannedEntry.event.venueAddress].filter(Boolean).length > 0 ? (
+              <p className="text-sm text-dark-400">
+                {[scannedEntry.event.venueName, scannedEntry.event.venueAddress].filter(Boolean).join(' · ')}
+              </p>
+            ) : null}
+            {scannedEntry.event.coverImage ? (
+              <div className="rounded-xl overflow-hidden border border-dark-200 max-h-48">
+                <img
+                  src={scannedEntry.event.coverImage}
+                  alt=""
+                  className="w-full h-full max-h-48 object-cover object-top"
+                />
+              </div>
+            ) : null}
+            {scannedEntry.event.description ? (
+              <p className="text-sm text-dark-300 leading-relaxed whitespace-pre-wrap border-t border-dark-200 pt-3">
+                {scannedEntry.event.description}
+              </p>
+            ) : null}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div className="bg-dark-50 border border-dark-200 rounded-lg p-3">
                 <p className="text-dark-400">Cliente</p>
@@ -472,10 +508,6 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
               <div className="bg-dark-50 border border-dark-200 rounded-lg p-3">
                 <p className="text-dark-400">Cantidad</p>
                 <p className="text-white font-medium">{scannedEntry.numberOfEntries}</p>
-              </div>
-              <div className="bg-dark-50 border border-dark-200 rounded-lg p-3">
-                <p className="text-dark-400">Fecha evento</p>
-                <p className="text-white font-medium">{new Date(scannedEntry.event.date).toLocaleDateString('es-HN')}</p>
               </div>
             </div>
 
