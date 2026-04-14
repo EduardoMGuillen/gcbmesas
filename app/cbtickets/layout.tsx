@@ -1,9 +1,38 @@
 import type { Metadata } from 'next'
 import { CbTicketsHeader } from './CbTicketsHeader'
 
+const metadataBaseUrl = process.env.NEXT_PUBLIC_CBTICKETS_CANONICAL_BASE || 'https://gcbtickets.com'
+
 export const metadata: Metadata = {
-  title: 'CBTickets · La Gran Casa Blanca',
-  description: 'Entradas en línea · La Gran Casa Blanca',
+  metadataBase: new URL(metadataBaseUrl),
+  title: {
+    default: 'GCBTickets | Ticketera oficial de eventos',
+    template: '%s | GCBTickets',
+  },
+  description: 'GCBTickets es la ticketera en linea para comprar entradas de eventos en La Gran Casa Blanca.',
+  keywords: [
+    'GCBTickets',
+    'ticketera Honduras',
+    'entradas en linea',
+    'comprar boletos',
+    'eventos La Gran Casa Blanca',
+  ],
+  alternates: {
+    canonical: '/cbtickets',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'es_HN',
+    url: '/cbtickets',
+    siteName: 'GCBTickets',
+    title: 'GCBTickets | Ticketera oficial de eventos',
+    description: 'Compra entradas de eventos en GCBTickets, la ticketera de La Gran Casa Blanca.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'GCBTickets | Ticketera oficial de eventos',
+    description: 'Compra entradas de eventos en GCBTickets.',
+  },
 }
 
 export default function CbTicketsLayout({ children }: { children: React.ReactNode }) {
@@ -17,11 +46,11 @@ export default function CbTicketsLayout({ children }: { children: React.ReactNod
         className="cbtickets-shell min-h-screen flex flex-col"
         style={{
           fontFamily: "'Exo 2', sans-serif",
-          background: 'linear-gradient(180deg, #fffefb 0%, #faf6ef 45%, #f3ebe0 100%)',
+          background: 'linear-gradient(180deg, #f5efe2 0%, #ead9b8 42%, #d8c09a 100%)',
         }}
       >
         <div
-          className="pointer-events-none fixed inset-0 opacity-[0.07] z-0"
+          className="pointer-events-none fixed inset-0 opacity-[0.11] z-0"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L30 60M0 30L60 30' stroke='%23a07828' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`,
           }}

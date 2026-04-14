@@ -6,8 +6,8 @@ import Image from 'next/image'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Próximos eventos · CBTickets',
-  description: 'Compra entradas en línea para eventos en CBTickets · La Gran Casa Blanca.',
+  title: 'Proximos eventos',
+  description: 'Descubre y compra entradas en linea para los proximos eventos en GCBTickets.',
 }
 
 export default async function CbTicketsEventosPage() {
