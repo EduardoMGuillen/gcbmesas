@@ -28,7 +28,7 @@ export function CbTicketsHeader() {
             priority
           />
           <div className="min-w-0 text-left">
-            <p className="text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-amber-700">CBTickets</p>
+            <p className="text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-amber-700">GCBTickets</p>
             <p className="text-xs sm:text-sm font-semibold text-stone-800 leading-tight truncate">La Gran Casa Blanca</p>
           </div>
         </Link>

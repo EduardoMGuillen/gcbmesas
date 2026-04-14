@@ -91,11 +91,26 @@ export default function middleware(req: NextRequest, evt: NextFetchEvent) {
   const path = req.nextUrl.pathname
 
   const hostRaw = (req.headers.get('host') || '').split(':')[0]?.toLowerCase() || ''
-  const cbtHosts = (process.env.CBTICKETS_HOST || '')
-    .split(',')
-    .map((h) => h.trim().toLowerCase())
-    .filter(Boolean)
-  if (cbtHosts.length > 0 && cbtHosts.includes(hostRaw) && path === '/') {
+  const defaultCbtHosts = ['gcbtickets.com', 'www.gcbtickets.com']
+  const cbtHosts = Array.from(
+    new Set([
+      ...defaultCbtHosts,
+      ...(process.env.CBTICKETS_HOST || '')
+        .split(',')
+        .map((h) => h.trim().toLowerCase())
+        .filter(Boolean),
+    ])
+  )
+  const isCbtHost = cbtHosts.length > 0 && cbtHosts.includes(hostRaw)
+  const isCbtSafePath =
+    path.startsWith('/cbtickets') ||
+    path.startsWith('/api') ||
+    path.startsWith('/_next') ||
+    path === '/favicon.ico' ||
+    path === '/sw.js' ||
+    path === '/manifest.json'
+
+  if (isCbtHost && (req.method === 'GET' || req.method === 'HEAD') && !isCbtSafePath) {
     const url = req.nextUrl.clone()
     url.pathname = '/cbtickets'
     return NextResponse.rewrite(url)

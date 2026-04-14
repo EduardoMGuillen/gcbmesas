@@ -124,7 +124,8 @@ export default async function CbTicketsEventosPage() {
                           <span className="text-amber-800/50 text-xs font-semibold tracking-widest uppercase">CBTickets</span>
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/15 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/72 via-black/15 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 h-[58%] bg-gradient-to-t from-black/95 via-black/72 to-transparent pointer-events-none" />
 
                       <div
                         className="absolute top-4 left-4 text-center rounded-xl px-3 py-2"
