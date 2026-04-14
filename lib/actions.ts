@@ -2914,6 +2914,7 @@ export async function validateEntryByToken(token: string) {
         select: {
           name: true,
           date: true,
+          description: true,
           coverPrice: true,
           coverImage: true,
           venueName: true,
@@ -2938,6 +2939,7 @@ export async function validateEntryByToken(token: string) {
       id: entry.eventId,
       name: entry.event.name,
       date: entry.event.date,
+      description: entry.event.description,
       coverPrice: Number(entry.event.coverPrice),
       coverImage: entry.event.coverImage,
       venueName: entry.event.venueName,

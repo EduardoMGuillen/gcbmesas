@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { EventPurchaseClient } from '@/app/eventos/[id]/EventPurchaseClient'
 import { FreeCoverEventView } from '@/app/eventos/_components/FreeCoverEventView'
-import { PublicSiteVantaBackground } from '@/components/PublicSiteVantaBackground'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,106 +51,64 @@ export default async function CbTicketsEventoPage({
 
   return (
     <>
-      <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Exo+2:wght@400;600;700&display=swap"
-        rel="stylesheet"
-      />
-      <PublicSiteVantaBackground>
-        <div className="flex flex-col flex-1 min-h-screen font-[family-name:var(--font-exo)]" style={{ fontFamily: "'Exo 2', sans-serif" }}>
-          <nav
-            className="border-b border-white/10 backdrop-blur-md shrink-0"
-            style={{
-              paddingTop: 'env(safe-area-inset-top)',
-              background: 'rgba(10,0,21,0.72)',
-            }}
-          >
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-4 sm:gap-6">
-                <Link
-                  href="/"
-                  className="text-xs sm:text-sm font-medium text-white/55 hover:text-white transition-colors flex items-center gap-1.5"
-                >
-                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Inicio
-                </Link>
-                <Link href="/cbtickets" className="flex items-center gap-2 group">
-                  <span className="text-xs font-bold tracking-widest uppercase text-cyan-300/90">CBTickets</span>
-                  <span className="text-sm font-medium text-white/70 group-hover:text-white transition-colors">Eventos</span>
-                </Link>
-              </div>
-              <Link
-                href="/cbtickets"
-                className="text-xs sm:text-sm text-white/45 hover:text-cyan-300 transition-colors flex items-center gap-1.5"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Todos los eventos
-              </Link>
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10 flex-1 w-full">
+        {venueLine ? (
+          <p className="text-center text-stone-600 text-sm mb-6">{venueLine}</p>
+        ) : null}
+        {eventHasPassed ? (
+          <div className="text-center py-16 px-4 rounded-2xl border border-amber-200/50 bg-white/70 shadow-sm">
+            <div
+              className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center bg-amber-50"
+              style={{ border: '1px solid rgba(201,168,76,0.35)' }}
+            >
+              <svg className="w-10 h-10 text-amber-600/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
-          </nav>
+            <h3 className="text-xl font-semibold text-stone-700 mb-2">Este evento ya pasó</h3>
+            <p className="text-stone-500 mb-6 text-sm">La venta de entradas en línea ya no está disponible.</p>
+            <Link
+              href="/cbtickets"
+              className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-2.5 rounded-full transition-all hover:scale-[1.02]"
+              style={{
+                background: 'linear-gradient(135deg, #d4af37, #9a7328)',
+                color: '#1a1510',
+                boxShadow: '0 4px 18px rgba(180, 140, 60, 0.3)',
+              }}
+            >
+              Ver otros eventos
+            </Link>
+          </div>
+        ) : freeOnly ? (
+          <FreeCoverEventView
+            name={event.name}
+            eventDateLabel={eventDateLabel}
+            description={event.description}
+            coverImage={event.coverImage}
+            listHref="/cbtickets"
+            theme="cbtickets"
+          />
+        ) : (
+          <EventPurchaseClient event={eventData} eventsListPath="/cbtickets" variant="cbtickets" />
+        )}
+      </main>
 
-          <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex-1 w-full">
-            {venueLine ? (
-              <p className="text-center text-white/45 text-sm mb-6">{venueLine}</p>
-            ) : null}
-            {eventHasPassed ? (
-              <div className="text-center py-20">
-                <div
-                  className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center"
-                  style={{ border: '1px solid rgba(0,255,255,0.25)' }}
-                >
-                  <svg className="w-10 h-10 text-cyan-400/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-white/40 mb-2">Este evento ya pasó</h3>
-                <p className="text-white/25 mb-6 text-sm">La venta de entradas en línea ya no está disponible.</p>
-                <Link
-                  href="/cbtickets"
-                  className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full transition-all hover:scale-105"
-                  style={{
-                    background: 'linear-gradient(45deg, #00ffff, #a855f7)',
-                    color: '#0a0a15',
-                    boxShadow: '0 4px 20px rgba(0,255,255,0.2)',
-                  }}
-                >
-                  Ver otros eventos
-                </Link>
-              </div>
-            ) : freeOnly ? (
-              <FreeCoverEventView
-                name={event.name}
-                eventDateLabel={eventDateLabel}
-                description={event.description}
-                coverImage={event.coverImage}
-                listHref="/cbtickets"
-              />
-            ) : (
-              <EventPurchaseClient event={eventData} eventsListPath="/cbtickets" />
-            )}
-          </main>
-
-          <footer className="py-8 mt-auto border-t border-white/10 shrink-0" style={{ background: 'rgba(0,0,0,0.35)' }}>
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-3">
-              <p className="text-xs text-white/25">&copy; {new Date().getFullYear()} CBTickets</p>
-              <p className="text-xs text-white/25">
-                Powered by{' '}
-                <a
-                  href="https://www.nexusglobalsuministros.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-cyan-400/60 hover:text-cyan-300 underline underline-offset-2"
-                >
-                  Nexus Global
-                </a>
-              </p>
-            </div>
-          </footer>
+      <footer className="py-8 mt-auto border-t border-amber-200/40 shrink-0 bg-white/50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-3">
+          <p className="text-xs text-stone-500">&copy; {new Date().getFullYear()} CBTickets · La Gran Casa Blanca</p>
+          <p className="text-xs text-stone-400">
+            Powered by{' '}
+            <a
+              href="https://www.nexusglobalsuministros.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-800/80 hover:text-amber-950 underline underline-offset-2"
+            >
+              Nexus Global
+            </a>
+          </p>
         </div>
-      </PublicSiteVantaBackground>
+      </footer>
     </>
   )
 }

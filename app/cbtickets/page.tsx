@@ -1,13 +1,13 @@
 import { getPublicEvents } from '@/lib/public-events'
 import { isPublicFreeCoverOnly } from '@/lib/public-event-pricing'
 import Link from 'next/link'
-import { PublicSiteVantaBackground } from '@/components/PublicSiteVantaBackground'
+import Image from 'next/image'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Eventos - CBTickets',
-  description: 'Compra entradas en línea para eventos en CBTickets.',
+  title: 'Próximos eventos · CBTickets',
+  description: 'Compra entradas en línea para eventos en CBTickets · La Gran Casa Blanca.',
 }
 
 export default async function CbTicketsEventosPage() {
@@ -15,221 +15,186 @@ export default async function CbTicketsEventosPage() {
 
   return (
     <>
-      <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@400;600;700&display=swap"
-        rel="stylesheet"
-      />
       <style>{`
-        .eventos-page { font-family: 'Exo 2', sans-serif; }
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(24px); }
-          to   { opacity: 1; transform: translateY(0); }
+        .cb-page { font-family: 'Exo 2', sans-serif; }
+        @keyframes cbFadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes fadeInDown {
-          from { opacity: 0; transform: translateY(-16px); }
-          to   { opacity: 1; transform: translateY(0); }
+        @keyframes cbFadeInDown {
+          from { opacity: 0; transform: translateY(-12px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes shimmer {
-          0%   { background-position: -200% center; }
-          100% { background-position:  200% center; }
+        @keyframes cbShimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
         }
-        .event-card:hover {
-          border-color: rgba(0,255,255,0.35) !important;
-          box-shadow: 0 20px 50px rgba(0,255,255,0.12), 0 4px 24px rgba(0,0,0,0.5) !important;
+        .cb-card:hover {
+          border-color: rgba(180, 140, 70, 0.55) !important;
+          box-shadow: 0 22px 48px rgba(120, 83, 30, 0.12), 0 4px 16px rgba(0,0,0,0.06) !important;
         }
-        .hero-anim { animation: fadeInDown 0.6s ease both; }
-        .shimmer-bar {
-          background: linear-gradient(90deg, transparent 0%, #00ffff 35%, #ff00ff 50%, #00ffff 65%, transparent 100%);
+        .cb-hero { animation: cbFadeInDown 0.55s ease both; }
+        .cb-shimmer-bar {
+          background: linear-gradient(90deg, transparent 0%, #c9a84c 35%, #e8d5a8 50%, #c9a84c 65%, transparent 100%);
           background-size: 200% auto;
-          animation: shimmer 3s linear infinite;
+          animation: cbShimmer 4s linear infinite;
         }
-        .event-card:hover .card-shine { opacity: 1; }
-        .card-shine {
+        .cb-card:hover .cb-card-shine { opacity: 1; }
+        .cb-card-shine {
           position: absolute; inset: 0;
-          background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%);
-          opacity: 0; transition: opacity 0.4s;
+          background: linear-gradient(135deg, rgba(255,255,255,0.14) 0%, transparent 55%);
+          opacity: 0; transition: opacity 0.35s;
           pointer-events: none;
         }
-        .section-title-eventos {
-          font-family: 'Orbitron', monospace;
-          font-size: clamp(1.5rem, 4vw, 2.25rem);
+        .cb-section-title {
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: clamp(1.75rem, 4vw, 2.5rem);
           font-weight: 700;
-          background: linear-gradient(45deg, #00ffff, #ff00ff);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+          color: #3d3428;
+          letter-spacing: 0.02em;
         }
       `}</style>
 
-      <PublicSiteVantaBackground>
-        <div className="eventos-page flex flex-col flex-1">
-          <nav
-            className="border-b border-white/10 backdrop-blur-md shrink-0"
-            style={{
-              paddingTop: 'env(safe-area-inset-top)',
-              background: 'rgba(10,0,21,0.72)',
-            }}
-          >
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-              <Link
-                href="/"
-                className="text-xs sm:text-sm font-medium text-white/60 hover:text-white transition-colors flex items-center gap-1.5"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Inicio
-              </Link>
-              <span className="text-xs sm:text-sm font-medium tracking-widest uppercase text-white/50">CBTickets</span>
-            </div>
-          </nav>
-
-          <header className="pt-8 sm:pt-12 pb-6 sm:pb-10 hero-anim">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-              <p className="orbitron text-2xl sm:text-3xl font-bold tracking-widest uppercase text-white/90 mb-2">CBTickets</p>
-              <p className="text-white/40 text-sm">Entradas en línea</p>
-            </div>
-          </header>
-
-          <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 flex-1 w-full">
-            <div className="text-center mb-10 sm:mb-14" style={{ animation: 'fadeInDown 0.7s ease 0.15s both' }}>
-              <h2 className="section-title-eventos mb-3 tracking-widest uppercase">Próximos Eventos</h2>
-              <div className="shimmer-bar w-28 h-0.5 mx-auto mb-4 rounded-full" />
-              <p className="text-white/40 text-sm sm:text-base">
-                Compra tus entradas en línea · Recibe tu QR al instante
-              </p>
-            </div>
-
-            {events.length === 0 ? (
-              <div className="text-center py-24" style={{ animation: 'fadeInUp 0.6s ease both' }}>
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full border border-cyan-500/20 flex items-center justify-center">
-                  <svg className="w-10 h-10 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-white/35 mb-2">No hay eventos disponibles</h3>
-                <p className="text-white/20 text-sm">Vuelve pronto para ver los próximos eventos.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                {events.map((event, idx) => {
-                  const eventDate = new Date(event.date)
-                  const dayNum = eventDate.toLocaleDateString('es-HN', { day: 'numeric', timeZone: 'UTC' })
-                  const monthStr = eventDate.toLocaleDateString('es-HN', { month: 'short', timeZone: 'UTC' }).toUpperCase()
-                  const weekday = eventDate.toLocaleDateString('es-HN', { weekday: 'long', timeZone: 'UTC' })
-                  const fullDate = eventDate.toLocaleDateString('es-HN', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                    timeZone: 'UTC',
-                  })
-                  const onlinePrice = Number(event.paypalPrice)
-                  const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
-                  const venueLine = [event.venueName, event.venueAddress].filter(Boolean).join(' · ')
-
-                  return (
-                    <Link
-                      key={event.id}
-                      href={`/cbtickets/${event.id}`}
-                      className="event-card group relative rounded-2xl overflow-hidden transition-all duration-500 hover:-translate-y-2"
-                      style={{
-                        background: 'linear-gradient(180deg, rgba(18,18,42,0.92) 0%, rgba(10,10,28,0.95) 100%)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        boxShadow: '0 4px 24px rgba(0,0,0,0.45)',
-                        animation: `fadeInUp 0.55s ease ${idx * 0.08}s both`,
-                      }}
-                    >
-                      <div className="card-shine" />
-
-                      <div className="aspect-[4/5] relative overflow-hidden">
-                        {event.coverImage ? (
-                          <img
-                            src={event.coverImage}
-                            alt={event.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                          />
-                        ) : (
-                          <div
-                            className="w-full h-full flex items-center justify-center"
-                            style={{ background: 'linear-gradient(135deg, #1a1a30 0%, #0d0d1a 100%)' }}
-                          >
-                            <span className="text-white/25 text-sm font-semibold tracking-widest">CBTickets</span>
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent" />
-
-                        <div
-                          className="absolute top-4 left-4 text-center rounded-xl px-3 py-2"
-                          style={{
-                            background: 'rgba(8,8,18,0.88)',
-                            backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(0,255,255,0.35)',
-                          }}
-                        >
-                          <p className="text-lg font-bold text-white leading-none">{dayNum}</p>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">{monthStr}</p>
-                        </div>
-
-                        <div className="absolute bottom-0 left-0 right-0 p-5">
-                          <h3 className="text-xl font-bold text-white mb-1 group-hover:text-cyan-200 transition-colors duration-300">
-                            {event.name}
-                          </h3>
-                          {event.description && (
-                            <p className="text-white/45 text-sm line-clamp-2 mb-2">{event.description}</p>
-                          )}
-                          {venueLine ? (
-                            <p className="text-white/35 text-xs line-clamp-2 mb-2">{venueLine}</p>
-                          ) : null}
-                          <div className="flex items-center justify-between">
-                            <span className="text-white/35 text-xs capitalize">{fullDate}</span>
-                            <span className="font-bold text-lg bg-gradient-to-r from-cyan-300 to-fuchsia-300 bg-clip-text text-transparent">
-                              {freeOnly ? 'Cover gratuito' : `L ${onlinePrice.toFixed(2)}`}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-4 flex items-center justify-between border-t border-white/5">
-                        <span className="text-white/40 text-xs capitalize">{weekday} · 9:00 PM</span>
-                        <span
-                          className="text-sm font-semibold px-4 py-1.5 rounded-full transition-all duration-300 group-hover:scale-105"
-                          style={{
-                            background: 'linear-gradient(45deg, #00ffff, #a855f7)',
-                            color: '#0a0a15',
-                            boxShadow: '0 2px 16px rgba(0,255,255,0.25)',
-                          }}
-                        >
-                          {freeOnly ? 'Ver evento' : 'Comprar Entrada'}
-                        </span>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
-          </main>
-
-          <footer className="py-8 mt-auto border-t border-white/10 shrink-0" style={{ background: 'rgba(0,0,0,0.35)' }}>
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-3">
-              <p className="text-xs text-white/25">
-                &copy; {new Date().getFullYear()} CBTickets
-              </p>
-              <p className="text-xs text-white/25">
-                Powered by{' '}
-                <a
-                  href="https://www.nexusglobalsuministros.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-cyan-400/60 hover:text-cyan-300 transition-colors underline underline-offset-2"
-                >
-                  Nexus Global
-                </a>
-              </p>
-            </div>
-          </footer>
+      <div className="cb-page flex flex-col flex-1">
+        <div className="pt-8 sm:pt-10 pb-6 sm:pb-8 cb-hero text-center px-4">
+          <p className="text-xs sm:text-sm font-semibold tracking-[0.25em] uppercase text-amber-700/90 mb-2">Entradas en línea</p>
+          <h1 className="cb-section-title mb-2">Próximos eventos</h1>
+          <div className="cb-shimmer-bar w-32 h-0.5 mx-auto mb-4 rounded-full" />
+          <p className="text-stone-600 text-sm sm:text-base max-w-lg mx-auto">
+            Compra con confianza · Recibe tu QR al instante
+          </p>
         </div>
-      </PublicSiteVantaBackground>
+
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-14 flex-1 w-full">
+          {events.length === 0 ? (
+            <div className="text-center py-20" style={{ animation: 'cbFadeInUp 0.5s ease both' }}>
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full border border-amber-200/80 bg-white/60 flex items-center justify-center">
+                <svg className="w-10 h-10 text-amber-300/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-stone-700 mb-2">No hay eventos disponibles</h3>
+              <p className="text-stone-500 text-sm">Vuelve pronto para ver los próximos eventos.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {events.map((event, idx) => {
+                const eventDate = new Date(event.date)
+                const dayNum = eventDate.toLocaleDateString('es-HN', { day: 'numeric', timeZone: 'UTC' })
+                const monthStr = eventDate.toLocaleDateString('es-HN', { month: 'short', timeZone: 'UTC' }).toUpperCase()
+                const weekday = eventDate.toLocaleDateString('es-HN', { weekday: 'long', timeZone: 'UTC' })
+                const fullDate = eventDate.toLocaleDateString('es-HN', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                  timeZone: 'UTC',
+                })
+                const onlinePrice = Number(event.paypalPrice)
+                const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
+                const venueLine = [event.venueName, event.venueAddress].filter(Boolean).join(' · ')
+
+                return (
+                  <Link
+                    key={event.id}
+                    href={`/cbtickets/${event.id}`}
+                    className="cb-card group relative rounded-2xl overflow-hidden transition-all duration-500 hover:-translate-y-1.5"
+                    style={{
+                      background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(252,248,242,0.99) 100%)',
+                      border: '1px solid rgba(200, 175, 130, 0.35)',
+                      boxShadow: '0 6px 28px rgba(80, 60, 30, 0.08)',
+                      animation: `cbFadeInUp 0.5s ease ${idx * 0.06}s both`,
+                    }}
+                  >
+                    <div className="cb-card-shine" />
+
+                    <div className="aspect-[4/5] relative overflow-hidden">
+                      {event.coverImage ? (
+                        <img
+                          src={event.coverImage}
+                          alt={event.name}
+                          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-full flex flex-col items-center justify-center gap-3"
+                          style={{ background: 'linear-gradient(160deg, #faf6ef 0%, #ebe4d8 100%)' }}
+                        >
+                          <Image src="/LogoCasaBlanca.png" alt="" width={72} height={72} className="w-16 h-16 object-contain opacity-40" />
+                          <span className="text-amber-800/50 text-xs font-semibold tracking-widest uppercase">CBTickets</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/15 to-transparent" />
+
+                      <div
+                        className="absolute top-4 left-4 text-center rounded-xl px-3 py-2"
+                        style={{
+                          background: 'rgba(255,252,248,0.94)',
+                          backdropFilter: 'blur(8px)',
+                          border: '1px solid rgba(201,168,76,0.45)',
+                        }}
+                      >
+                        <p className="text-lg font-bold text-stone-800 leading-none">{dayNum}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800">{monthStr}</p>
+                      </div>
+
+                      <div className="absolute bottom-0 left-0 right-0 p-5 [&_p]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.75)] [&_span]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.75)]">
+                        <h3 className="text-xl font-bold text-white mb-1 drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]">
+                          {event.name}
+                        </h3>
+                        {event.description && (
+                          <p className="text-white text-sm line-clamp-2 mb-2">{event.description}</p>
+                        )}
+                        {venueLine ? <p className="text-white text-xs line-clamp-2 mb-2">{venueLine}</p> : null}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-white text-xs capitalize">{fullDate}</span>
+                          <span className="font-bold text-lg text-white shrink-0">
+                            {freeOnly ? 'Cover gratuito' : `L ${onlinePrice.toFixed(2)}`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      className="p-4 flex items-center justify-between border-t"
+                      style={{ borderColor: 'rgba(201, 168, 76, 0.22)', background: 'rgba(255,252,248,0.75)' }}
+                    >
+                      <span className="text-stone-600 text-xs capitalize">{weekday} · 9:00 PM</span>
+                      <span
+                        className="text-sm font-semibold px-4 py-1.5 rounded-full transition-all duration-300 group-hover:scale-[1.02]"
+                        style={{
+                          background: 'linear-gradient(135deg, #d4af37, #b8942f)',
+                          color: '#1a1510',
+                          boxShadow: '0 2px 14px rgba(180, 140, 60, 0.35)',
+                        }}
+                      >
+                        {freeOnly ? 'Ver evento' : 'Comprar entrada'}
+                      </span>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </main>
+
+        <footer className="py-8 mt-auto border-t border-amber-200/40 shrink-0 bg-white/50">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-3">
+            <p className="text-xs text-stone-500">&copy; {new Date().getFullYear()} CBTickets · La Gran Casa Blanca</p>
+            <p className="text-xs text-stone-400">
+              Powered by{' '}
+              <a
+                href="https://www.nexusglobalsuministros.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-800/80 hover:text-amber-950 underline underline-offset-2"
+              >
+                Nexus Global
+              </a>
+            </p>
+          </div>
+        </footer>
+      </div>
     </>
   )
 }

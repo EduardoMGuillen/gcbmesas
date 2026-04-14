@@ -84,14 +84,16 @@ export default async function ValidarEntradaPage({
           {/* Event passed banner */}
           {eventHasPassed && (
             <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-3 text-center">
-              <p className="text-amber-400 text-sm font-medium">Este evento ya pas&oacute;. Esta entrada ya no es v&aacute;lida para acceso.</p>
+              <p className="text-amber-400 text-sm font-medium">
+                Este evento ya pasó. Esta entrada ya no es válida para acceso.
+              </p>
             </div>
           )}
 
           {/* Content */}
           <div className="p-6 space-y-4">
             {/* Event info */}
-            <div className="text-center">
+            <div className="text-center space-y-2">
               <h2 className="text-xl font-bold text-white">{entry.event.name}</h2>
               <p className="text-dark-300 text-sm">
                 {new Date(entry.event.date).toLocaleDateString('es-HN', {
@@ -102,6 +104,16 @@ export default async function ValidarEntradaPage({
                   timeZone: 'UTC',
                 })}
               </p>
+              {[entry.event.venueName, entry.event.venueAddress].filter(Boolean).length > 0 ? (
+                <p className="text-dark-300/90 text-sm">
+                  {[entry.event.venueName, entry.event.venueAddress].filter(Boolean).join(' · ')}
+                </p>
+              ) : null}
+              {entry.event.description ? (
+                <p className="text-left text-dark-300 text-sm leading-relaxed whitespace-pre-wrap border-t border-dark-200 pt-3 mt-1">
+                  {entry.event.description}
+                </p>
+              ) : null}
             </div>
 
             {/* Details */}

@@ -36,12 +36,64 @@ async function generateQRDataUrl(text: string): Promise<string> {
   })
 }
 
-const goldGradient = 'linear-gradient(135deg, #c9a84c, #a88a3d)'
-const cardBg = 'rgba(15, 15, 30, 0.8)'
-const cardBorder = 'rgba(255,255,255,0.06)'
-const inputBg = 'rgba(10,10,25,0.9)'
-const inputBorder = 'rgba(255,255,255,0.1)'
-const mutedText = 'rgba(255,255,255,0.55)'
+export type EventPurchaseVariant = 'lcb' | 'cbtickets'
+
+export type PurchasePalette = ReturnType<typeof getPurchasePalette>
+
+function getPurchasePalette(variant: EventPurchaseVariant) {
+  const isLight = variant === 'cbtickets'
+  return {
+    isLight,
+    goldGradient: 'linear-gradient(135deg, #c9a84c, #a88a3d)',
+    cardBg: isLight ? 'rgba(255, 252, 248, 0.97)' : 'rgba(15, 15, 30, 0.8)',
+    cardBorder: isLight ? 'rgba(176, 145, 80, 0.32)' : 'rgba(255,255,255,0.06)',
+    inputBg: isLight ? '#ffffff' : 'rgba(10,10,25,0.9)',
+    inputBorder: isLight ? 'rgba(176, 145, 80, 0.45)' : 'rgba(255,255,255,0.1)',
+    mutedText: isLight ? 'rgba(41, 37, 36, 0.62)' : 'rgba(255,255,255,0.55)',
+    innerPanelBg: isLight ? 'rgba(254, 252, 249, 0.96)' : 'rgba(10,10,25,0.6)',
+    chipPaso: isLight
+      ? { background: 'rgba(201,168,76,0.14)', color: '#5c4a1c', border: '1px solid rgba(201,168,76,0.42)' }
+      : { background: 'rgba(201,168,76,0.18)', color: '#e8d18d', border: '1px solid rgba(201,168,76,0.35)' },
+    linkCta: isLight
+      ? { background: 'linear-gradient(135deg, #d4af37, #8b6914)', color: '#1a1510', boxShadow: '0 4px 20px rgba(180,140,60,0.22)' }
+      : { background: 'linear-gradient(45deg, #00ffff, #a855f7)', color: '#0a0a15', boxShadow: '0 4px 20px rgba(0,255,255,0.2)' },
+    fieldRim: isLight ? 'rgba(252, 249, 244, 0.98)' : 'rgba(255,255,255,0.03)',
+    inputFieldClass: isLight
+      ? 'text-stone-900 placeholder:text-stone-400 focus:ring-amber-400/35'
+      : 'text-white placeholder:text-white/20 focus:ring-cyan-500/25',
+    qtyBtnClass: isLight ? 'text-stone-800' : 'text-white',
+    unifiedPanel: isLight
+      ? {
+          background: 'rgba(255,252,248,0.97)',
+          border: '1px solid rgba(176,145,80,0.38)',
+          boxShadow: '0 0 0 1px rgba(176,145,80,0.12) inset',
+        }
+      : {
+          background: 'rgba(16, 27, 48, 0.8)',
+          border: '1px solid rgba(59,130,246,0.35)',
+          boxShadow: '0 0 0 1px rgba(59,130,246,0.1) inset',
+        },
+    tx: {
+      h2: isLight ? 'text-stone-900' : 'text-white',
+      h3: isLight ? 'text-stone-900' : 'text-white',
+      body: isLight ? 'text-stone-600' : 'text-white/40',
+      label: isLight ? 'text-stone-600' : 'text-white/50',
+      faint: isLight ? 'text-stone-500' : 'text-white/20',
+      vfaint: isLight ? 'text-stone-400' : 'text-white/25',
+      hint: isLight ? 'text-stone-500' : 'text-white/30',
+      row: isLight ? 'text-stone-500' : 'text-white/40',
+      entryRow: isLight ? 'text-stone-500' : 'text-white/45',
+      successSub: isLight ? 'text-stone-600' : 'text-white/50',
+      moreEvents: isLight ? 'text-stone-600 hover:text-stone-900' : 'text-white/50 hover:text-white',
+      ref: isLight ? 'text-stone-400' : 'text-white/15',
+      directTitle: isLight ? 'text-stone-800' : 'text-white/80',
+      directBadge: isLight ? 'text-stone-500' : 'text-white/40',
+      unifiedLead: isLight ? 'text-sm font-medium text-amber-900' : 'text-sm font-medium text-blue-200',
+      unifiedLbl: isLight ? 'text-xs text-amber-900/80' : 'text-xs text-blue-100/80',
+      unifiedFoot: isLight ? 'text-xs text-amber-900/75' : 'text-xs text-blue-100/70',
+    },
+  }
+}
 
 function formatLps(value: number) {
   return `L ${value.toFixed(2)}`
@@ -68,11 +120,15 @@ function formatCardNumber(value: string, brand: CardBrand) {
 export function EventPurchaseClient({
   event,
   eventsListPath = '/eventos',
+  variant = 'lcb',
 }: {
   event: EventData
   /** Listado público del canal (ej. `/eventos` o `/cbtickets`). No altera el POST a CyberSource. */
   eventsListPath?: string
+  /** `cbtickets`: UI clara blanco/dorado. No altera CyberSource. */
+  variant?: EventPurchaseVariant
 }) {
+  const p = getPurchasePalette(variant)
   const [clientNames, setClientNames] = useState<string[]>([''])
   const [clientEmail, setClientEmail] = useState('')
   const [clientPhone, setClientPhone] = useState('')
@@ -698,24 +754,20 @@ export function EventPurchaseClient({
   }
 
   if (success) {
-    return <ConfirmationView success={success} event={event} eventsListPath={eventsListPath} />
+    return <ConfirmationView success={success} event={event} eventsListPath={eventsListPath} palette={p} />
   }
 
   if (onlineSoldOut) {
     return (
       <div className="max-w-xl mx-auto text-center py-16 px-4">
-        <h3 className="text-xl font-semibold text-white mb-2">Cupo agotado</h3>
-        <p className="text-white/50 text-sm mb-6">
+        <h3 className={`text-xl font-semibold mb-2 ${p.tx.h3}`}>Cupo agotado</h3>
+        <p className={`${p.tx.successSub} text-sm mb-6`}>
           Las entradas en línea para este evento ya no están disponibles.
         </p>
         <Link
           href={eventsListPath}
           className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full transition-all hover:scale-105"
-          style={{
-            background: 'linear-gradient(45deg, #00ffff, #a855f7)',
-            color: '#0a0a15',
-            boxShadow: '0 4px 20px rgba(0,255,255,0.2)',
-          }}
+          style={p.linkCta}
         >
           Ver otros eventos
         </Link>
@@ -798,48 +850,45 @@ export function EventPurchaseClient({
       )}
       <div>
         {event.coverImage && (
-          <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-6" style={{ border: `1px solid ${cardBorder}` }}>
+          <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-6" style={{ border: `1px solid ${p.cardBorder}` }}>
             <img src={event.coverImage} alt={event.name} className="w-full h-full object-cover" />
           </div>
         )}
-        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">{event.name}</h2>
+        <h2 className={`text-2xl sm:text-3xl font-bold mb-2 ${p.tx.h2}`}>{event.name}</h2>
         <p className="font-medium mb-4 capitalize" style={{ color: '#c9a84c' }}>{eventDateStr}</p>
         {event.description && (
-          <p className="text-white/40 text-sm leading-relaxed mb-6 whitespace-pre-line">{event.description}</p>
+          <p className={`${p.tx.body} text-sm leading-relaxed mb-6 whitespace-pre-line`}>{event.description}</p>
         )}
-        <div className="rounded-xl p-5" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+        <div className="rounded-xl p-5" style={{ background: p.cardBg, border: `1px solid ${p.cardBorder}` }}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-white/40">Precio por entrada</span>
+            <span className={p.tx.body}>Precio por entrada</span>
             <span className="text-2xl font-bold" style={{ color: '#c9a84c' }}>{formatLps(event.onlinePrice)}</span>
           </div>
-          <p className="text-xs text-white/20">Precio online en Lempiras (HNL)</p>
+          <p className={`text-xs ${p.tx.faint}`}>Precio online en Lempiras (HNL)</p>
         </div>
       </div>
 
-      <div className="rounded-2xl p-5 sm:p-6 h-fit" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+      <div className="rounded-2xl p-5 sm:p-6 h-fit" style={{ background: p.cardBg, border: `1px solid ${p.cardBorder}` }}>
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
-            <h3 className="text-lg font-bold text-white mb-1">Comprar Entrada</h3>
-            <p className="text-xs" style={{ color: mutedText }}>Completa tus datos y paga de forma segura</p>
+            <h3 className={`text-lg font-bold mb-1 ${p.tx.h3}`}>Comprar Entrada</h3>
+            <p className="text-xs" style={{ color: p.mutedText }}>Completa tus datos y paga de forma segura</p>
           </div>
-          <div
-            className="text-xs font-semibold px-3 py-1.5 rounded-full"
-            style={{ background: 'rgba(201,168,76,0.18)', color: '#e8d18d', border: '1px solid rgba(201,168,76,0.35)' }}
-          >
+          <div className="text-xs font-semibold px-3 py-1.5 rounded-full" style={p.chipPaso}>
             Paso 1 de 2
           </div>
         </div>
-        <div className="w-12 h-0.5 mb-5" style={{ background: goldGradient }} />
+        <div className="w-12 h-0.5 mb-5" style={{ background: p.goldGradient }} />
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-white/50 mb-2">Cantidad de entradas</label>
+            <label className={`block text-sm font-medium mb-2 ${p.tx.label}`}>Cantidad de entradas</label>
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => handleQtyChange(Math.max(1, numberOfEntries - 1))}
-                className="w-11 h-11 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors text-lg font-semibold"
-                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-              >-</button>
+                className={`w-11 h-11 flex items-center justify-center rounded-lg hover:opacity-80 transition-colors text-lg font-semibold ${p.qtyBtnClass}`}
+                style={{ background: p.inputBg, border: `1px solid ${p.inputBorder}` }}
+                >-</button>
               <input
                 type="number"
                 min={1}
@@ -848,19 +897,19 @@ export function EventPurchaseClient({
                 onChange={(e) =>
                   handleQtyChange(Math.max(1, Math.min(maxQtyThisCheckout, parseInt(e.target.value) || 1)))
                 }
-                className="w-24 text-center px-3 py-2.5 rounded-lg text-white focus:outline-none text-base font-semibold"
-                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+                className={`w-24 text-center px-3 py-2.5 rounded-lg focus:outline-none text-base font-semibold ${p.inputFieldClass}`}
+                style={{ background: p.inputBg, border: `1px solid ${p.inputBorder}` }}
               />
               <button
                 type="button"
                 disabled={numberOfEntries >= maxQtyThisCheckout}
                 onClick={() => handleQtyChange(Math.min(maxQtyThisCheckout, numberOfEntries + 1))}
-                className="w-11 h-11 flex items-center justify-center rounded-lg text-white hover:opacity-80 transition-colors text-lg font-semibold disabled:opacity-35 disabled:pointer-events-none"
-                style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-              >+</button>
+                className={`w-11 h-11 flex items-center justify-center rounded-lg hover:opacity-80 transition-colors text-lg font-semibold disabled:opacity-35 disabled:pointer-events-none ${p.qtyBtnClass}`}
+                style={{ background: p.inputBg, border: `1px solid ${p.inputBorder}` }}
+                >+</button>
             </div>
             {remainingOnline != null && remainingOnline <= 10 && (
-              <p className="text-xs mt-2" style={{ color: mutedText }}>
+              <p className="text-xs mt-2" style={{ color: p.mutedText }}>
                 Quedan {remainingOnline} entrada{remainingOnline !== 1 ? 's' : ''} disponibles en línea.
               </p>
             )}
@@ -869,7 +918,7 @@ export function EventPurchaseClient({
           <div className="space-y-3">
             {clientNames.map((name, i) => (
               <div key={i}>
-                <label className="block text-sm font-medium text-white/50 mb-2">
+                <label className={`block text-sm font-medium mb-2 ${p.tx.label}`}>
                   {numberOfEntries > 1 ? `Nombre entrada ${i + 1} *` : 'Nombre completo *'}
                 </label>
                 <input
@@ -877,32 +926,32 @@ export function EventPurchaseClient({
                   value={name}
                   onChange={(e) => updateName(i, e.target.value)}
                   placeholder={numberOfEntries > 1 ? `Nombre persona ${i + 1}` : 'Tu nombre'}
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none focus:ring-2 transition-all"
-                  style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all ${p.inputFieldClass}`}
+                  style={{ background: p.inputBg, border: `1px solid ${p.inputBorder}` }}
                 />
               </div>
             ))}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-white/50 mb-2">Email *</label>
+            <label className={`block text-sm font-medium mb-2 ${p.tx.label}`}>Email *</label>
             <input
               type="email"
               value={clientEmail}
               onChange={(e) => setClientEmail(e.target.value)}
               placeholder="correo@ejemplo.com"
-              className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none focus:ring-2 transition-all"
-              style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+              className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all ${p.inputFieldClass}`}
+              style={{ background: p.inputBg, border: `1px solid ${p.inputBorder}` }}
             />
-            <p className="text-xs text-white/20 mt-1">Recibiras todas las entradas y QRs aqui</p>
+            <p className={`text-xs mt-1 ${p.tx.faint}`}>Recibiras todas las entradas y QRs aqui</p>
           </div>
 
 
           {paymentMode === 'direct' && (
-            <div className="rounded-lg p-4 space-y-3" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
+            <div className="rounded-lg p-4 space-y-3" style={{ background: p.inputBg, border: `1px solid ${p.inputBorder}` }}>
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-white/80">Tarjeta (modo directo sandbox)</p>
-                <span className="text-[11px] text-white/40">Activo</span>
+                <p className={`text-sm font-medium ${p.tx.directTitle}`}>Tarjeta (modo directo sandbox)</p>
+                <span className={`text-[11px] ${p.tx.directBadge}`}>Activo</span>
               </div>
               <div className="flex items-center gap-2">
                 <div
@@ -943,8 +992,8 @@ export function EventPurchaseClient({
                 value={cardHolderName}
                 onChange={(e) => setCardHolderName(e.target.value)}
                 placeholder="Nombre del titular"
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
               />
               <input
                 type="text"
@@ -958,8 +1007,8 @@ export function EventPurchaseClient({
                   setCardNumber(rawDigits.slice(0, maxLen))
                 }}
                 placeholder="Número de tarjeta"
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
               />
               <div className="grid grid-cols-3 gap-2">
                 <input
@@ -969,8 +1018,8 @@ export function EventPurchaseClient({
                   value={cardExpMonth}
                   onChange={(e) => setCardExpMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
                   placeholder="MM"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
                 <input
                   type="text"
@@ -979,8 +1028,8 @@ export function EventPurchaseClient({
                   value={cardExpYear}
                   onChange={(e) => setCardExpYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   placeholder="YYYY"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
                 <input
                   type="password"
@@ -989,11 +1038,11 @@ export function EventPurchaseClient({
                   value={cardCvv}
                   onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, isAmex ? 4 : 3))}
                   placeholder={isAmex ? 'CID' : 'CVV'}
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
               </div>
-              <p className="text-[11px] text-white/35">
+              <p className={`text-[11px] ${p.tx.hint}`}>
                 En modo sandbox directo, estos datos se envían al backend para prueba técnica.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1002,40 +1051,40 @@ export function EventPurchaseClient({
                   value={billingAddress1}
                   onChange={(e) => setBillingAddress1(e.target.value)}
                   placeholder="Dirección *"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none sm:col-span-2"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 sm:col-span-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
                 <input
                   type="text"
                   value={billingCity}
                   onChange={(e) => setBillingCity(e.target.value)}
                   placeholder="Ciudad *"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
                 <input
                   type="text"
                   value={billingState}
                   onChange={(e) => setBillingState(e.target.value)}
                   placeholder="Departamento/Estado *"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
                 <input
                   type="text"
                   value={billingPostalCode}
                   onChange={(e) => setBillingPostalCode(e.target.value)}
                   placeholder="Código postal *"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
                 <input
                   type="text"
                   value={billingCountry}
                   onChange={(e) => setBillingCountry(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2))}
                   placeholder="País ISO2 (ej. HN) *"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
               </div>
             </div>
@@ -1043,47 +1092,40 @@ export function EventPurchaseClient({
 
           <div className="rounded-lg p-4" style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)' }}>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-white/40">Total a pagar</span>
+              <span className={`text-sm ${p.tx.row}`}>Total a pagar</span>
               <span className="text-2xl font-bold" style={{ color: '#c9a84c' }}>{formatLps(totalPrice)}</span>
             </div>
-            <p className="text-xs text-white/20 mt-1">{numberOfEntries} entrada{numberOfEntries > 1 ? 's' : ''} x {formatLps(event.onlinePrice)}</p>
-            <div className="mt-3 w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <p className={`text-xs mt-1 ${p.tx.faint}`}>{numberOfEntries} entrada{numberOfEntries > 1 ? 's' : ''} x {formatLps(event.onlinePrice)}</p>
+            <div className={`mt-3 w-full h-1.5 rounded-full overflow-hidden ${p.isLight ? 'bg-amber-100' : 'bg-white/10'}`}>
               <div
                 className="h-full rounded-full"
                 style={{
                   width: `${Math.min(100, Math.max(35, (numberOfEntries / maxQtyThisCheckout) * 100))}%`,
-                  background: goldGradient,
+                  background: p.goldGradient,
                 }}
               />
             </div>
           </div>
 
           {showUnified && paymentMode === 'unified' && (
-            <div
-              className="rounded-xl p-4 space-y-3"
-              style={{
-                background: 'rgba(16, 27, 48, 0.8)',
-                border: '1px solid rgba(59,130,246,0.35)',
-                boxShadow: '0 0 0 1px rgba(59,130,246,0.1) inset',
-              }}
-            >
-              <p className="text-sm font-medium text-blue-200">Paso 2 de 2: Ingresa tarjeta en Microform (3DS)</p>
+            <div className="rounded-xl p-4 space-y-3" style={p.unifiedPanel}>
+              <p className={p.tx.unifiedLead}>Paso 2 de 2: Ingresa tarjeta en Microform (3DS)</p>
               <input
                 type="text"
                 value={cardHolderName}
                 onChange={(e) => setCardHolderName(e.target.value)}
                 placeholder="Nombre del titular *"
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
               />
               <div className="space-y-2">
-                <label className="block text-xs text-blue-100/80">Número de tarjeta</label>
+                <label className={`block text-xs ${p.tx.unifiedLbl}`}>Número de tarjeta</label>
                 <div
                   id="cybs-card-number"
                   className="w-full rounded-lg overflow-hidden"
                   style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${inputBorder}`,
+                    background: p.fieldRim,
+                    border: `1px solid ${p.inputBorder}`,
                     height: '44px',
                     padding: '0 16px',
                     display: 'flex',
@@ -1098,8 +1140,8 @@ export function EventPurchaseClient({
                   value={microformExpMonth}
                   onChange={(e) => setMicroformExpMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
                   placeholder="MM"
-                  className="w-full px-4 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}`, height: '44px' }}
+                  className={`w-full px-4 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}`, height: '44px' }}
                 />
                 <input
                   type="text"
@@ -1107,15 +1149,15 @@ export function EventPurchaseClient({
                   value={microformExpYear}
                   onChange={(e) => setMicroformExpYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   placeholder="YYYY"
-                  className="w-full px-4 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}`, height: '44px' }}
+                  className={`w-full px-4 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}`, height: '44px' }}
                 />
                 <div
                   id="cybs-card-cvv"
                   className="w-full rounded-lg overflow-hidden"
                   style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${inputBorder}`,
+                    background: p.fieldRim,
+                    border: `1px solid ${p.inputBorder}`,
                     height: '44px',
                     padding: '0 16px',
                     display: 'flex',
@@ -1129,43 +1171,43 @@ export function EventPurchaseClient({
                   value={billingAddress1}
                   onChange={(e) => setBillingAddress1(e.target.value)}
                   placeholder="Dirección *"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none sm:col-span-2"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 sm:col-span-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
                 <input
                   type="text"
                   value={billingCity}
                   onChange={(e) => setBillingCity(e.target.value)}
                   placeholder="Ciudad *"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
                 <input
                   type="text"
                   value={billingState}
                   onChange={(e) => setBillingState(e.target.value)}
                   placeholder="Departamento/Estado *"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
                 <input
                   type="text"
                   value={billingPostalCode}
                   onChange={(e) => setBillingPostalCode(e.target.value)}
                   placeholder="Código postal *"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
                 <input
                   type="text"
                   value={billingCountry}
                   onChange={(e) => setBillingCountry(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2))}
                   placeholder="País ISO2 (ej. HN) *"
-                  className="w-full px-4 py-3 rounded-lg text-white placeholder-white/20 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${inputBorder}` }}
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
+                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
               </div>
-              <p className="text-xs text-blue-100/70">
+              <p className={p.tx.unifiedFoot}>
                 Los datos sensibles se capturan en iframes seguros de CyberSource.
               </p>
             </div>
@@ -1176,24 +1218,24 @@ export function EventPurchaseClient({
           {processing ? (
             <div className="text-center py-4">
               <div className="inline-block w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mb-2" style={{ borderColor: '#c9a84c', borderTopColor: 'transparent' }} />
-              <p className="text-sm text-white/40">Procesando pago...</p>
+              <p className={`text-sm ${p.tx.row}`}>Procesando pago...</p>
             </div>
           ) : formValid ? (
             <button
               type="button"
               onClick={handlePayClick}
               className="w-full font-semibold py-3 px-4 rounded-lg transition-all hover:opacity-90 shadow-[0_10px_30px_rgba(201,168,76,0.25)]"
-              style={{ background: goldGradient, color: '#0a0a15' }}
+              style={{ background: p.goldGradient, color: '#0a0a15' }}
             >
               Pagar con tarjeta
             </button>
           ) : (
-            <div className="rounded-lg p-4 text-center" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
-              <p className="text-sm text-white/30">Completa tu nombre y email para continuar</p>
+            <div className="rounded-lg p-4 text-center" style={{ background: p.inputBg, border: `1px solid ${p.inputBorder}` }}>
+              <p className={`text-sm ${p.tx.hint}`}>Completa tu nombre y email para continuar</p>
             </div>
           )}
 
-          <p className="text-xs text-white/25 text-center">
+          <p className={`text-xs text-center ${p.tx.vfaint}`}>
             Pago seguro procesado por CyberSource (Visa / Mastercard / Amex). Recibirás tu entrada por email automáticamente.
           </p>
         </div>
@@ -1206,10 +1248,12 @@ function ConfirmationView({
   success,
   event,
   eventsListPath = '/eventos',
+  palette,
 }: {
   success: PurchaseSuccess
   event: EventData
   eventsListPath?: string
+  palette: PurchasePalette
 }) {
   const [downloading, setDownloading] = useState(false)
   const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
@@ -1292,40 +1336,59 @@ function ConfirmationView({
     window.open(`https://wa.me/?text=${encodeURIComponent(fullMessage)}`, '_blank')
   }
 
+  const headerBg = palette.isLight
+    ? 'linear-gradient(135deg, rgba(201,168,76,0.22), rgba(255,252,248,0.98))'
+    : 'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(201,168,76,0.05))'
+
   return (
     <div className="max-w-lg mx-auto">
-      <div className="rounded-2xl overflow-hidden" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
-        <div className="p-8 text-center" style={{ background: 'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(201,168,76,0.05))' }}>
+      <div className="rounded-2xl overflow-hidden" style={{ background: palette.cardBg, border: `1px solid ${palette.cardBorder}` }}>
+        <div className="p-8 text-center" style={{ background: headerBg }}>
           <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: 'rgba(201,168,76,0.2)', border: '2px solid rgba(201,168,76,0.4)' }}>
             <svg className="w-8 h-8" style={{ color: '#c9a84c' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-1">Compra Exitosa!</h2>
-          <p className="text-white/50 text-sm">Tu entrada ha sido enviada por email</p>
+          <h2 className={`text-2xl font-bold mb-1 ${palette.tx.h2}`}>Compra Exitosa!</h2>
+          <p className={`text-sm ${palette.tx.successSub}`}>Tu entrada ha sido enviada por email</p>
         </div>
 
         <div className="p-6 space-y-4">
-          <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(10,10,25,0.6)', border: `1px solid ${cardBorder}` }}>
-            <div className="flex justify-between"><span className="text-sm text-white/40">Evento</span><span className="text-white font-medium">{success.eventName}</span></div>
-            <div style={{ borderTop: `1px solid ${cardBorder}` }} />
-            <div className="flex justify-between"><span className="text-sm text-white/40">Fecha</span><span className="font-medium capitalize" style={{ color: '#c9a84c' }}>{eventDateStr}</span></div>
-            <div style={{ borderTop: `1px solid ${cardBorder}` }} />
-            <div className="flex justify-between"><span className="text-sm text-white/40">Entradas</span><span className="text-white font-bold">{success.entries.length}</span></div>
-            <div style={{ borderTop: `1px solid ${cardBorder}` }} />
-            <div className="flex justify-between"><span className="text-sm text-white/40">Total Pagado</span><span className="font-bold text-lg" style={{ color: '#c9a84c' }}>{formatLps(success.totalPriceLps)}</span></div>
-            <div style={{ borderTop: `1px solid ${cardBorder}` }} />
-            <div className="flex justify-between"><span className="text-sm text-white/40">Email</span><span className="text-white text-sm">{success.clientEmail}</span></div>
+          <div className="rounded-xl p-4 space-y-3" style={{ background: palette.innerPanelBg, border: `1px solid ${palette.cardBorder}` }}>
+            <div className="flex justify-between">
+              <span className={`text-sm ${palette.tx.row}`}>Evento</span>
+              <span className={`font-medium ${palette.tx.h3}`}>{success.eventName}</span>
+            </div>
+            <div style={{ borderTop: `1px solid ${palette.cardBorder}` }} />
+            <div className="flex justify-between">
+              <span className={`text-sm ${palette.tx.row}`}>Fecha</span>
+              <span className="font-medium capitalize" style={{ color: '#c9a84c' }}>{eventDateStr}</span>
+            </div>
+            <div style={{ borderTop: `1px solid ${palette.cardBorder}` }} />
+            <div className="flex justify-between">
+              <span className={`text-sm ${palette.tx.row}`}>Entradas</span>
+              <span className={`font-bold ${palette.tx.h3}`}>{success.entries.length}</span>
+            </div>
+            <div style={{ borderTop: `1px solid ${palette.cardBorder}` }} />
+            <div className="flex justify-between">
+              <span className={`text-sm ${palette.tx.row}`}>Total Pagado</span>
+              <span className="font-bold text-lg" style={{ color: '#c9a84c' }}>{formatLps(success.totalPriceLps)}</span>
+            </div>
+            <div style={{ borderTop: `1px solid ${palette.cardBorder}` }} />
+            <div className="flex justify-between">
+              <span className={`text-sm ${palette.tx.row}`}>Email</span>
+              <span className={`text-sm ${palette.tx.h3}`}>{success.clientEmail}</span>
+            </div>
           </div>
 
           {success.entries.length > 1 && (
-            <div className="rounded-xl p-4" style={{ background: 'rgba(10,10,25,0.6)', border: `1px solid ${cardBorder}` }}>
-              <p className="text-sm font-semibold text-white mb-2">Entradas emitidas</p>
+            <div className="rounded-xl p-4" style={{ background: palette.innerPanelBg, border: `1px solid ${palette.cardBorder}` }}>
+              <p className={`text-sm font-semibold mb-2 ${palette.tx.h3}`}>Entradas emitidas</p>
               <div className="space-y-2">
                 {success.entries.map((entry, index) => (
                   <div key={entry.entryId} className="flex items-center justify-between text-sm">
-                    <span className="text-white/45">Entrada {index + 1}</span>
-                    <span className="text-white font-medium truncate max-w-[70%] text-right">{entry.clientName}</span>
+                    <span className={palette.tx.entryRow}>Entrada {index + 1}</span>
+                    <span className={`font-medium truncate max-w-[70%] text-right ${palette.tx.h3}`}>{entry.clientName}</span>
                   </div>
                 ))}
               </div>
@@ -1337,7 +1400,7 @@ function ConfirmationView({
               onClick={handleDownload}
               disabled={downloading}
               className="w-full font-semibold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
-              style={{ background: goldGradient, color: '#0a0a15' }}
+              style={{ background: palette.goldGradient, color: '#0a0a15' }}
             >
               {downloading ? 'Generando...' : 'Descargar / Imprimir Entrada'}
             </button>
@@ -1351,14 +1414,17 @@ function ConfirmationView({
 
             <Link
               href={eventsListPath}
-              className="block w-full text-center text-white/50 hover:text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-              style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${cardBorder}` }}
+              className={`block w-full text-center font-medium py-2.5 px-4 rounded-lg transition-colors text-sm ${palette.tx.moreEvents}`}
+              style={{
+                background: palette.isLight ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${palette.cardBorder}`,
+              }}
             >
               Ver mas eventos
             </Link>
           </div>
 
-          <p className="text-xs text-white/15 text-center">
+          <p className={`text-xs text-center ${palette.tx.ref}`}>
             Referencia: {success.paymentReference}
           </p>
         </div>

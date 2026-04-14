@@ -190,23 +190,23 @@ export default async function EventosPage() {
                             border: '1px solid rgba(0,255,255,0.35)',
                           }}
                         >
-                          <p className="text-lg font-bold text-white leading-none">{dayNum}</p>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">{monthStr}</p>
+                          <p className="text-lg font-bold text-white leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">{dayNum}</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">{monthStr}</p>
                         </div>
 
-                        <div className="absolute bottom-0 left-0 right-0 p-5">
-                          <h3 className="text-xl font-bold text-white mb-1 group-hover:text-cyan-200 transition-colors duration-300">
+                        <div className="absolute bottom-0 left-0 right-0 p-5 [&_p]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] [&_span]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
+                          <h3 className="text-xl font-bold text-white mb-1 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] group-hover:text-white transition-colors duration-300">
                             {event.name}
                           </h3>
                           {event.description && (
-                            <p className="text-white/45 text-sm line-clamp-2 mb-2">{event.description}</p>
+                            <p className="text-white text-sm line-clamp-2 mb-2">{event.description}</p>
                           )}
                           {venueLine ? (
-                            <p className="text-white/35 text-xs line-clamp-2 mb-2">{venueLine}</p>
+                            <p className="text-white text-xs line-clamp-2 mb-2">{venueLine}</p>
                           ) : null}
-                          <div className="flex items-center justify-between">
-                            <span className="text-white/35 text-xs capitalize">{fullDate}</span>
-                            <span className="font-bold text-lg bg-gradient-to-r from-cyan-300 to-fuchsia-300 bg-clip-text text-transparent">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-white text-xs capitalize">{fullDate}</span>
+                            <span className="font-bold text-lg text-white shrink-0">
                               {freeOnly ? 'Cover gratuito' : `L ${onlinePrice.toFixed(2)}`}
                             </span>
                           </div>
@@ -214,7 +214,7 @@ export default async function EventosPage() {
                       </div>
 
                       <div className="p-4 flex items-center justify-between border-t border-white/5">
-                        <span className="text-white/40 text-xs capitalize">{weekday} · 9:00 PM</span>
+                        <span className="text-white text-xs capitalize">{weekday} · 9:00 PM</span>
                         <span
                           className="text-sm font-semibold px-4 py-1.5 rounded-full transition-all duration-300 group-hover:scale-105"
                           style={{
@@ -236,7 +236,7 @@ export default async function EventosPage() {
               <p className="text-white/30 text-xs mb-5 tracking-wide uppercase">Reservaciones y consultas</p>
               <div className="flex items-center justify-center gap-4 flex-wrap">
                 <a
-                  href="https://wa.me/50494373757"
+                  href="https://wa.me/50498240217"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-white transition-all hover:scale-105"
@@ -246,7 +246,21 @@ export default async function EventosPage() {
                     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
                     <path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.344 0-4.507-.81-6.214-2.163l-.436-.345-2.648.888.888-2.648-.345-.436A9.956 9.956 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z" />
                   </svg>
-                  9437-3757
+                  9824-0217
+                </a>
+                <a
+                  href="https://wa.me/50494902444"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-white transition-all hover:scale-105"
+                  style={{ background: 'linear-gradient(135deg, #1e3a5f, #2563eb)', boxShadow: '0 4px 15px rgba(37,99,235,0.25)' }}
+                  aria-label="AstroBot WhatsApp"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.344 0-4.507-.81-6.214-2.163l-.436-.345-2.648.888.888-2.648-.345-.436A9.956 9.956 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z" />
+                  </svg>
+                  AstroBot
                 </a>
                 <a
                   href="https://www.instagram.com/casablancasps/"
