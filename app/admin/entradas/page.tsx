@@ -13,7 +13,7 @@ export default async function EntradasPage() {
     redirect('/login')
   }
 
-  const { events, recentEntries, todayStats } = await getEntradasDashboardData()
+  const { events, recentEntries, todayStats, eventStats } = await getEntradasDashboardData()
 
   return (
     <div className="space-y-6">
@@ -42,7 +42,7 @@ export default async function EntradasPage() {
           </div>
         </div>
 
-      <EntradasClient events={events} recentEntries={recentEntries} />
+      <EntradasClient events={events} recentEntries={recentEntries} eventStats={eventStats} />
     </div>
   )
 }

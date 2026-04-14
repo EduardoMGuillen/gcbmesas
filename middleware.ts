@@ -90,6 +90,17 @@ const authMiddleware = withAuth(
 export default function middleware(req: NextRequest, evt: NextFetchEvent) {
   const path = req.nextUrl.pathname
 
+  const hostRaw = (req.headers.get('host') || '').split(':')[0]?.toLowerCase() || ''
+  const cbtHosts = (process.env.CBTICKETS_HOST || '')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean)
+  if (cbtHosts.length > 0 && cbtHosts.includes(hostRaw) && path === '/') {
+    const url = req.nextUrl.clone()
+    url.pathname = '/cbtickets'
+    return NextResponse.rewrite(url)
+  }
+
   // Exclude public redirects and API auth routes from NextAuth/middleware
   // /api/auth/error must never reach NextAuth to avoid NO_SECRET
   if (path === '/api/auth/error' || path.startsWith('/api/auth')) {

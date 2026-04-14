@@ -14,6 +14,8 @@ type ActiveEvent = {
   id: string
   name: string
   date: string | Date
+  venueName: string | null
+  venueAddress: string | null
 }
 
 type ScannedEntry = {
@@ -230,6 +232,8 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
           eventName: selectedEvent.name,
           eventDate: String(selectedEvent.date),
           totalPrice: entry.totalPrice,
+          venueName: selectedEvent.venueName ?? undefined,
+          venueAddress: selectedEvent.venueAddress ?? undefined,
         }),
       })
       const json = await res.json().catch(() => ({}))

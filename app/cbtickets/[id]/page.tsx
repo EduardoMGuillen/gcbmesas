@@ -1,18 +1,17 @@
 import { getPublicEventById } from '@/lib/public-events'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
-import { EventPurchaseClient } from './EventPurchaseClient'
+import { EventPurchaseClient } from '@/app/eventos/[id]/EventPurchaseClient'
 import { PublicSiteVantaBackground } from '@/components/PublicSiteVantaBackground'
 
 export const dynamic = 'force-dynamic'
 
-export default async function EventoPage({
+export default async function CbTicketsEventoPage({
   params,
 }: {
   params: { id: string }
 }) {
-  const event = await getPublicEventById(params.id, { channel: 'lcb' })
+  const event = await getPublicEventById(params.id, { channel: 'cbtickets' })
 
   if (!event || !event.paypalPrice) {
     notFound()
@@ -63,19 +62,13 @@ export default async function EventoPage({
                   </svg>
                   Inicio
                 </Link>
-                <Link href="/eventos" className="flex items-center gap-2 group">
-                  <Image
-                    src="/LogoCasaBlanca.png"
-                    alt="Casa Blanca"
-                    width={36}
-                    height={36}
-                    className="h-8 w-auto object-contain"
-                  />
+                <Link href="/cbtickets" className="flex items-center gap-2 group">
+                  <span className="text-xs font-bold tracking-widest uppercase text-cyan-300/90">CBTickets</span>
                   <span className="text-sm font-medium text-white/70 group-hover:text-white transition-colors">Eventos</span>
                 </Link>
               </div>
               <Link
-                href="/eventos"
+                href="/cbtickets"
                 className="text-xs sm:text-sm text-white/45 hover:text-cyan-300 transition-colors flex items-center gap-1.5"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,7 +96,7 @@ export default async function EventoPage({
                 <h3 className="text-xl font-semibold text-white/40 mb-2">Este evento ya pasó</h3>
                 <p className="text-white/25 mb-6 text-sm">La venta de entradas en línea ya no está disponible.</p>
                 <Link
-                  href="/eventos"
+                  href="/cbtickets"
                   className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full transition-all hover:scale-105"
                   style={{
                     background: 'linear-gradient(45deg, #00ffff, #a855f7)',
@@ -115,20 +108,13 @@ export default async function EventoPage({
                 </Link>
               </div>
             ) : (
-              <EventPurchaseClient event={eventData} />
+              <EventPurchaseClient event={eventData} eventsListPath="/cbtickets" />
             )}
           </main>
 
           <footer className="py-8 mt-auto border-t border-white/10 shrink-0" style={{ background: 'rgba(0,0,0,0.35)' }}>
             <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-3">
-              <div className="flex items-center justify-center gap-6 sm:gap-10 mb-3 flex-wrap">
-                <Image src="/LogoAstronomical.png" alt="Astronomical" width={90} height={30} className="h-6 sm:h-7 w-auto object-contain opacity-35" />
-                <Image src="/LogoCasaBlanca.png" alt="Casa Blanca" width={40} height={40} className="h-8 w-auto object-contain opacity-35" />
-                <Image src="/LogoStudio54.png" alt="Studio 54" width={90} height={30} className="h-6 sm:h-7 w-auto object-contain opacity-35" />
-              </div>
-              <p className="text-xs text-white/25">
-                &copy; {new Date().getFullYear()} Casa Blanca &middot; San Pedro Sula, Honduras
-              </p>
+              <p className="text-xs text-white/25">&copy; {new Date().getFullYear()} CBTickets</p>
               <p className="text-xs text-white/25">
                 Powered by{' '}
                 <a

@@ -65,7 +65,14 @@ function formatCardNumber(value: string, brand: CardBrand) {
   return digits.replace(/(.{4})/g, '$1 ').trim()
 }
 
-export function EventPurchaseClient({ event }: { event: EventData }) {
+export function EventPurchaseClient({
+  event,
+  eventsListPath = '/eventos',
+}: {
+  event: EventData
+  /** Listado público del canal (ej. `/eventos` o `/cbtickets`). No altera el POST a CyberSource. */
+  eventsListPath?: string
+}) {
   const [clientNames, setClientNames] = useState<string[]>([''])
   const [clientEmail, setClientEmail] = useState('')
   const [clientPhone, setClientPhone] = useState('')
@@ -691,7 +698,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   }
 
   if (success) {
-    return <ConfirmationView success={success} event={event} />
+    return <ConfirmationView success={success} event={event} eventsListPath={eventsListPath} />
   }
 
   if (onlineSoldOut) {
@@ -702,7 +709,7 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
           Las entradas en línea para este evento ya no están disponibles.
         </p>
         <Link
-          href="/eventos"
+          href={eventsListPath}
           className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full transition-all hover:scale-105"
           style={{
             background: 'linear-gradient(45deg, #00ffff, #a855f7)',
@@ -1195,7 +1202,15 @@ export function EventPurchaseClient({ event }: { event: EventData }) {
   )
 }
 
-function ConfirmationView({ success, event }: { success: PurchaseSuccess; event: EventData }) {
+function ConfirmationView({
+  success,
+  event,
+  eventsListPath = '/eventos',
+}: {
+  success: PurchaseSuccess
+  event: EventData
+  eventsListPath?: string
+}) {
   const [downloading, setDownloading] = useState(false)
   const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -1334,13 +1349,13 @@ function ConfirmationView({ success, event }: { success: PurchaseSuccess; event:
               Compartir por WhatsApp
             </button>
 
-            <a
-              href="/eventos"
+            <Link
+              href={eventsListPath}
               className="block w-full text-center text-white/50 hover:text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
               style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${cardBorder}` }}
             >
               Ver mas eventos
-            </a>
+            </Link>
           </div>
 
           <p className="text-xs text-white/15 text-center">
