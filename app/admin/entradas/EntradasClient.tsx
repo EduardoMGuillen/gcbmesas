@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
 import {
@@ -15,6 +15,7 @@ import {
   validateEntryByToken,
   markEntryWhatsappSent,
 } from '@/lib/actions'
+import { isPublicFreeCoverOnly } from '@/lib/public-event-pricing'
 
 // ==================== TYPES ====================
 
@@ -42,6 +43,7 @@ type EventStatRow = {
   eventId: string
   name: string
   date: string | Date
+  venueName: string | null
   entriesSold: number
   revenueLps: number
 }
@@ -988,21 +990,101 @@ function EscanearTab() {
 
 // ==================== ESTADISTICAS TAB ====================
 
+const VENUE_FILTER_NONE = '__sin_lugar__'
+
 function EstadisticasTab({ rows }: { rows: EventStatRow[] }) {
-  const sorted = [...rows].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const [filterVenue, setFilterVenue] = useState('')
+  const [filterEventName, setFilterEventName] = useState('')
+
+  const distinctVenueNames = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of rows) {
+      const v = r.venueName?.trim()
+      if (v) set.add(v)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
+  }, [rows])
+
+  const distinctEventNames = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of rows) {
+      if (r.name?.trim()) set.add(r.name.trim())
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
+  }, [rows])
+
+  const hasRowsWithoutVenue = useMemo(() => rows.some((r) => !r.venueName?.trim()), [rows])
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      if (filterVenue === VENUE_FILTER_NONE) {
+        if (r.venueName?.trim()) return false
+      } else if (filterVenue) {
+        if ((r.venueName?.trim() || '') !== filterVenue) return false
+      }
+      if (filterEventName && r.name !== filterEventName) return false
+      return true
+    })
+  }, [rows, filterVenue, filterEventName])
+
+  const sorted = useMemo(
+    () => [...filteredRows].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [filteredRows]
+  )
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-dark-300">
         Ventas acumuladas por evento (entradas no canceladas). Incluye taquilla y en línea.
       </p>
-      {sorted.length === 0 ? (
+      {rows.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-dark-100 border border-dark-200">
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">Filtrar por lugar</label>
+            <select
+              value={filterVenue}
+              onChange={(e) => setFilterVenue(e.target.value)}
+              className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Todos los lugares</option>
+              {hasRowsWithoutVenue && <option value={VENUE_FILTER_NONE}>(Sin lugar definido)</option>}
+              {distinctVenueNames.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">Filtrar por nombre del evento</label>
+            <select
+              value={filterEventName}
+              onChange={(e) => setFilterEventName(e.target.value)}
+              className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Todos los eventos</option>
+              {distinctEventNames.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+      {rows.length === 0 ? (
         <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center text-white/40">No hay eventos.</div>
+      ) : sorted.length === 0 ? (
+        <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center text-white/40">
+          Ningún evento coincide con los filtros.
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-dark-200">
           <table className="w-full text-sm text-left">
             <thead>
               <tr className="bg-dark-100 border-b border-dark-200 text-dark-300">
                 <th className="px-4 py-3 font-medium">Evento</th>
+                <th className="px-4 py-3 font-medium">Lugar</th>
                 <th className="px-4 py-3 font-medium">Fecha</th>
                 <th className="px-4 py-3 font-medium text-right">Entradas</th>
                 <th className="px-4 py-3 font-medium text-right">Ingreso (L)</th>
@@ -1012,6 +1094,7 @@ function EstadisticasTab({ rows }: { rows: EventStatRow[] }) {
               {sorted.map((r) => (
                 <tr key={r.eventId} className="border-b border-dark-200/80 hover:bg-dark-50/50">
                   <td className="px-4 py-3 text-white font-medium">{r.name}</td>
+                  <td className="px-4 py-3 text-dark-300">{r.venueName?.trim() || '—'}</td>
                   <td className="px-4 py-3 text-dark-300">
                     {new Date(r.date).toLocaleDateString('es-HN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}
                   </td>
@@ -1049,6 +1132,39 @@ function EventosTab({ events }: { events: EventItem[] }) {
   const [venueAddress, setVenueAddress] = useState('')
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [filterListVenue, setFilterListVenue] = useState('')
+  const [filterListEventName, setFilterListEventName] = useState('')
+
+  const distinctListVenueNames = useMemo(() => {
+    const set = new Set<string>()
+    for (const ev of events) {
+      const v = ev.venueName?.trim()
+      if (v) set.add(v)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
+  }, [events])
+
+  const distinctListEventNames = useMemo(() => {
+    const set = new Set<string>()
+    for (const ev of events) {
+      if (ev.name?.trim()) set.add(ev.name.trim())
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
+  }, [events])
+
+  const hasEventsWithoutVenue = useMemo(() => events.some((ev) => !ev.venueName?.trim()), [events])
+
+  const filteredListEvents = useMemo(() => {
+    return events.filter((ev) => {
+      if (filterListVenue === VENUE_FILTER_NONE) {
+        if (ev.venueName?.trim()) return false
+      } else if (filterListVenue) {
+        if ((ev.venueName?.trim() || '') !== filterListVenue) return false
+      }
+      if (filterListEventName && ev.name !== filterListEventName) return false
+      return true
+    })
+  }, [events, filterListVenue, filterListEventName])
 
   const resetForm = () => {
     setName('')
@@ -1110,7 +1226,25 @@ function EventosTab({ events }: { events: EventItem[] }) {
     setError('')
     if (!name.trim()) { setError('Ingresa el nombre del evento'); return }
     if (!date) { setError('Selecciona una fecha'); return }
-    if (!coverPrice || parseFloat(coverPrice) <= 0) { setError('Ingresa un precio válido'); return }
+    const coverTrim = coverPrice.trim()
+    const coverN = parseFloat(coverTrim)
+    if (coverTrim === '' || !Number.isFinite(coverN) || coverN < 0) {
+      setError('Ingresa un precio de cover válido (0 o más)')
+      return
+    }
+
+    const onlineTrim = onlinePrice.trim()
+    let paypalResolved: number | null
+    if (onlineTrim === '') {
+      paypalResolved = null
+    } else {
+      const on = parseFloat(onlineTrim)
+      if (!Number.isFinite(on) || on < 0) {
+        setError('Precio online inválido')
+        return
+      }
+      paypalResolved = on === 0 ? null : on
+    }
 
     const limitTrim = maxEntriesLimit.trim()
     let maxEntries: number | null | undefined
@@ -1130,10 +1264,10 @@ function EventosTab({ events }: { events: EventItem[] }) {
         const eventData = {
           name: name.trim(),
           date,
-          coverPrice: parseFloat(coverPrice),
+          coverPrice: coverN,
           description: description.trim() || undefined,
           coverImage: coverImage.trim() || undefined,
-          paypalPrice: onlinePrice ? parseFloat(onlinePrice) : undefined,
+          paypalPrice: paypalResolved,
           publishOnLcb,
           publishOnCbtickets,
           venueName: venueName.trim() || null,
@@ -1189,6 +1323,17 @@ function EventosTab({ events }: { events: EventItem[] }) {
               <div>
                 <label className="block text-sm font-medium text-dark-300 mb-2">Precio Cover (L)</label>
                 <input type="number" step="0.01" min="0" value={coverPrice} onChange={(e) => setCoverPrice(e.target.value)} placeholder="200.00" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCoverPrice('0')
+                    setOnlinePrice('')
+                    setError('')
+                  }}
+                  className="mt-2 text-xs font-medium text-cyan-400/90 hover:text-cyan-300 underline underline-offset-2"
+                >
+                  Cover gratuito (sin venta web)
+                </button>
               </div>
             </div>
             <div>
@@ -1286,8 +1431,47 @@ function EventosTab({ events }: { events: EventItem[] }) {
       {events.length === 0 ? (
         <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center"><p className="text-white/40">No hay eventos creados aún.</p></div>
       ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-dark-100 border border-dark-200">
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-2">Filtrar por lugar</label>
+              <select
+                value={filterListVenue}
+                onChange={(e) => setFilterListVenue(e.target.value)}
+                className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Todos los lugares</option>
+                {hasEventsWithoutVenue && <option value={VENUE_FILTER_NONE}>(Sin lugar definido)</option>}
+                {distinctListVenueNames.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-2">Filtrar por nombre del evento</label>
+              <select
+                value={filterListEventName}
+                onChange={(e) => setFilterListEventName(e.target.value)}
+                className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Todos los eventos</option>
+                {distinctListEventNames.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {filteredListEvents.length === 0 ? (
+            <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center text-white/40">
+              Ningún evento coincide con los filtros.
+            </div>
+          ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {events.map((ev) => (
+          {filteredListEvents.map((ev) => (
             <div key={ev.id} className={`bg-dark-100 border rounded-xl p-4 transition-colors ${ev.isActive ? 'border-dark-200' : 'border-dark-200/50 opacity-60'}`}>
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -1310,8 +1494,19 @@ function EventosTab({ events }: { events: EventItem[] }) {
                     {[ev.venueName, ev.venueAddress].filter(Boolean).join(' · ')}
                   </p>
                 )}
-                <p className="text-dark-300">Cover: <span className="text-primary-400 font-semibold">L {ev.coverPrice.toFixed(2)}</span></p>
-                {ev.paypalPrice && <p className="text-dark-300">Online: <span className="text-blue-400 font-semibold">L {ev.paypalPrice.toFixed(2)}</span></p>}
+                <p className="text-dark-300">
+                  Cover:{' '}
+                  {isPublicFreeCoverOnly(ev.coverPrice, ev.paypalPrice) ? (
+                    <span className="text-emerald-400 font-semibold">Gratuito · sin venta web</span>
+                  ) : (
+                    <span className="text-primary-400 font-semibold">L {ev.coverPrice.toFixed(2)}</span>
+                  )}
+                </p>
+                {ev.paypalPrice != null && Number(ev.paypalPrice) > 0 ? (
+                  <p className="text-dark-300">
+                    Online: <span className="text-blue-400 font-semibold">L {Number(ev.paypalPrice).toFixed(2)}</span>
+                  </p>
+                ) : null}
                 <p className="text-dark-300">
                   Entradas vendidas:{' '}
                   <span className="text-white font-medium">
@@ -1329,6 +1524,8 @@ function EventosTab({ events }: { events: EventItem[] }) {
             </div>
           ))}
         </div>
+          )}
+        </>
       )}
     </div>
   )

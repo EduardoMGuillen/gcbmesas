@@ -1,4 +1,5 @@
-import { getPublicEventById } from '@/lib/public-events'
+import { getPublicEventById, hasOnlineTicketSale, isPublicFreeCoverOnly } from '@/lib/public-events'
+import { FreeCoverEventView } from '../_components/FreeCoverEventView'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -14,7 +15,13 @@ export default async function EventoPage({
 }) {
   const event = await getPublicEventById(params.id, { channel: 'lcb' })
 
-  if (!event || !event.paypalPrice) {
+  if (!event) {
+    notFound()
+  }
+
+  const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
+  const hasSale = hasOnlineTicketSale(event.paypalPrice)
+  if (!freeOnly && !hasSale) {
     notFound()
   }
 
@@ -30,12 +37,19 @@ export default async function EventoPage({
     description: event.description,
     coverImage: event.coverImage,
     coverPrice: Number(event.coverPrice),
-    onlinePrice: Number(event.paypalPrice),
+    onlinePrice: Number(event.paypalPrice ?? 0),
     maxEntries: event.maxEntries,
     entriesSoldSum: event.entriesSoldSum,
   }
 
   const venueLine = [event.venueName, event.venueAddress].filter(Boolean).join(' · ')
+  const eventDateLabel = eventDate.toLocaleDateString('es-HN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
 
   return (
     <>
@@ -114,6 +128,14 @@ export default async function EventoPage({
                   Ver otros eventos
                 </Link>
               </div>
+            ) : freeOnly ? (
+              <FreeCoverEventView
+                name={event.name}
+                eventDateLabel={eventDateLabel}
+                description={event.description}
+                coverImage={event.coverImage}
+                listHref="/eventos"
+              />
             ) : (
               <EventPurchaseClient event={eventData} />
             )}

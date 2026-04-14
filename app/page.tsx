@@ -32,6 +32,7 @@ export default async function Home() {
     date: e.date,
     description: e.description,
     coverImage: e.coverImage,
+    coverPrice: Number(e.coverPrice),
     paypalPrice: e.paypalPrice != null ? e.paypalPrice.toString() : null,
   }))
 

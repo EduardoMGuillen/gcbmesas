@@ -1,6 +1,9 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export type PublicEventChannel = 'lcb' | 'cbtickets'
+
+export { isPublicFreeCoverOnly, hasOnlineTicketSale } from '@/lib/public-event-pricing'
 
 async function getEventSoldEntriesCount(eventId: string): Promise<number> {
   const agg = await prisma.entry.aggregate({
@@ -21,9 +24,17 @@ export async function getPublicEvents(channel: PublicEventChannel = 'lcb') {
   return prisma.event.findMany({
     where: {
       isActive: true,
-      paypalPrice: { not: null },
       date: { gte: now },
       ...channelWhere(channel),
+      OR: [
+        { paypalPrice: { gt: 0 } },
+        {
+          AND: [
+            { coverPrice: { equals: new Prisma.Decimal(0) } },
+            { OR: [{ paypalPrice: null }, { paypalPrice: { equals: new Prisma.Decimal(0) } }] },
+          ],
+        },
+      ],
     },
     orderBy: { date: 'asc' },
     select: {

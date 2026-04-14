@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import Script from 'next/script'
 import { isStandalonePWA } from '@/lib/pwa-detect'
+import { isPublicFreeCoverOnly } from '@/lib/public-event-pricing'
 
 type PublicEvent = {
   id: string
@@ -13,6 +14,7 @@ type PublicEvent = {
   date: Date
   description: string | null
   coverImage: string | null
+  coverPrice: number
   paypalPrice: string | null
 }
 
@@ -434,6 +436,7 @@ export default function LandingPage({ events }: LandingPageProps) {
                 const monthStr = eventDate.toLocaleDateString('es-HN', { month: 'long', timeZone: 'UTC' })
                 const weekday  = eventDate.toLocaleDateString('es-HN', { weekday: 'long', timeZone: 'UTC' })
                 const price    = Number(event.paypalPrice)
+                const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
                 return (
                   <div key={event.id} className="glass-card">
                     {event.coverImage && (
@@ -455,10 +458,10 @@ export default function LandingPage({ events }: LandingPageProps) {
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                         <span style={{ color: '#00ffff', fontWeight: 700, fontSize: '1.1rem' }}>
-                          L {price.toFixed(2)}
+                          {freeOnly ? 'Cover gratuito' : `L ${price.toFixed(2)}`}
                         </span>
                         <Link href={`/eventos/${event.id}`} className="btn-primary" style={{ padding: '0.55rem 1.4rem', fontSize: '0.9rem' }}>
-                          Comprar Entrada
+                          {freeOnly ? 'Ver evento' : 'Comprar Entrada'}
                         </Link>
                       </div>
                     </div>

@@ -1,7 +1,8 @@
-import { getPublicEventById } from '@/lib/public-events'
+import { getPublicEventById, hasOnlineTicketSale, isPublicFreeCoverOnly } from '@/lib/public-events'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { EventPurchaseClient } from '@/app/eventos/[id]/EventPurchaseClient'
+import { FreeCoverEventView } from '@/app/eventos/_components/FreeCoverEventView'
 import { PublicSiteVantaBackground } from '@/components/PublicSiteVantaBackground'
 
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,13 @@ export default async function CbTicketsEventoPage({
 }) {
   const event = await getPublicEventById(params.id, { channel: 'cbtickets' })
 
-  if (!event || !event.paypalPrice) {
+  if (!event) {
+    notFound()
+  }
+
+  const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
+  const hasSale = hasOnlineTicketSale(event.paypalPrice)
+  if (!freeOnly && !hasSale) {
     notFound()
   }
 
@@ -29,12 +36,19 @@ export default async function CbTicketsEventoPage({
     description: event.description,
     coverImage: event.coverImage,
     coverPrice: Number(event.coverPrice),
-    onlinePrice: Number(event.paypalPrice),
+    onlinePrice: Number(event.paypalPrice ?? 0),
     maxEntries: event.maxEntries,
     entriesSoldSum: event.entriesSoldSum,
   }
 
   const venueLine = [event.venueName, event.venueAddress].filter(Boolean).join(' · ')
+  const eventDateLabel = eventDate.toLocaleDateString('es-HN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
 
   return (
     <>
@@ -107,6 +121,14 @@ export default async function CbTicketsEventoPage({
                   Ver otros eventos
                 </Link>
               </div>
+            ) : freeOnly ? (
+              <FreeCoverEventView
+                name={event.name}
+                eventDateLabel={eventDateLabel}
+                description={event.description}
+                coverImage={event.coverImage}
+                listHref="/cbtickets"
+              />
             ) : (
               <EventPurchaseClient event={eventData} eventsListPath="/cbtickets" />
             )}
