@@ -2070,7 +2070,7 @@ export async function createEvent(data: {
   coverPrice: number
   description?: string
   coverImage?: string
-  paypalPrice?: number
+  paypalPrice?: number | null
   maxEntries?: number | null
   publishOnLcb?: boolean
   publishOnCbtickets?: boolean
@@ -2136,7 +2136,7 @@ export async function updateEvent(
     isActive?: boolean
     description?: string
     coverImage?: string
-    paypalPrice?: number
+    paypalPrice?: number | null
     maxEntries?: number | null
     publishOnLcb?: boolean
     publishOnCbtickets?: boolean
@@ -2517,6 +2517,7 @@ export async function getEntradasDashboardData() {
       eventId: e.id,
       name: e.name,
       date: e.date,
+      venueName: e.venueName ?? null,
       entriesSold: soldMap.get(e.id) ?? 0,
       revenueLps: revenueByEventMap.get(e.id) ?? 0,
     })),

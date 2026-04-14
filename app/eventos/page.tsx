@@ -1,4 +1,5 @@
 import { getPublicEvents } from '@/lib/public-events'
+import { isPublicFreeCoverOnly } from '@/lib/public-event-pricing'
 import Link from 'next/link'
 import Image from 'next/image'
 import { PublicSiteVantaBackground } from '@/components/PublicSiteVantaBackground'
@@ -147,6 +148,7 @@ export default async function EventosPage() {
                     timeZone: 'UTC',
                   })
                   const onlinePrice = Number(event.paypalPrice)
+                  const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
                   const venueLine = [event.venueName, event.venueAddress].filter(Boolean).join(' · ')
 
                   return (
@@ -205,7 +207,7 @@ export default async function EventosPage() {
                           <div className="flex items-center justify-between">
                             <span className="text-white/35 text-xs capitalize">{fullDate}</span>
                             <span className="font-bold text-lg bg-gradient-to-r from-cyan-300 to-fuchsia-300 bg-clip-text text-transparent">
-                              L {onlinePrice.toFixed(2)}
+                              {freeOnly ? 'Cover gratuito' : `L ${onlinePrice.toFixed(2)}`}
                             </span>
                           </div>
                         </div>
@@ -221,7 +223,7 @@ export default async function EventosPage() {
                             boxShadow: '0 2px 16px rgba(0,255,255,0.25)',
                           }}
                         >
-                          Comprar Entrada
+                          {freeOnly ? 'Ver evento' : 'Comprar Entrada'}
                         </span>
                       </div>
                     </Link>
