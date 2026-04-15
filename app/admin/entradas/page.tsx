@@ -9,10 +9,11 @@ export const dynamic = 'force-dynamic'
 export default async function EntradasPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session || session.user.role !== 'ADMIN') {
+  if (!session || !['ADMIN', 'CLIENTE_TICKETERA'].includes(session.user.role)) {
     redirect('/login')
   }
 
+  const isTicketeraClient = session.user.role === 'CLIENTE_TICKETERA'
   const { events, recentEntries, todayStats, eventStats } = await getEntradasDashboardData()
 
   return (
@@ -20,7 +21,9 @@ export default async function EntradasPage() {
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">Entradas</h1>
         <p className="text-sm sm:text-base text-dark-300">
-          Vende entradas, administra eventos y envía QR por email o WhatsApp.
+          {isTicketeraClient
+            ? 'Ventas e historial de los eventos que te asignó el administrador.'
+            : 'Vende entradas, administra eventos y envía QR por email o WhatsApp.'}
         </p>
       </div>
 
@@ -42,7 +45,12 @@ export default async function EntradasPage() {
           </div>
         </div>
 
-      <EntradasClient events={events} recentEntries={recentEntries} eventStats={eventStats} />
+      <EntradasClient
+        events={events}
+        recentEntries={recentEntries}
+        eventStats={eventStats}
+        isTicketeraClient={isTicketeraClient}
+      />
     </div>
   )
 }

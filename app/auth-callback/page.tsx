@@ -43,6 +43,8 @@ export default async function AuthCallbackPage() {
     const redirectUrl =
       session.user.role === 'ADMIN'
         ? '/admin'
+        : session.user.role === 'CLIENTE_TICKETERA'
+        ? '/admin/entradas'
         : session.user.role === 'MESERO'
         ? '/mesero'
         : session.user.role === 'CAJERO'

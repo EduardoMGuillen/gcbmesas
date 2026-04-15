@@ -19,6 +19,7 @@ export default function LoginPage() {
     if (status !== 'loading' && session?.user?.role) {
       const url =
         session.user.role === 'ADMIN'    ? '/admin'    :
+        session.user.role === 'CLIENTE_TICKETERA' ? '/admin/entradas' :
         session.user.role === 'MESERO'   ? '/mesero'   :
         session.user.role === 'CAJERO'   ? '/cajero'   :
         session.user.role === 'TAQUILLA' ? '/taquilla' :
@@ -33,6 +34,7 @@ export default function LoginPage() {
         if (s?.user?.role) {
           const url =
             s.user.role === 'ADMIN'    ? '/admin'    :
+            s.user.role === 'CLIENTE_TICKETERA' ? '/admin/entradas' :
             s.user.role === 'MESERO'   ? '/mesero'   :
             s.user.role === 'CAJERO'   ? '/cajero'   :
             s.user.role === 'TAQUILLA' ? '/taquilla' :

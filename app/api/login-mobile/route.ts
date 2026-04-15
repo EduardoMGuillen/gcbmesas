@@ -70,6 +70,8 @@ export async function POST(request: Request) {
     const redirectUrl =
       user.role === 'ADMIN'
         ? '/admin'
+        : user.role === 'CLIENTE_TICKETERA'
+        ? '/admin/entradas'
         : user.role === 'MESERO'
         ? '/mesero'
         : user.role === 'CAJERO'

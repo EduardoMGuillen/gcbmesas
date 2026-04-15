@@ -24,6 +24,7 @@ export function Navbar() {
     { href: '/cocina', label: 'Comandas cocina', match: pathname === '/cocina' },
     { href: '/bar', label: 'Comandas bar', match: pathname === '/bar' },
     { href: '/admin/inventario', label: 'Inventario', match: pathname?.startsWith('/admin/inventario') },
+    { href: '/admin/comandas', label: 'Ruta comandas', match: pathname?.startsWith('/admin/comandas') },
     { href: '/admin/usuarios', label: 'Usuarios', match: pathname?.startsWith('/admin/usuarios') },
     { href: '/admin/configuracion', label: 'Configuración', match: pathname?.startsWith('/admin/configuracion') },
     { href: '/admin/logs', label: 'Logs', match: pathname?.startsWith('/admin/logs') },
@@ -65,9 +66,15 @@ export function Navbar() {
     { href: '/bar', label: 'Bar', match: pathname === '/bar' },
   ]
 
+  const clienteTicketeraLinks = [
+    { href: '/admin/entradas', label: 'Entradas', match: pathname?.startsWith('/admin/entradas') },
+  ]
+
   const links =
     session?.user.role === 'ADMIN'
       ? adminLinks
+      : session?.user.role === 'CLIENTE_TICKETERA'
+      ? clienteTicketeraLinks
       : session?.user.role === 'CAJERO'
       ? cajeroLinks
       : session?.user.role === 'TAQUILLA'

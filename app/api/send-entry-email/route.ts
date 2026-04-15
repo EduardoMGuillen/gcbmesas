@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { markEntryEmailSent } from '@/lib/actions'
 import { generateQRCode } from '@/lib/utils'
 import { escapeHtml } from '@/lib/html-escape'
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
   try {
     // Auth check
     const session = await getServerSession(authOptions)
-    const allowedSend = ['ADMIN', 'TAQUILLA', 'MESERO', 'CAJERO'] as const
+    const allowedSend = ['ADMIN', 'TAQUILLA', 'MESERO', 'CAJERO', 'CLIENTE_TICKETERA'] as const
     if (!session || !allowedSend.includes(session.user.role as (typeof allowedSend)[number])) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
@@ -60,6 +61,27 @@ export async function POST(req: NextRequest) {
 
     if (!entries.length || !clientEmail || !eventName) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
+    }
+
+    if (session.user.role === 'CLIENTE_TICKETERA') {
+      const entryIds = entries.map((e) => e.entryId)
+      const dbEntries = await prisma.entry.findMany({
+        where: { id: { in: entryIds } },
+        select: { id: true, eventId: true },
+      })
+      if (dbEntries.length !== entryIds.length) {
+        return NextResponse.json({ error: 'Entrada no encontrada' }, { status: 403 })
+      }
+      const allowedRows = await prisma.userEventAssignment.findMany({
+        where: { userId: session.user.id },
+        select: { eventId: true },
+      })
+      const allowedSet = new Set(allowedRows.map((a) => a.eventId))
+      for (const row of dbEntries) {
+        if (!allowedSet.has(row.eventId)) {
+          return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+        }
+      }
     }
 
     const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'

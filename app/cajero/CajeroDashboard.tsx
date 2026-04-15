@@ -227,9 +227,17 @@ export function CajeroDashboard({
           <button
             type="button"
             onClick={() => setFreeInvoiceOpen(true)}
-            className="px-4 py-2 rounded-lg bg-dark-200 text-white text-sm hover:bg-dark-100 border border-dark-100 w-full sm:w-auto"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-dark-50 text-white text-sm font-medium border border-dark-200 hover:border-primary-500/40 hover:bg-dark-200/80 transition-colors w-full sm:w-auto"
           >
-            Factura libre (mostrador)
+            <svg className="w-4 h-4 text-primary-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 3H5a2 2 0 00-2 2v14l4-2 4 2 4-2 4 2V5a2 2 0 00-2-2h-4M9 3v18M9 3h6"
+              />
+            </svg>
+            Factura libre
           </button>
         </div>
         <CashierAccounts
