@@ -2081,8 +2081,11 @@ export async function createOrder(data: {
 
   const quantity = data.quantity || 1
   const totalPrice = Number(product.price) * quantity
+  const isWalkInAccount =
+    account.table?.shortCode === WALK_IN_TABLE_SHORT_CODE ||
+    (account.table?.zone === WALK_IN_TABLE_ZONE && account.table?.name === WALK_IN_TABLE_NAME)
 
-  if (Number(account.currentBalance) < totalPrice) {
+  if (!isWalkInAccount && Number(account.currentBalance) < totalPrice) {
     throw new Error(INSUFFICIENT_BALANCE_MESSAGE)
   }
 
@@ -2093,7 +2096,10 @@ export async function createOrder(data: {
       where: { id: data.accountId },
     })
 
-    if (!lockedAccount || Number(lockedAccount.currentBalance) < totalPrice) {
+    if (!lockedAccount) {
+      throw new Error('Cuenta no encontrada')
+    }
+    if (!isWalkInAccount && Number(lockedAccount.currentBalance) < totalPrice) {
       throw new Error(INSUFFICIENT_BALANCE_MESSAGE)
     }
 

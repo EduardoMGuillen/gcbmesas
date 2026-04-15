@@ -228,8 +228,8 @@ export function CustomerOrderView({
     setLoading(true)
 
     try {
-      const balance = cuentaAbierta ? OPEN_ACCOUNT_SENTINEL : parseFloat(initialBalance)
-      if (!cuentaAbierta && (isNaN(balance) || balance <= 0)) {
+      const balance = isWalkIn ? 0 : cuentaAbierta ? OPEN_ACCOUNT_SENTINEL : parseFloat(initialBalance)
+      if (!isWalkIn && !cuentaAbierta && (isNaN(balance) || balance <= 0)) {
         setError('El saldo inicial debe ser mayor a 0')
         setLoading(false)
         return
@@ -598,19 +598,25 @@ export function CustomerOrderView({
                 placeholder="Ej: Juan Pérez"
               />
             </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="cuentaAbierta"
-                checked={cuentaAbierta}
-                onChange={(e) => setCuentaAbierta(e.target.checked)}
-                className="w-4 h-4 rounded border-dark-300 bg-dark-50 text-primary-600 focus:ring-primary-500"
-              />
-              <label htmlFor="cuentaAbierta" className="text-sm font-medium text-white cursor-pointer">
-                Cuenta Abierta (sin límite)
-              </label>
-            </div>
-            {!cuentaAbierta && (
+            {isWalkIn ? (
+              <div className="rounded-lg border border-cyan-500/35 bg-cyan-500/10 p-3 text-sm text-cyan-100">
+                Esta cuenta inicia en cero. El total se calcula con los pedidos que agregues.
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="cuentaAbierta"
+                  checked={cuentaAbierta}
+                  onChange={(e) => setCuentaAbierta(e.target.checked)}
+                  className="w-4 h-4 rounded border-dark-300 bg-dark-50 text-primary-600 focus:ring-primary-500"
+                />
+                <label htmlFor="cuentaAbierta" className="text-sm font-medium text-white cursor-pointer">
+                  Cuenta Abierta (sin límite)
+                </label>
+              </div>
+            )}
+            {!isWalkIn && !cuentaAbierta && (
               <div>
                 <label className="block text-sm font-medium text-white mb-2">
                   Saldo Inicial
