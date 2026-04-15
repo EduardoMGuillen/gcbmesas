@@ -3,11 +3,16 @@ import { NextResponse } from 'next/server'
 import type { NextRequest, NextFetchEvent } from 'next/server'
 
 // Importing node's crypto in middleware (Edge runtime) can fail, so read the secret directly
+const RAW_NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET
+if (process.env.NODE_ENV === 'production' && (!RAW_NEXTAUTH_SECRET || RAW_NEXTAUTH_SECRET.length < 32)) {
+  throw new Error('NEXTAUTH_SECRET es obligatorio en producción y debe tener al menos 32 caracteres.')
+}
+
 const MIDDLEWARE_SECRET =
-  (process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32
-    ? process.env.NEXTAUTH_SECRET
+  (RAW_NEXTAUTH_SECRET && RAW_NEXTAUTH_SECRET.length >= 32
+    ? RAW_NEXTAUTH_SECRET
     : process.env.NEXT_PUBLIC_FALLBACK_SECRET) ||
-  'hard-fallback-secret-32-chars-minimum-string!'
+  'dev-only-fallback-secret-32-chars-minimum-string!'
 
 // Base auth middleware for protected routes
 const authMiddleware = withAuth(

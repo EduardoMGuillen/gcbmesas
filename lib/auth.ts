@@ -9,12 +9,11 @@ import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 import { findUserByUsernameInsensitive } from './find-user-by-login'
 
-// Guarantee a valid secret even if env is missing (preview safety)
-const HARD_FALLBACK_SECRET = 'hard-fallback-secret-32-chars-minimum-string!'
+// In production this is guaranteed by lib/auth-secret (throws if missing/invalid).
 const EFFECTIVE_SECRET =
-  (process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32
+  process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32
     ? process.env.NEXTAUTH_SECRET
-    : NEXTAUTH_SECRET) || HARD_FALLBACK_SECRET
+    : NEXTAUTH_SECRET
 
 export const authOptions: NextAuthOptions = {
   providers: [
