@@ -18,6 +18,7 @@ type PrepOrder = {
   account: {
     id: string
     clientName: string | null
+    openedBy?: { username: string; name: string | null } | null
     table: { name: string; shortCode: string; zone: string | null }
   }
 }
@@ -271,12 +272,9 @@ export function ComandasBoard({
               >
                 <div>
                   <p className="text-white font-medium">
-                    Mesa {o.account.table.shortCode} · {o.account.table.name}
-                    {o.account.table.zone ? ` · ${o.account.table.zone}` : ''}
+                    {o.account.openedBy?.name?.trim() || o.account.openedBy?.username || 'Mesero no asignado'} · Mesa{' '}
+                    {o.account.table.shortCode || o.account.table.name}
                   </p>
-                  {o.account.clientName && (
-                    <p className="text-sm text-white/70">Cliente: {o.account.clientName}</p>
-                  )}
                   {o.servedBy && (
                     <p className="text-xs text-cyan-200/90 mt-1">
                       Aceptado en caja: {o.servedBy.name?.trim() || o.servedBy.username}
