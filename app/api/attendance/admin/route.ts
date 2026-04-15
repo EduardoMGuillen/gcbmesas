@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       if (from) where.markedAt.gte = from
       if (to) where.markedAt.lte = to
     }
-    if (role && ['ADMIN', 'MESERO', 'CAJERO', 'TAQUILLA'].includes(role)) {
+    if (role && ['ADMIN', 'MESERO', 'CAJERO', 'TAQUILLA', 'COCINA', 'BAR'].includes(role)) {
       where.role = role as UserRole
     }
     if (type && ['IN', 'OUT'].includes(type)) {
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.attendanceMark.count({ where }),
       prisma.user.findMany({
-        where: { role: { in: ['MESERO', 'CAJERO', 'TAQUILLA', 'ADMIN'] } },
+        where: { role: { in: ['MESERO', 'CAJERO', 'TAQUILLA', 'ADMIN', 'COCINA', 'BAR'] } },
         select: { id: true, username: true, name: true, role: true },
         orderBy: [{ role: 'asc' }, { name: 'asc' }],
       }),

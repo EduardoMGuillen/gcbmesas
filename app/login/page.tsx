@@ -21,7 +21,9 @@ export default function LoginPage() {
         session.user.role === 'ADMIN'    ? '/admin'    :
         session.user.role === 'MESERO'   ? '/mesero'   :
         session.user.role === 'CAJERO'   ? '/cajero'   :
-        session.user.role === 'TAQUILLA' ? '/taquilla' : '/'
+        session.user.role === 'TAQUILLA' ? '/taquilla' :
+        session.user.role === 'COCINA' ? '/cocina'   :
+        session.user.role === 'BAR'    ? '/bar'      : '/'
       router.replace(`${url}?from=callback`)
       return
     }
@@ -33,7 +35,9 @@ export default function LoginPage() {
             s.user.role === 'ADMIN'    ? '/admin'    :
             s.user.role === 'MESERO'   ? '/mesero'   :
             s.user.role === 'CAJERO'   ? '/cajero'   :
-            s.user.role === 'TAQUILLA' ? '/taquilla' : '/'
+            s.user.role === 'TAQUILLA' ? '/taquilla' :
+            s.user.role === 'COCINA' ? '/cocina'   :
+            s.user.role === 'BAR'    ? '/bar'      : '/'
           router.replace(`${url}?from=callback`)
         }
       }, 1000)

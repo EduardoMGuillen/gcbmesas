@@ -20,6 +20,8 @@ export default async function Home() {
       if (session.user.role === 'MESERO')   redirect('/mesero')
       if (session.user.role === 'CAJERO')   redirect('/cajero')
       if (session.user.role === 'TAQUILLA') redirect('/taquilla')
+      if (session.user.role === 'COCINA') redirect('/cocina')
+      if (session.user.role === 'BAR') redirect('/bar')
     }
   } catch {
     // Not authenticated — show landing page

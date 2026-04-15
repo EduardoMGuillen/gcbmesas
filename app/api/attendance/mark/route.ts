@@ -5,7 +5,7 @@ import { AttendanceMarkType } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const ALLOWED_ROLES = ['ADMIN', 'MESERO', 'CAJERO', 'TAQUILLA']
+const ALLOWED_ROLES = ['ADMIN', 'MESERO', 'CAJERO', 'TAQUILLA', 'COCINA', 'BAR']
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024
 const SETTINGS_ID = 1
 const DEFAULT_RADIUS_METERS = 100
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.id
-    const role = session.user.role as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA'
+    const role = session.user.role as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR'
     const latestMark = await prisma.attendanceMark.findFirst({
       where: { userId },
       orderBy: { markedAt: 'desc' },

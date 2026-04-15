@@ -15,6 +15,8 @@ enum UserRole {
   MESERO
   CAJERO
   TAQUILLA
+  COCINA
+  BAR
 }
 
 enum AccountStatus {
@@ -62,6 +64,34 @@ enum EntryStatus {
   CANCELLED
 }
 
+/// Cola cocina/bar tras aceptación en caja
+enum OrderPrepStatus {
+  NONE
+  QUEUED
+  PREPARING
+  READY
+}
+
+model AppSettings {
+  id        Int      @id @default(1)
+  updatedAt DateTime @updatedAt
+
+  clientSelfOrderingEnabled Boolean @default(true)
+
+  invoiceLegalName   String?
+  invoiceTradeName   String?
+  invoiceRtn         String?
+  invoiceAddress     String? @db.Text
+  invoicePhone       String?
+  invoiceEmail       String?
+  invoiceCaiBlock    String? @db.Text
+  invoiceFooterNote  String? @db.Text
+  /// Porcentaje ISV (ej. 15). null = usar 15 en UI
+  invoiceIsvPercent  Decimal? @db.Decimal(5, 2)
+
+  @@map("app_settings")
+}
+
 model User {
   id        String   @id @default(cuid())
   username  String   @unique
@@ -82,6 +112,7 @@ model User {
   cajeroWatchesMeseros CajeroMeseroWatch[] @relation("CajeroWatchesMesero")
   /// Cajeros que siguen a este mesero
   meseroWatchedByCajeros CajeroMeseroWatch[] @relation("MeseroWatchedByCajeros")
+  prepCategories         UserPrepCategory[]
 
   @@map("users")
 }
@@ -100,6 +131,21 @@ model CajeroMeseroWatch {
   @@index([cajeroId])
   @@index([meseroId])
   @@map("cajero_mesero_watches")
+}
+
+/// Categorías de producto que este usuario de cocina/bar quiere ver en comandas
+model UserPrepCategory {
+  id        String   @id @default(cuid())
+  userId    String
+  /// Valor de Product.category o "__NONE__" para productos sin categoría
+  category  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@index([userId])
+  @@map("user_prep_categories")
 }
 
 model PushSubscription {
@@ -153,14 +199,18 @@ model Account {
 }
 
 model Product {
-  id        String   @id @default(cuid())
-  name      String
-  price     Decimal  @db.Decimal(10, 2)
-  category  String?
-  emoji     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  price        Decimal  @db.Decimal(10, 2)
+  category     String?
+  emoji        String?
+  isActive     Boolean  @default(true)
+  /// Si false, al aceptar en caja no entra a cola cocina/bar
+  requiresPrep Boolean  @default(true)
+  /// Si true, línea exenta de ISV en factura impresa
+  isTaxExempt  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   orders Order[]
 
@@ -168,15 +218,16 @@ model Product {
 }
 
 model Order {
-  id        String   @id @default(cuid())
-  accountId String
-  productId String
-  userId    String
-  price     Decimal  @db.Decimal(10, 2)
-  quantity  Int      @default(1)
-  served    Boolean  @default(false)
-  rejected  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id         String          @id @default(cuid())
+  accountId  String
+  productId  String
+  userId     String
+  price      Decimal         @db.Decimal(10, 2)
+  quantity   Int             @default(1)
+  served     Boolean         @default(false)
+  rejected   Boolean         @default(false)
+  prepStatus OrderPrepStatus @default(NONE)
+  createdAt  DateTime        @default(now())
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
@@ -187,6 +238,7 @@ model Order {
   @@index([createdAt])
   @@index([served, rejected, createdAt])
   @@index([accountId, rejected])
+  @@index([prepStatus, createdAt])
   @@map("orders")
 }
 
@@ -301,4 +353,3 @@ model AttendanceSettings {
 
   @@map("attendance_settings")
 }
-

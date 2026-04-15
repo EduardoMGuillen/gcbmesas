@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getCashierDashboardData, closeOldAccounts } from '@/lib/actions'
+import { getAppSettingsSafe } from '@/lib/app-settings'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { CajeroDashboard } from './CajeroDashboard'
@@ -19,8 +20,8 @@ export default async function CajeroPage() {
   // Cerrar cuentas antiguas en background (no bloquea)
   closeOldAccounts().catch((err) => console.error('[CajeroPage] Error al cerrar cuentas antiguas:', err))
 
-  const { accounts, pendingOrders, recentServed, activeMeseros, watchedMeseroIds } =
-    await getCashierDashboardData()
+  const [{ accounts, pendingOrders, recentServed, activeMeseros, watchedMeseroIds }, invoiceSettings] =
+    await Promise.all([getCashierDashboardData(), getAppSettingsSafe()])
 
   const isAdmin = session.user.role === 'ADMIN'
   const isCajero = session.user.role === 'CAJERO'
@@ -50,6 +51,7 @@ export default async function CajeroPage() {
           userId={session.user.id}
           watchedMeseroIds={watchedMeseroIds}
           isCajero={isCajero}
+          invoiceSettings={invoiceSettings}
         />
       </main>
       {!isAdmin && <Footer />}
