@@ -7,6 +7,15 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  const session = await getServerSession(authOptions)
+  if (!session?.user || session.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  }
+
   try {
     console.log('[TestSession API] Checking session...')
     
@@ -21,9 +30,6 @@ export async function GET(request: Request) {
       sessionTokenValue: sessionToken?.value ? 'exists' : 'missing',
       secureSessionTokenValue: secureSessionToken?.value ? 'exists' : 'missing',
     })
-    
-    // Try to get session
-    const session = await getServerSession(authOptions)
     
     const result = {
       hasSession: !!session,

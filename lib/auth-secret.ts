@@ -8,6 +8,7 @@ import crypto from 'crypto'
 // Get the secret from environment or generate a fallback
 const getSecret = () => {
   const existingSecret = process.env.NEXTAUTH_SECRET
+  const isProd = process.env.NODE_ENV === 'production'
   
   if (existingSecret && existingSecret.length >= 32) {
     // Ensure it's set in process.env
@@ -15,6 +16,12 @@ const getSecret = () => {
       process.env.NEXTAUTH_SECRET = existingSecret
     }
     return existingSecret
+  }
+
+  if (isProd) {
+    throw new Error(
+      'NEXTAUTH_SECRET es obligatorio en producción y debe tener al menos 32 caracteres.'
+    )
   }
   
   // Generate a deterministic secret based on VERCEL_URL or a fixed fallback
