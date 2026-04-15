@@ -6,6 +6,7 @@ import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount } from 
 import { closeAccount } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
+import { getTableLabel, isWalkInTable } from '@/lib/walk-in-table'
 
 interface AccountsListProps {
   initialAccounts: any[]
@@ -230,7 +231,9 @@ export function AccountsList({ initialAccounts, userRole }: AccountsListProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredAccounts.map((account) => (
+          {filteredAccounts.map((account) => {
+            const walkIn = isWalkInTable(account.table)
+            return (
           <div
             key={account.id}
             className="bg-dark-100 border border-dark-200 rounded-xl p-6"
@@ -238,9 +241,9 @@ export function AccountsList({ initialAccounts, userRole }: AccountsListProps) {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-xl font-semibold text-white mb-1">
-                  Mesa: {account.table.name}
+                  {getTableLabel(account.table)}
                 </h3>
-                {account.table.zone && (
+                {account.table.zone && !walkIn && (
                   <p className="text-sm text-white/80 mb-1">
                     Zona: {account.table.zone}
                   </p>
@@ -309,7 +312,7 @@ export function AccountsList({ initialAccounts, userRole }: AccountsListProps) {
                       href={`/mesero/pedidos?tableId=${account.table.id}`}
                       className="text-primary-400 hover:text-primary-300 text-sm font-medium underline"
                     >
-                      Ir a mesa
+                      {walkIn ? 'Ir a cuenta' : 'Ir a mesa'}
                     </Link>
                   )}
               </div>
@@ -333,7 +336,8 @@ export function AccountsList({ initialAccounts, userRole }: AccountsListProps) {
               </div>
             </div>
           </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -342,7 +346,7 @@ export function AccountsList({ initialAccounts, userRole }: AccountsListProps) {
           <div className="bg-dark-100 border border-dark-200 rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-semibold text-white">
-                Pedidos - Mesa {selectedAccount.table.name}
+                Pedidos - {getTableLabel(selectedAccount.table)}
               </h2>
               <div className="flex gap-2">
                 <button
