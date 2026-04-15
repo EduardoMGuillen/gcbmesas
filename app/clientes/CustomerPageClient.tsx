@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Footer } from '@/components/Footer'
 
-export function CustomerPageClient() {
+export function CustomerPageClient({ clientOrdersEnabled = true }: { clientOrdersEnabled?: boolean }) {
   const [manualCode, setManualCode] = useState('')
   const [error, setError] = useState('')
   const [isScanning, setIsScanning] = useState(false)
@@ -111,6 +111,11 @@ export function CustomerPageClient() {
     e.preventDefault()
     setError('')
 
+    if (!clientOrdersEnabled) {
+      setError('Los pedidos desde aquí están desactivados.')
+      return
+    }
+
     if (!manualCode.trim()) {
       setError('Por favor ingresa un código de mesa')
       return
@@ -141,6 +146,10 @@ export function CustomerPageClient() {
   }
 
   const startScanner = async () => {
+    if (!clientOrdersEnabled) {
+      setScannerError('Los pedidos desde aquí están desactivados.')
+      return
+    }
     await stopScanner()
     await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -301,6 +310,12 @@ export function CustomerPageClient() {
           </p>
         </div>
 
+        {!clientOrdersEnabled && (
+          <div className="mb-6 bg-amber-500/15 border border-amber-500/40 text-amber-100 rounded-xl px-4 py-3 text-sm text-center">
+            El autoservicio de pedidos desde aquí está desactivado. Pide al personal que tome tu pedido.
+          </div>
+        )}
+
         <div className="bg-white/10 border border-white/20 rounded-xl p-8 backdrop-blur-sm">
           <form onSubmit={handleManualSubmit} className="space-y-6">
             <div>
@@ -330,7 +345,7 @@ export function CustomerPageClient() {
             <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
               <button
                 type="submit"
-                disabled={manualLoading}
+                disabled={manualLoading || !clientOrdersEnabled}
                 className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
               >
                 {manualLoading ? 'Buscando...' : 'Acceder a Mesa'}

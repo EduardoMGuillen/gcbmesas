@@ -1,10 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount } from '@/lib/utils'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
+import {
+  buildHnInvoiceHtml,
+  printHnInvoice,
+  type InvoiceSettingsLike,
+  type HnInvoiceLine,
+} from '@/lib/invoice-print-hn'
 
 interface CashierAccountsProps {
+  invoiceSettings: InvoiceSettingsLike | null
   accounts: Array<{
     id: string
     table: { name: string; shortCode: string; zone?: string | null }
@@ -19,7 +26,8 @@ interface CashierAccountsProps {
       served: boolean
       rejected?: boolean
       quantity: number
-      product: { name: string }
+      price: string | number | { toString(): string }
+      product: { name: string; price?: string | number | { toString(): string }; isTaxExempt?: boolean }
       user?: { username: string; name?: string | null }
     }>
   }>
@@ -35,8 +43,52 @@ function pendingCount(orders: CashierAccountsProps['accounts'][0]['orders']) {
   return orders.filter((o) => !o.served && o.rejected !== true).length
 }
 
-export function CashierAccounts({ accounts, selectedMeseroIds, allMeseroIds, noneSelected }: CashierAccountsProps) {
+export function CashierAccounts({
+  accounts,
+  selectedMeseroIds,
+  allMeseroIds,
+  noneSelected,
+  invoiceSettings,
+}: CashierAccountsProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  const handlePrintPrecuenta = useCallback(
+    (account: CashierAccountsProps['accounts'][0]) => {
+      if (typeof window === 'undefined') return
+      const origin = window.location.origin
+      const lines: HnInvoiceLine[] = account.orders.map((o) => {
+        const lineTotal = Number(typeof o.price === 'object' ? o.price.toString() : o.price)
+        const unit = o.quantity > 0 ? lineTotal / o.quantity : lineTotal
+        const suffix = o.rejected ? ' (Rechazado)' : !o.served ? ' (Pendiente caja)' : ''
+        return {
+          description: `${o.product.name}${suffix}`,
+          quantity: o.quantity,
+          unitPrice: unit,
+          lineTotal,
+          taxExempt: o.product.isTaxExempt === true,
+        }
+      })
+      const receptorLines = [
+        `Mesa ${account.table.shortCode} · ${account.table.name}`,
+        ...(account.table.zone ? [`Zona: ${account.table.zone}`] : []),
+        ...(account.clientName ? [`Cliente: ${account.clientName}`] : []),
+        `Mesero: ${account.openedBy?.name || account.openedBy?.username || '—'}`,
+      ]
+      const ref = `CTA-${account.id.slice(-10).toUpperCase()}`
+      const html = buildHnInvoiceHtml({
+        logoUrl: `${origin.replace(/\/$/, '')}/LogoCasaBlanca.png`,
+        documentTitle: 'Precuenta',
+        ref,
+        settings: invoiceSettings,
+        receptorLines,
+        lines,
+        footerNote:
+          'Precuenta informativa. Verificar saldo en sistema. Pedidos pendientes o rechazados indicados en descripción.',
+      })
+      printHnInvoice(html)
+    },
+    [invoiceSettings]
+  )
 
   const toggleExpanded = (accountId: string) => {
     setExpandedIds((prev) => {
@@ -89,80 +141,98 @@ export function CashierAccounts({ accounts, selectedMeseroIds, allMeseroIds, non
             key={account.id}
             className="bg-dark-100 border border-dark-200 rounded-xl overflow-hidden"
           >
-            <button
-              type="button"
-              onClick={() => toggleExpanded(account.id)}
-              className="w-full text-left p-6 hover:bg-dark-50/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
-            >
-              <div className="flex items-start gap-3">
-                {pending > 0 && (
-                  <span
-                    className="flex h-3 w-3 shrink-0 mt-1.5 rounded-full bg-amber-400 ring-2 ring-amber-400/40"
-                    title={`${pending} pedido(s) pendiente(s) sin aceptar`}
-                  />
-                )}
-                <div>
-                  <h3 className="text-lg font-semibold text-white">
-                    Mesa {account.table.shortCode} · {account.table.name}
-                  </h3>
-                  {account.table.zone && (
-                    <p className="text-sm text-white/80">Zona: {account.table.zone}</p>
+            <div className="flex flex-col sm:flex-row sm:items-stretch gap-0">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => toggleExpanded(account.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    toggleExpanded(account.id)
+                  }
+                }}
+                className="flex-1 text-left p-6 hover:bg-dark-50/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 cursor-pointer"
+              >
+                <div className="flex items-start gap-3">
+                  {pending > 0 && (
+                    <span
+                      className="flex h-3 w-3 shrink-0 mt-1.5 rounded-full bg-amber-400 ring-2 ring-amber-400/40"
+                      title={`${pending} pedido(s) pendiente(s) sin aceptar`}
+                    />
                   )}
-                  <p className="text-sm text-primary-400 font-medium">
-                    Mesero: {account.openedBy?.name || account.openedBy?.username || '—'}
-                  </p>
-                  {account.clientName && (
-                    <p className="text-sm text-white/90">Cliente: {account.clientName}</p>
-                  )}
-                  <p className="text-xs text-white/70">
-                    Abierta {formatDate(account.createdAt)}
-                  </p>
-                  {account.orders.length > 0 && (
-                    <p className="text-xs text-white/60 mt-1">
-                      {account.orders.length} pedido(s)
-                      {pending > 0 && (
-                        <span className="text-amber-400 font-medium"> · {pending} pendiente(s)</span>
-                      )}
-                      <span className="ml-1 text-white/50">
-                        {isExpanded ? ' ▼ cerrar' : ' ▶ ver listado'}
-                      </span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">
+                      Mesa {account.table.shortCode} · {account.table.name}
+                    </h3>
+                    {account.table.zone && (
+                      <p className="text-sm text-white/80">Zona: {account.table.zone}</p>
+                    )}
+                    <p className="text-sm text-primary-400 font-medium">
+                      Mesero: {account.openedBy?.name || account.openedBy?.username || '—'}
                     </p>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4 shrink-0">
-                <div>
-                  <p className="text-xs text-white/70">Inicial</p>
-                  <p className="text-white font-semibold">
-                    {isOpenAccount(account.initialBalance)
-                      ? 'Cuenta Abierta'
-                      : formatCurrency(
-                          typeof account.initialBalance === 'object'
-                            ? account.initialBalance.toString()
-                            : account.initialBalance
+                    {account.clientName && (
+                      <p className="text-sm text-white/90">Cliente: {account.clientName}</p>
+                    )}
+                    <p className="text-xs text-white/70">
+                      Abierta {formatDate(account.createdAt)}
+                    </p>
+                    {account.orders.length > 0 && (
+                      <p className="text-xs text-white/60 mt-1">
+                        {account.orders.length} pedido(s)
+                        {pending > 0 && (
+                          <span className="text-amber-400 font-medium"> · {pending} pendiente(s)</span>
                         )}
-                  </p>
+                        <span className="ml-1 text-white/50">
+                          {isExpanded ? ' ▼ cerrar' : ' ▶ ver listado'}
+                        </span>
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-white/70">Consumido</p>
-                  <p className="text-primary-400 font-semibold">
-                    {formatCurrency(Number(totalConsumed))}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-white/70">Disponible</p>
-                  <p
-                    className={`font-semibold ${
-                      !isOpenAccount(account.initialBalance) && Number(account.currentBalance) < 0
-                        ? 'text-red-400'
-                        : 'text-green-400'
-                    }`}
-                  >
-                    {formatAccountBalance(account.initialBalance, account.currentBalance)}
-                  </p>
+                <div className="grid grid-cols-3 gap-4 shrink-0">
+                  <div>
+                    <p className="text-xs text-white/70">Inicial</p>
+                    <p className="text-white font-semibold">
+                      {isOpenAccount(account.initialBalance)
+                        ? 'Cuenta Abierta'
+                        : formatCurrency(
+                            typeof account.initialBalance === 'object'
+                              ? account.initialBalance.toString()
+                              : account.initialBalance
+                          )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/70">Consumido</p>
+                    <p className="text-primary-400 font-semibold">
+                      {formatCurrency(Number(totalConsumed))}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/70">Disponible</p>
+                    <p
+                      className={`font-semibold ${
+                        !isOpenAccount(account.initialBalance) && Number(account.currentBalance) < 0
+                          ? 'text-red-400'
+                          : 'text-green-400'
+                      }`}
+                    >
+                      {formatAccountBalance(account.initialBalance, account.currentBalance)}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </button>
+              <div className="flex sm:flex-col justify-end sm:justify-start gap-2 p-4 sm:py-6 sm:pr-6 sm:pl-0 border-t sm:border-t-0 sm:border-l border-dark-200 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handlePrintPrecuenta(account)}
+                  className="px-3 py-2 text-sm font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-500 transition-colors whitespace-nowrap"
+                >
+                  Imprimir precuenta
+                </button>
+              </div>
+            </div>
 
             {isExpanded && (
               <div className="border-t border-dark-200 px-6 pb-6 pt-2">
@@ -183,6 +253,15 @@ export function CashierAccounts({ accounts, selectedMeseroIds, allMeseroIds, non
                         <div>
                           <p className="text-white text-sm">
                             {order.quantity} × {order.product.name}
+                            <span className="text-white/80 ml-2">
+                              {formatCurrency(
+                                Number(
+                                  typeof order.price === 'object'
+                                    ? order.price.toString()
+                                    : order.price
+                                )
+                              )}
+                            </span>
                           </p>
                           <p className="text-xs text-white/70">
                             {formatDate(order.createdAt)} ·{' '}

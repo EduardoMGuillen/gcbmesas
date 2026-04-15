@@ -49,6 +49,10 @@ export default async function AuthCallbackPage() {
         ? '/cajero'
         : session.user.role === 'TAQUILLA'
         ? '/taquilla'
+        : session.user.role === 'COCINA'
+        ? '/cocina'
+        : session.user.role === 'BAR'
+        ? '/bar'
         : '/'
     
     console.log('[AuthCallback] Redirecting to:', redirectUrl)

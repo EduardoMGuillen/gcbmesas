@@ -4,8 +4,9 @@ import { prisma } from './prisma'
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
-import { LogAction } from '@prisma/client'
+import { LogAction, OrderPrepStatus } from '@prisma/client'
 import { Prisma } from '@prisma/client'
+import { getClientSelfOrderingEnabled, ensureAppSettingsRow, UNCATEGORIZED_PREP_CATEGORY } from './app-settings'
 import { CyberSourceApiError, getCyberSourceApiHostForLogs, getCyberSourceEnvLabel } from './cybersource'
 import {
   findOnlineSaleLogForEntry,
@@ -31,8 +32,8 @@ async function createLog(
   })
 }
 
-// Auth helper
-async function getCurrentUser() {
+// Auth helper (exportado para otras acciones server si hace falta)
+export async function getCurrentUser() {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     throw new Error('No autorizado')
@@ -88,7 +89,7 @@ function ensureEntryScanAccess(role: string) {
 export async function createUser(data: {
   username: string
   password: string
-  role: 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA'
+  role: 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR'
   name?: string
 }) {
   const currentUser = await getCurrentUser()
@@ -124,7 +125,7 @@ export async function updateUser(
   data: {
     username?: string
     password?: string
-    role?: 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA'
+    role?: 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR'
     name?: string | null
   }
 ) {
@@ -319,10 +320,10 @@ export async function getCashierDashboardData() {
         orders: {
           orderBy: { createdAt: 'desc' },
           include: {
-            product: { select: { name: true } },
+            product: { select: { name: true, price: true, isTaxExempt: true } },
             user: { select: { username: true, name: true } },
           },
-          take: 15,
+          take: 100,
         },
       },
     }),
@@ -420,9 +421,24 @@ export async function setOrderServed(orderId: string, served: boolean) {
   const currentUser = await getCurrentUser()
   ensureCashierAccess(currentUser.role)
 
+  const before = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { product: { select: { name: true, requiresPrep: true } } },
+  })
+  if (!before) {
+    throw new Error('Pedido no encontrado')
+  }
+
+  let prepStatus: OrderPrepStatus = before.prepStatus
+  if (served && !before.rejected) {
+    prepStatus = before.product.requiresPrep ? OrderPrepStatus.QUEUED : OrderPrepStatus.NONE
+  } else if (!served) {
+    prepStatus = OrderPrepStatus.NONE
+  }
+
   const order = await prisma.order.update({
     where: { id: orderId },
-    data: { served },
+    data: { served, prepStatus },
     include: {
       account: {
         select: {
@@ -435,6 +451,8 @@ export async function setOrderServed(orderId: string, served: boolean) {
   })
 
   revalidatePath('/cajero')
+  revalidatePath('/cocina')
+  revalidatePath('/bar')
   revalidatePath(`/mesa/${order.account.tableId}`)
   return order
 }
@@ -747,17 +765,43 @@ export async function closeAccount(accountId: string) {
   )
 
   if (pendingOrders.length > 0) {
-    await prisma.order.updateMany({
-      where: {
-        id: { in: pendingOrders.map((o) => o.id) },
-        accountId: accountId,
-        served: false,
-        rejected: false,
-      },
-      data: {
-        served: true,
-      },
+    const pendingIds = pendingOrders.map((o) => o.id)
+    const withProd = await prisma.order.findMany({
+      where: { id: { in: pendingIds }, accountId },
+      select: { id: true, product: { select: { requiresPrep: true } } },
     })
+    const prepIds = withProd.filter((o) => o.product.requiresPrep).map((o) => o.id)
+    const noPrepIds = withProd.filter((o) => !o.product.requiresPrep).map((o) => o.id)
+    const ops: ReturnType<typeof prisma.order.updateMany>[] = []
+    if (prepIds.length > 0) {
+      ops.push(
+        prisma.order.updateMany({
+          where: {
+            id: { in: prepIds },
+            accountId,
+            served: false,
+            rejected: false,
+          },
+          data: { served: true, prepStatus: OrderPrepStatus.QUEUED },
+        })
+      )
+    }
+    if (noPrepIds.length > 0) {
+      ops.push(
+        prisma.order.updateMany({
+          where: {
+            id: { in: noPrepIds },
+            accountId,
+            served: false,
+            rejected: false,
+          },
+          data: { served: true, prepStatus: OrderPrepStatus.NONE },
+        })
+      )
+    }
+    if (ops.length > 0) {
+      await prisma.$transaction(ops)
+    }
 
     // Crear log para indicar que los pedidos fueron aceptados automáticamente
     await createLog(
@@ -807,6 +851,8 @@ export async function closeAccount(accountId: string) {
 
   revalidatePath(`/mesa/${account.tableId}`)
   revalidatePath('/admin/cuentas')
+  revalidatePath('/cocina')
+  revalidatePath('/bar')
   return closedAccount
 }
 
@@ -847,17 +893,42 @@ export async function closeOldAccounts() {
       const pendingOrderIds = account.orders.map((o) => o.id)
 
       if (pendingOrderIds.length > 0) {
-        await prisma.order.updateMany({
-          where: {
-            id: { in: pendingOrderIds },
-            accountId: account.id,
-            served: false,
-            rejected: false,
-          },
-          data: {
-            served: true,
-          },
+        const withProd = await prisma.order.findMany({
+          where: { id: { in: pendingOrderIds }, accountId: account.id },
+          select: { id: true, product: { select: { requiresPrep: true } } },
         })
+        const prepIds = withProd.filter((o) => o.product.requiresPrep).map((o) => o.id)
+        const noPrepIds = withProd.filter((o) => !o.product.requiresPrep).map((o) => o.id)
+        const ops: ReturnType<typeof prisma.order.updateMany>[] = []
+        if (prepIds.length > 0) {
+          ops.push(
+            prisma.order.updateMany({
+              where: {
+                id: { in: prepIds },
+                accountId: account.id,
+                served: false,
+                rejected: false,
+              },
+              data: { served: true, prepStatus: OrderPrepStatus.QUEUED },
+            })
+          )
+        }
+        if (noPrepIds.length > 0) {
+          ops.push(
+            prisma.order.updateMany({
+              where: {
+                id: { in: noPrepIds },
+                accountId: account.id,
+                served: false,
+                rejected: false,
+              },
+              data: { served: true, prepStatus: OrderPrepStatus.NONE },
+            })
+          )
+        }
+        if (ops.length > 0) {
+          await prisma.$transaction(ops)
+        }
       }
 
       const totalConsumed =
@@ -893,6 +964,8 @@ export async function closeOldAccounts() {
 
       revalidatePath(`/mesa/${account.tableId}`)
       revalidatePath('/admin/cuentas')
+      revalidatePath('/cocina')
+      revalidatePath('/bar')
 
       results.closed++
       results.accountIds.push(account.id)
@@ -903,6 +976,265 @@ export async function closeOldAccounts() {
   }
 
   return results
+}
+
+// ========== APP SETTINGS (ADMIN) ==========
+
+export async function setClientSelfOrderingEnabled(enabled: boolean) {
+  const u = await getCurrentUser()
+  if (u.role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden cambiar esta opción')
+  }
+  await ensureAppSettingsRow()
+  await prisma.appSettings.update({
+    where: { id: 1 },
+    data: { clientSelfOrderingEnabled: enabled },
+  })
+  revalidatePath('/clientes')
+  revalidatePath('/admin/configuracion')
+}
+
+export async function updateInvoiceSettings(data: {
+  invoiceLegalName?: string | null
+  invoiceTradeName?: string | null
+  invoiceRtn?: string | null
+  invoiceAddress?: string | null
+  invoicePhone?: string | null
+  invoiceEmail?: string | null
+  invoiceCaiBlock?: string | null
+  invoiceFooterNote?: string | null
+  invoiceIsvPercent?: number | null
+}) {
+  const u = await getCurrentUser()
+  if (u.role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden editar la facturación')
+  }
+  await ensureAppSettingsRow()
+  await prisma.appSettings.update({
+    where: { id: 1 },
+    data: {
+      invoiceLegalName: data.invoiceLegalName,
+      invoiceTradeName: data.invoiceTradeName,
+      invoiceRtn: data.invoiceRtn,
+      invoiceAddress: data.invoiceAddress,
+      invoicePhone: data.invoicePhone,
+      invoiceEmail: data.invoiceEmail,
+      invoiceCaiBlock: data.invoiceCaiBlock,
+      invoiceFooterNote: data.invoiceFooterNote,
+      invoiceIsvPercent: data.invoiceIsvPercent,
+    },
+  })
+  revalidatePath('/admin/configuracion')
+  revalidatePath('/cajero')
+}
+
+// ========== COMANDAS (COCINA / BAR) ==========
+
+function ensurePrepStationAccess(role: string, station: 'COCINA' | 'BAR') {
+  if (station === 'COCINA') {
+    if (!['ADMIN', 'COCINA'].includes(role)) {
+      throw new Error('No autorizado para cocina')
+    }
+  } else if (!['ADMIN', 'BAR'].includes(role)) {
+    throw new Error('No autorizado para bar')
+  }
+}
+
+export async function getPrepCategoryKeys() {
+  const u = await getCurrentUser()
+  if (!['ADMIN', 'COCINA', 'BAR'].includes(u.role)) {
+    throw new Error('No autorizado')
+  }
+  const rows = await prisma.product.groupBy({
+    by: ['category'],
+    where: { isActive: true },
+  })
+  const keys = rows.map((r) =>
+    r.category == null || r.category === '' ? UNCATEGORIZED_PREP_CATEGORY : r.category
+  )
+  return Array.from(new Set(keys)).sort()
+}
+
+export async function getMyPrepCategories() {
+  const u = await getCurrentUser()
+  if (!['COCINA', 'BAR'].includes(u.role)) {
+    throw new Error('No autorizado')
+  }
+  const rows = await prisma.userPrepCategory.findMany({
+    where: { userId: u.id },
+    select: { category: true },
+    orderBy: { category: 'asc' },
+  })
+  return rows.map((r) => r.category)
+}
+
+export async function setMyPrepCategories(categories: string[]) {
+  const u = await getCurrentUser()
+  if (!['COCINA', 'BAR'].includes(u.role)) {
+    throw new Error('No autorizado')
+  }
+  const allowed = new Set(await getPrepCategoryKeys())
+  for (const c of categories) {
+    if (!allowed.has(c)) {
+      throw new Error(`Categoría no válida: ${c}`)
+    }
+  }
+  await prisma.$transaction([
+    prisma.userPrepCategory.deleteMany({ where: { userId: u.id } }),
+    ...(categories.length > 0
+      ? [
+          prisma.userPrepCategory.createMany({
+            data: categories.map((category) => ({ userId: u.id, category })),
+          }),
+        ]
+      : []),
+  ])
+  revalidatePath('/cocina')
+  revalidatePath('/bar')
+}
+
+export async function getPrepQueue(_station: 'COCINA' | 'BAR') {
+  const u = await getCurrentUser()
+  ensurePrepStationAccess(u.role, _station)
+
+  const baseWhere: Prisma.OrderWhereInput = {
+    served: true,
+    rejected: false,
+    prepStatus: { in: [OrderPrepStatus.QUEUED, OrderPrepStatus.PREPARING] },
+  }
+
+  if (u.role === 'ADMIN') {
+    const orders = await prisma.order.findMany({
+      where: baseWhere,
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+      select: {
+        id: true,
+        quantity: true,
+        price: true,
+        prepStatus: true,
+        createdAt: true,
+        product: { select: { name: true, category: true } },
+        account: {
+          select: {
+            id: true,
+            clientName: true,
+            table: { select: { name: true, shortCode: true, zone: true } },
+          },
+        },
+      },
+    })
+    return { orders, needsCategories: false as const }
+  }
+
+  const mine = await prisma.userPrepCategory.findMany({
+    where: { userId: u.id },
+    select: { category: true },
+  })
+  const cats = mine.map((m) => m.category)
+  if (cats.length === 0) {
+    return { orders: [], needsCategories: true as const }
+  }
+
+  const hasNone = cats.includes(UNCATEGORIZED_PREP_CATEGORY)
+  const named = cats.filter((c) => c !== UNCATEGORIZED_PREP_CATEGORY)
+
+  const productOr: Prisma.ProductWhereInput[] = []
+  if (named.length > 0) {
+    productOr.push({ category: { in: named } })
+  }
+  if (hasNone) {
+    productOr.push({ OR: [{ category: null }, { category: '' }] })
+  }
+
+  const orders = await prisma.order.findMany({
+    where: {
+      ...baseWhere,
+      product: { OR: productOr },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 150,
+    select: {
+      id: true,
+      quantity: true,
+      price: true,
+      prepStatus: true,
+      createdAt: true,
+      product: { select: { name: true, category: true } },
+      account: {
+        select: {
+          id: true,
+          clientName: true,
+          table: { select: { name: true, shortCode: true, zone: true } },
+        },
+      },
+    },
+  })
+
+  return { orders, needsCategories: false as const }
+}
+
+export async function advancePrepStatus(
+  orderId: string,
+  station: 'COCINA' | 'BAR',
+  next: 'PREPARING' | 'READY'
+) {
+  const u = await getCurrentUser()
+  ensurePrepStationAccess(u.role, station)
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { product: { select: { category: true } } },
+  })
+  if (!order || !order.served || order.rejected) {
+    throw new Error('Pedido no válido')
+  }
+
+  if (u.role !== 'ADMIN') {
+    const mine = await prisma.userPrepCategory.findMany({
+      where: { userId: u.id },
+      select: { category: true },
+    })
+    const catKey =
+      order.product.category && order.product.category !== ''
+        ? order.product.category
+        : UNCATEGORIZED_PREP_CATEGORY
+    if (!mine.some((m) => m.category === catKey)) {
+      throw new Error('Este pedido no corresponde a tus categorías')
+    }
+  }
+
+  const expected = next === 'PREPARING' ? OrderPrepStatus.QUEUED : OrderPrepStatus.PREPARING
+  const nextStatus = next === 'PREPARING' ? OrderPrepStatus.PREPARING : OrderPrepStatus.READY
+
+  const r = await prisma.order.updateMany({
+    where: { id: orderId, prepStatus: expected },
+    data: { prepStatus: nextStatus },
+  })
+  if (r.count === 0) {
+    throw new Error('El pedido ya fue actualizado o no está en el estado esperado')
+  }
+
+  revalidatePath('/cocina')
+  revalidatePath('/bar')
+  revalidatePath('/cajero')
+}
+
+/** Lectura pública (sin sesión) para landing /clientes */
+export async function getPublicClientOrderingSetting() {
+  return getClientSelfOrderingEnabled()
+}
+
+export async function getProductsForCashierInvoice() {
+  const u = await getCurrentUser()
+  if (!['ADMIN', 'CAJERO'].includes(u.role)) {
+    throw new Error('No autorizado')
+  }
+  return prisma.product.findMany({
+    where: { isActive: true },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, price: true, category: true, isTaxExempt: true },
+  })
 }
 
 export async function addBalanceToAccount(accountId: string, amount: number) {
@@ -1087,6 +1419,8 @@ export async function createProduct(data: {
   price: number
   category?: string
   emoji?: string
+  requiresPrep?: boolean
+  isTaxExempt?: boolean
 }) {
   const currentUser = await getCurrentUser()
   if (currentUser.role !== 'ADMIN') {
@@ -1100,6 +1434,8 @@ export async function createProduct(data: {
       category: data.category,
       emoji: data.emoji || null,
       isActive: true,
+      requiresPrep: data.requiresPrep !== false,
+      isTaxExempt: data.isTaxExempt === true,
     },
   })
 
@@ -1121,6 +1457,8 @@ export async function updateProduct(
     category?: string
     emoji?: string | null
     isActive?: boolean
+    requiresPrep?: boolean
+    isTaxExempt?: boolean
   }
 ) {
   const currentUser = await getCurrentUser()
@@ -1552,6 +1890,11 @@ export async function createCustomerOrder(data: {
   productId: string
   quantity?: number
 }) {
+  const clientOrdersOk = await getClientSelfOrderingEnabled()
+  if (!clientOrdersOk) {
+    throw new Error('Los pedidos desde la mesa están deshabilitados. Solicita al personal.')
+  }
+
   // Obtener usuario cliente
   const customerUser = await getOrCreateCustomerUser()
 

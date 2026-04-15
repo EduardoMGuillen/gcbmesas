@@ -27,6 +27,8 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
     price: '',
     category: '',
     emoji: '',
+    requiresPrep: true,
+    isTaxExempt: false,
   })
   const router = useRouter()
 
@@ -62,11 +64,13 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
         price,
         category: formData.category || undefined,
         emoji: formData.emoji.trim() === '' ? undefined : formData.emoji.trim(),
+        requiresPrep: formData.requiresPrep,
+        isTaxExempt: formData.isTaxExempt,
       })
       setProducts([...products, newProduct])
       // Si el nuevo producto tiene categoría y estamos filtrando por esa categoría, se mostrará automáticamente
       setShowCreateModal(false)
-      setFormData({ name: '', price: '', category: '', emoji: '' })
+      setFormData({ name: '', price: '', category: '', emoji: '', requiresPrep: true, isTaxExempt: false })
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Error al crear producto')
@@ -97,6 +101,8 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
         // Si el campo está vacío, establecer como null
         updateData.emoji = formData.emoji.trim() === '' ? null : formData.emoji.trim()
       }
+      updateData.requiresPrep = formData.requiresPrep
+      updateData.isTaxExempt = formData.isTaxExempt
 
       const updatedProduct = await updateProduct(editingProduct.id, updateData)
       setProducts(
@@ -104,7 +110,7 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
       )
       // Si cambió la categoría y estamos filtrando, ajustar el filtro si es necesario
       setEditingProduct(null)
-      setFormData({ name: '', price: '', category: '', emoji: '' })
+      setFormData({ name: '', price: '', category: '', emoji: '', requiresPrep: true, isTaxExempt: false })
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Error al actualizar producto')
@@ -166,6 +172,8 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
       price: product.price.toString(),
       category: product.category || '',
       emoji: product.emoji || '',
+      requiresPrep: product.requiresPrep !== false,
+      isTaxExempt: product.isTaxExempt === true,
     })
   }
 
@@ -244,6 +252,12 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
                     <p className="text-sm text-dark-400">
                       {product.category}
                     </p>
+                  )}
+                  {product.requiresPrep === false && (
+                    <p className="text-xs text-amber-400/90 mt-1">No pasa por cocina/bar</p>
+                  )}
+                  {product.isTaxExempt === true && (
+                    <p className="text-xs text-sky-400/90">Exento ISV en factura</p>
                   )}
                 </div>
                 <div
@@ -373,13 +387,31 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
                   Ingresa un emoji para mostrar en el grid de productos (máx. 2 caracteres)
                 </p>
               </div>
+              <label className="flex items-center gap-2 text-sm text-white/90 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.requiresPrep}
+                  onChange={(e) => setFormData({ ...formData, requiresPrep: e.target.checked })}
+                  className="rounded border-dark-200"
+                />
+                Enviar a cocina/bar tras aceptar en caja
+              </label>
+              <label className="flex items-center gap-2 text-sm text-white/90 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.isTaxExempt}
+                  onChange={(e) => setFormData({ ...formData, isTaxExempt: e.target.checked })}
+                  className="rounded border-dark-200"
+                />
+                Exento de ISV (factura)
+              </label>
               <div className="flex space-x-3">
                 <button
                   type="button"
                   onClick={() => {
                     setShowCreateModal(false)
                     setError('')
-                    setFormData({ name: '', price: '', category: '', emoji: '' })
+                    setFormData({ name: '', price: '', category: '', emoji: '', requiresPrep: true, isTaxExempt: false })
                   }}
                   className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                 >
@@ -473,13 +505,31 @@ export function ProductsList({ initialProducts }: ProductsListProps) {
                   Ingresa un emoji para mostrar en el grid de productos (máx. 2 caracteres)
                 </p>
               </div>
+              <label className="flex items-center gap-2 text-sm text-white/90 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.requiresPrep}
+                  onChange={(e) => setFormData({ ...formData, requiresPrep: e.target.checked })}
+                  className="rounded border-dark-200"
+                />
+                Enviar a cocina/bar tras aceptar en caja
+              </label>
+              <label className="flex items-center gap-2 text-sm text-white/90 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.isTaxExempt}
+                  onChange={(e) => setFormData({ ...formData, isTaxExempt: e.target.checked })}
+                  className="rounded border-dark-200"
+                />
+                Exento de ISV (factura)
+              </label>
               <div className="flex space-x-3">
                 <button
                   type="button"
                   onClick={() => {
                     setEditingProduct(null)
                     setError('')
-                    setFormData({ name: '', price: '', category: '', emoji: '' })
+                    setFormData({ name: '', price: '', category: '', emoji: '', requiresPrep: true, isTaxExempt: false })
                   }}
                   className="flex-1 bg-dark-200 hover:bg-dark-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                 >

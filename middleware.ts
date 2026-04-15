@@ -59,6 +59,18 @@ const authMiddleware = withAuth(
           return NextResponse.redirect(new URL('/login', req.url))
         }
       }
+
+      if (path.startsWith('/cocina')) {
+        if (!['COCINA', 'ADMIN'].includes(token.role as string)) {
+          return NextResponse.redirect(new URL('/login', req.url))
+        }
+      }
+
+      if (path.startsWith('/bar')) {
+        if (!['BAR', 'ADMIN'].includes(token.role as string)) {
+          return NextResponse.redirect(new URL('/login', req.url))
+        }
+      }
     }
 
     return NextResponse.next()

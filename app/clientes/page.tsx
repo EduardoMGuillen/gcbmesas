@@ -1,4 +1,5 @@
 import { getTableByIdPublic, getTableByShortCodePublic, getProductsPublic } from '@/lib/actions'
+import { getClientSelfOrderingEnabled } from '@/lib/app-settings'
 import { redirect } from 'next/navigation'
 import { CustomerOrderView } from '@/components/CustomerOrderView'
 import { Footer } from '@/components/Footer'
@@ -12,6 +13,7 @@ interface ClientesPageProps {
 
 export default async function ClientesPage({ searchParams }: ClientesPageProps) {
   const tableId = searchParams.tableId
+  const clientOrdersEnabled = await getClientSelfOrderingEnabled()
 
   // Si hay tableId, mostrar la vista de pedidos
   if (tableId) {
@@ -82,7 +84,12 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
     return (
       <div className="min-h-screen flex flex-col pt-safe" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
-          <CustomerOrderView table={table} account={accountForView} products={productsForView} />
+          <CustomerOrderView
+            table={table}
+            account={accountForView}
+            products={productsForView}
+            clientOrdersDisabled={!clientOrdersEnabled}
+          />
         </main>
         <Footer />
       </div>
@@ -90,5 +97,5 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
   }
 
   // Si no hay tableId, mostrar la página de escaneo/búsqueda
-  return <CustomerPageClient />
+  return <CustomerPageClient clientOrdersEnabled={clientOrdersEnabled} />
 }

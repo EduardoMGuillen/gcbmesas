@@ -29,6 +29,8 @@ export function Navbar() {
     { href: '/mesero', label: 'Mesero', match: pathname === '/mesero' },
     { href: '/mesero/mesas-activas', label: 'Mesas Activas', match: pathname?.startsWith('/mesero/mesas-activas') },
     { href: '/cajero', label: 'Cajero', match: pathname === '/cajero' },
+    { href: '/cocina', label: 'Cocina', match: pathname === '/cocina' },
+    { href: '/bar', label: 'Bar', match: pathname === '/bar' },
   ]
 
   const meseroLinks = [
@@ -50,6 +52,14 @@ export function Navbar() {
     { href: '/taquilla', label: 'Taquilla', match: pathname?.startsWith('/taquilla') },
   ]
 
+  const cocinaLinks = [
+    { href: '/cocina', label: 'Cocina', match: pathname === '/cocina' },
+  ]
+
+  const barLinks = [
+    { href: '/bar', label: 'Bar', match: pathname === '/bar' },
+  ]
+
   const links =
     session?.user.role === 'ADMIN'
       ? adminLinks
@@ -57,6 +67,10 @@ export function Navbar() {
       ? cajeroLinks
       : session?.user.role === 'TAQUILLA'
       ? taquillaLinks
+      : session?.user.role === 'COCINA'
+      ? cocinaLinks
+      : session?.user.role === 'BAR'
+      ? barLinks
       : meseroLinks
 
   return (

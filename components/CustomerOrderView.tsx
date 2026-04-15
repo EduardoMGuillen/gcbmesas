@@ -57,6 +57,8 @@ interface CustomerOrderViewProps {
   onCreateAccount?: (tableId: string, initialBalance: number, clientName?: string | null) => Promise<void>
   onChangeTable?: (tableId: string) => void
   backUrl?: string
+  /** Si true, el cliente no puede agregar pedidos (configuración admin) */
+  clientOrdersDisabled?: boolean
 }
 
 export function CustomerOrderView({ 
@@ -68,7 +70,8 @@ export function CustomerOrderView({
   isMesero = false,
   onCreateAccount,
   onChangeTable,
-  backUrl = '/clientes'
+  backUrl = '/clientes',
+  clientOrdersDisabled = false,
 }: CustomerOrderViewProps) {
   const [selectedTableId, setSelectedTableId] = useState(initialTableId || initialTable.id)
   const [table, setTable] = useState(initialTable)
@@ -698,13 +701,20 @@ export function CustomerOrderView({
             </div>
           )}
 
+          {!isMesero && clientOrdersDisabled && (
+            <div className="mb-6 bg-amber-500/15 border border-amber-500/40 text-amber-100 px-4 py-3 rounded-lg text-sm">
+              Los pedidos desde esta página están desactivados por el administrador. Pide al mesero que registre tu
+              pedido.
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <div className="bg-dark-100 border border-dark-200 rounded-xl p-6">
                 <div className="mb-6">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
                     <h2 className="text-xl font-semibold text-white">Pedidos</h2>
-                    {!isMesero && (
+                    {!isMesero && !clientOrdersDisabled && (
                       <button
                         onClick={() => setShowAddProduct(true)}
                         className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm w-full sm:w-auto sm:flex-shrink-0"

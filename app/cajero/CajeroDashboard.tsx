@@ -4,7 +4,9 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { CashierOrders } from '@/components/CashierOrders'
 import { CashierAccounts } from '@/components/CashierAccounts'
+import { CashierFreeInvoiceModal } from '@/components/CashierFreeInvoiceModal'
 import { setCajeroMeseroWatches } from '@/lib/actions'
+import type { InvoiceSettingsLike } from '@/lib/invoice-print-hn'
 
 type ActiveMesero = {
   id: string
@@ -26,7 +28,8 @@ type AccountItem = {
     served: boolean
     rejected?: boolean
     quantity: number
-    product: { name: string }
+    price: string | number | { toString(): string }
+    product: { name: string; price: string | number | { toString(): string }; isTaxExempt?: boolean }
     user?: { username: string; name?: string | null }
   }>
 }
@@ -53,6 +56,7 @@ interface CajeroDashboardProps {
   userId: string
   watchedMeseroIds: string[]
   isCajero: boolean
+  invoiceSettings: InvoiceSettingsLike | null
 }
 
 const STORAGE_KEY_PREFIX = 'cajero-meseros-'
@@ -93,6 +97,7 @@ export function CajeroDashboard({
   userId,
   watchedMeseroIds,
   isCajero,
+  invoiceSettings,
 }: CajeroDashboardProps) {
   const router = useRouter()
   const activeMeseroIds = activeMeseros.map((m) => m.id)
@@ -148,6 +153,7 @@ export function CajeroDashboard({
 
   const allSelected = activeMeseros.length > 0 && selectedMeseroIds.size === activeMeseros.length
   const noneSelected = selectedMeseroIds.size === 0
+  const [freeInvoiceOpen, setFreeInvoiceOpen] = useState(false)
 
   return (
     <>
@@ -216,14 +222,30 @@ export function CajeroDashboard({
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-white mb-4">Cuentas abiertas</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-xl font-semibold text-white">Cuentas abiertas</h2>
+          <button
+            type="button"
+            onClick={() => setFreeInvoiceOpen(true)}
+            className="px-4 py-2 rounded-lg bg-dark-200 text-white text-sm hover:bg-dark-100 border border-dark-100 w-full sm:w-auto"
+          >
+            Factura libre (mostrador)
+          </button>
+        </div>
         <CashierAccounts
           accounts={accounts}
           selectedMeseroIds={selectedMeseroIds}
           allMeseroIds={allMeseroIds}
           noneSelected={noneSelected}
+          invoiceSettings={invoiceSettings}
         />
       </section>
+
+      <CashierFreeInvoiceModal
+        open={freeInvoiceOpen}
+        onClose={() => setFreeInvoiceOpen(false)}
+        invoiceSettings={invoiceSettings}
+      />
     </>
   )
 }

@@ -18,7 +18,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
-    role: 'MESERO' as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA',
+    role: 'MESERO' as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR',
     name: '',
   })
   const router = useRouter()
@@ -158,7 +158,13 @@ export function UsersList({ initialUsers }: UsersListProps) {
                         ? 'bg-blue-500/20 text-blue-400'
                         : user.role === 'TAQUILLA'
                         ? 'bg-amber-500/20 text-amber-400'
-                        : 'bg-green-500/20 text-green-400'
+                        : user.role === 'CAJERO'
+                        ? 'bg-green-500/20 text-green-400'
+                        : user.role === 'COCINA'
+                        ? 'bg-rose-500/20 text-rose-300'
+                        : user.role === 'BAR'
+                        ? 'bg-cyan-500/20 text-cyan-300'
+                        : 'bg-dark-200 text-white/70'
                     }`}
                   >
                     {user.role}
@@ -241,7 +247,13 @@ export function UsersList({ initialUsers }: UsersListProps) {
                           ? 'bg-blue-500/20 text-blue-400'
                           : user.role === 'TAQUILLA'
                           ? 'bg-amber-500/20 text-amber-400'
-                          : 'bg-green-500/20 text-green-400'
+                          : user.role === 'CAJERO'
+                          ? 'bg-green-500/20 text-green-400'
+                          : user.role === 'COCINA'
+                          ? 'bg-rose-500/20 text-rose-300'
+                          : user.role === 'BAR'
+                          ? 'bg-cyan-500/20 text-cyan-300'
+                          : 'bg-dark-200 text-white/70'
                       }`}
                     >
                       {user.role}
@@ -338,7 +350,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA',
+                      role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR',
                     })
                   }
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
@@ -347,6 +359,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   <option value="ADMIN">Administrador</option>
                   <option value="CAJERO">Cajero</option>
                   <option value="TAQUILLA">Taquilla</option>
+                  <option value="COCINA">Cocina</option>
+                  <option value="BAR">Bar</option>
                 </select>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -440,7 +454,7 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA',
+                      role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR',
                     })
                   }
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
@@ -449,6 +463,8 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   <option value="ADMIN">Administrador</option>
                   <option value="CAJERO">Cajero</option>
                   <option value="TAQUILLA">Taquilla</option>
+                  <option value="COCINA">Cocina</option>
+                  <option value="BAR">Bar</option>
                 </select>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 pt-2">

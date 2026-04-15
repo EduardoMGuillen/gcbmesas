@@ -76,6 +76,10 @@ export async function POST(request: Request) {
         ? '/cajero'
         : user.role === 'TAQUILLA'
         ? '/taquilla'
+        : user.role === 'COCINA'
+        ? '/cocina'
+        : user.role === 'BAR'
+        ? '/bar'
         : '/'
 
     // Create response
