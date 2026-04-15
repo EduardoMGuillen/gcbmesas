@@ -143,12 +143,6 @@ export function PushSubscriptionButton() {
           )}
         </div>
         {testMsg && <p className="text-[11px] text-right text-green-400/90 break-words">{testMsg}</p>}
-        {typeof navigator !== 'undefined' &&
-          !/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) && (
-            <p className="text-[10px] text-right text-white/45 max-w-[260px]">
-              En PC: minimiza esta ventana o cambia de pestaña antes de pulsar Probar.
-            </p>
-          )}
       </div>
     )
   }
