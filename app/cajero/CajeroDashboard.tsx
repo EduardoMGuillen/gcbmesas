@@ -253,6 +253,7 @@ export function CajeroDashboard({
         open={freeInvoiceOpen}
         onClose={() => setFreeInvoiceOpen(false)}
         invoiceSettings={invoiceSettings}
+        meseros={activeMeseros}
       />
     </>
   )
