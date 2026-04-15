@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AccountsList } from '@/components/AccountsList'
 import { closeOldAccounts } from '@/lib/actions'
+import { getAppSettingsSafe } from '@/lib/app-settings'
 
 export default async function CuentasPage() {
   const session = await getServerSession(authOptions)
@@ -13,7 +14,8 @@ export default async function CuentasPage() {
   })
 
   try {
-    const accounts = await prisma.account.findMany({
+    const [accounts, invoiceSettings] = await Promise.all([
+      prisma.account.findMany({
       select: {
         id: true,
         initialBalance: true,
@@ -31,18 +33,20 @@ export default async function CuentasPage() {
             price: true,
             createdAt: true,
             rejected: true,
-            product: { select: { name: true, price: true } },
+            product: { select: { name: true, price: true, isTaxExempt: true } },
             user: { select: { username: true } },
           },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
+          orderBy: { createdAt: 'desc' },
+          take: 100,
         },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
-    })
+      }),
+      getAppSettingsSafe(),
+    ])
 
-    return <AccountsList initialAccounts={accounts} userRole={userRole} />
+    return <AccountsList initialAccounts={accounts} userRole={userRole} invoiceSettings={invoiceSettings} />
   } catch (error: any) {
     console.error('Error loading accounts:', error)
     return (
