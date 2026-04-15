@@ -58,6 +58,7 @@ interface CustomerOrderViewProps {
   onCreateAccount?: (tableId: string, initialBalance: number, clientName?: string | null) => Promise<void>
   onChangeTable?: (tableId: string) => void
   backUrl?: string
+  forceCreateAccount?: boolean
   /** Si true, el cliente no puede agregar pedidos (configuración admin) */
   clientOrdersDisabled?: boolean
 }
@@ -72,6 +73,7 @@ export function CustomerOrderView({
   onCreateAccount,
   onChangeTable,
   backUrl = '/clientes',
+  forceCreateAccount = false,
   clientOrdersDisabled = false,
 }: CustomerOrderViewProps) {
   const [selectedTableId, setSelectedTableId] = useState(initialTableId || initialTable.id)
@@ -141,8 +143,8 @@ export function CustomerOrderView({
             shortCode: newTable.name,
             zone: newTable.zone || null,
           })
-          const newAccount = newTable.accounts?.[0]
-          if (newAccount) {
+          const newAccount = forceCreateAccount ? null : newTable.accounts?.[0]
+          if (newAccount && !forceCreateAccount) {
             setAccount({
               id: newAccount.id,
               initialBalance: newAccount.initialBalance,
@@ -178,17 +180,21 @@ export function CustomerOrderView({
       setSelectedZone('')
       setSelectedTableId('')
     }
-  }, [initialTableId, initialTable, initialAccount, tables, isMesero, selectedTableId])
+  }, [initialTableId, initialTable, initialAccount, tables, isMesero, selectedTableId, forceCreateAccount])
 
   // Si se pasa un initialTableId y no tiene cuenta, mostrar el formulario de crear cuenta automáticamente
   useEffect(() => {
     if (isMesero && initialTableId && selectedTableId === initialTableId && tables) {
+      if (forceCreateAccount) {
+        setShowCreateAccount(true)
+        return
+      }
       const selectedTable = tables.find(t => t.id === selectedTableId)
       if (selectedTable && !selectedTable.accounts?.length) {
         setShowCreateAccount(true)
       }
     }
-  }, [initialTableId, selectedTableId, isMesero, tables])
+  }, [initialTableId, selectedTableId, isMesero, tables, forceCreateAccount])
 
   // Extraer categorías únicas de los productos
   const categories = Array.from(
@@ -235,6 +241,9 @@ export function CustomerOrderView({
         setInitialBalance('')
         setClientName('')
         setCuentaAbierta(false)
+        if (isMesero) {
+          router.push(`${backUrl}?tableId=${selectedTableId}`)
+        }
         router.refresh()
       }
     } catch (err: any) {
@@ -527,12 +536,12 @@ export function CustomerOrderView({
               onClick={() => {
                 const walkInTable = tables.find((t) => isWalkInTable(t))
                 if (!walkInTable) return
-                router.push(`${backUrl}?tableId=${walkInTable.id}`)
+                router.push(`${backUrl}?tableId=${walkInTable.id}&newWalkIn=1`)
                 setTimeout(() => router.refresh(), 100)
               }}
               className="w-full px-4 py-3 bg-cyan-600/20 border border-cyan-500/40 rounded-lg text-cyan-100 hover:bg-cyan-600/30 transition-colors text-sm font-medium"
             >
-              Cliente de pie (sin mesa)
+              Crear cuenta sin mesa
             </button>
           </div>
           {selectedZone && (
@@ -685,21 +694,6 @@ export function CustomerOrderView({
               )}
               {account.openedBy && (
                 <p className="text-white/90">Mesero: {account.openedBy.name || account.openedBy.username}</p>
-              )}
-              {isMesero && isWalkIn && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateAccount(true)
-                    setInitialBalance('')
-                    setClientName('')
-                    setCuentaAbierta(false)
-                    setError('')
-                  }}
-                  className="mt-3 px-3 py-2 rounded-lg bg-cyan-600/30 border border-cyan-500/40 text-cyan-100 text-sm hover:bg-cyan-600/40 transition-colors"
-                >
-                  Crear otra cuenta cliente de pie
-                </button>
               )}
             </div>
             {!isMesero && (

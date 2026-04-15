@@ -8,7 +8,7 @@ import { CustomerOrderView } from '@/components/CustomerOrderView'
 import { TableSelector } from '@/components/TableSelector'
 
 interface PedidosPageProps {
-  searchParams: { tableId?: string }
+  searchParams: { tableId?: string; newWalkIn?: string }
 }
 
 async function createAccountAction(tableId: string, initialBalance: number, clientName?: string | null) {
@@ -25,6 +25,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
 
   const [tables, products, walkInTable] = await Promise.all([getTables(), getProducts(true), getWalkInTable()])
   const initialTableId = searchParams.tableId || ''
+  const forceNewWalkIn = searchParams.newWalkIn === '1' && initialTableId === walkInTable.id
   const isAdmin = session.user.role === 'ADMIN'
 
   // Si hay una mesa inicial seleccionada, obtener sus datos
@@ -40,7 +41,9 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
         shortCode: tableData.shortCode || '',
         zone: tableData.zone || null,
       }
-      initialAccount = tableData.accounts[0]
+      initialAccount = forceNewWalkIn
+        ? null
+        : tableData.accounts[0]
         ? {
             id: tableData.accounts[0].id,
             initialBalance: Number(tableData.accounts[0].initialBalance),
@@ -107,6 +110,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
             initialTableId={initialTableId}
             isMesero={true}
             onCreateAccount={createAccountAction}
+            forceCreateAccount={forceNewWalkIn}
             backUrl="/mesero/pedidos"
           />
         ) : (

@@ -100,7 +100,7 @@ export default async function MeseroPage() {
           </Link>
 
           <Link
-            href={`/mesero/pedidos?tableId=${walkInTable.id}`}
+            href={`/mesero/pedidos?tableId=${walkInTable.id}&newWalkIn=1`}
             className="bg-dark-100 border border-cyan-500/40 rounded-xl p-4 sm:p-6 hover:border-cyan-400 active:border-cyan-400 transition-all hover:shadow-lg group touch-manipulation"
           >
             <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-cyan-600/20 rounded-lg mb-3 sm:mb-4 group-hover:bg-cyan-600/30 transition-colors">
