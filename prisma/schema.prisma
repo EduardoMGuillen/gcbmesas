@@ -17,6 +17,8 @@ enum UserRole {
   TAQUILLA
   COCINA
   BAR
+  /// Cliente externo: solo módulo Entradas y eventos asignados por admin
+  CLIENTE_TICKETERA
 }
 
 enum AccountStatus {
@@ -72,6 +74,12 @@ enum OrderPrepStatus {
   READY
 }
 
+/// Destino de comandas por categoría de producto (configuración admin)
+enum PrepCategoryDestination {
+  COCINA
+  BAR
+}
+
 model AppSettings {
   id        Int      @id @default(1)
   updatedAt DateTime @updatedAt
@@ -101,7 +109,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders            Order[]
+  orders            Order[] @relation("OrderCreatedByUser")
   logs              Log[]
   openedAccounts    Account[]
   pushSubscriptions PushSubscription[]
@@ -113,8 +121,54 @@ model User {
   /// Cajeros que siguen a este mesero
   meseroWatchedByCajeros CajeroMeseroWatch[] @relation("MeseroWatchedByCajeros")
   prepCategories         UserPrepCategory[]
+  /// Cajeros cuyas comandas de bar ve este usuario (rol BAR)
+  barCajeroWatches       BarCajeroWatch[] @relation("BarWatchesCajero")
+  /// Usuarios BAR que reciben comandas de este cajero
+  cajeroWatchedByBars    BarCajeroWatch[] @relation("CajeroWatchedByBar")
+  /// Pedidos aceptados en caja por este usuario (servedByUserId)
+  ordersAcceptedAsCashier Order[] @relation("OrderServedByCashier")
+  /// Eventos de ticketera visibles para este usuario (rol CLIENTE_TICKETERA)
+  ticketeraEventAssignments UserEventAssignment[]
 
   @@map("users")
+}
+
+/// Cajeros de los que el bar quiere ver comandas (aceptación en caja)
+model BarCajeroWatch {
+  id        String   @id @default(cuid())
+  barUserId String
+  cajeroId  String
+  createdAt DateTime @default(now())
+
+  barUser User @relation("BarWatchesCajero", fields: [barUserId], references: [id], onDelete: Cascade)
+  cajero  User @relation("CajeroWatchedByBar", fields: [cajeroId], references: [id], onDelete: Cascade)
+
+  @@unique([barUserId, cajeroId])
+  @@index([barUserId])
+  @@index([cajeroId])
+  @@map("bar_cajero_watches")
+}
+
+/// Categoría de producto → cocina o bar (si hay filas, se usa enrutado global en comandas)
+model PrepCategoryStation {
+  category String @id
+  station  PrepCategoryDestination
+
+  @@map("prep_category_stations")
+}
+
+/// Eventos que un cliente ticketera puede gestionar (ventas / historial)
+model UserEventAssignment {
+  userId    String
+  eventId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([userId, eventId])
+  @@index([eventId])
+  @@map("user_event_assignments")
 }
 
 /// Cajero elige qué meseros le notifican pedidos (misma lógica que el filtro del panel)
@@ -222,6 +276,8 @@ model Order {
   accountId  String
   productId  String
   userId     String
+  /// Usuario que aceptó el pedido en caja (sirve para filtrar comandas en bar)
+  servedByUserId String?
   price      Decimal         @db.Decimal(10, 2)
   quantity   Int             @default(1)
   served     Boolean         @default(false)
@@ -229,12 +285,14 @@ model Order {
   prepStatus OrderPrepStatus @default(NONE)
   createdAt  DateTime        @default(now())
 
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
+  account  Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  product  Product @relation(fields: [productId], references: [id])
+  user     User    @relation("OrderCreatedByUser", fields: [userId], references: [id])
+  servedBy User?   @relation("OrderServedByCashier", fields: [servedByUserId], references: [id], onDelete: SetNull)
 
   @@index([accountId])
   @@index([userId])
+  @@index([servedByUserId])
   @@index([createdAt])
   @@index([served, rejected, createdAt])
   @@index([accountId, rejected])
@@ -283,6 +341,7 @@ model Event {
 
   createdBy User?   @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   entries   Entry[]
+  ticketeraAssignments UserEventAssignment[]
 
   @@index([isActive])
   @@index([date])

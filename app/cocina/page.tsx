@@ -26,8 +26,12 @@ export default async function CocinaPage() {
       title="Comandas — Cocina"
       initialOrders={queue.orders as any[]}
       initialNeedsCategories={queue.needsCategories}
+      initialNeedsCajeros={queue.needsCajeros}
+      initialUseGlobalRouting={queue.useGlobalRouting}
       initialKeys={keys}
       initialMine={mine}
+      initialCajeroMine={[]}
+      cajeroOptions={[]}
       isAdmin={isAdmin}
     />
   )

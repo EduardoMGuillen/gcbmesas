@@ -4,7 +4,7 @@ import { prisma } from './prisma'
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
-import { LogAction, OrderPrepStatus } from '@prisma/client'
+import { LogAction, OrderPrepStatus, PrepCategoryDestination } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { getClientSelfOrderingEnabled, ensureAppSettingsRow, UNCATEGORIZED_PREP_CATEGORY } from './app-settings'
 import { CyberSourceApiError, getCyberSourceApiHostForLogs, getCyberSourceEnvLabel } from './cybersource'
@@ -71,11 +71,51 @@ function ensureCashierAccess(role: string) {
   }
 }
 
-/** Venta/gestión de entradas y eventos: solo administradores */
+/** Crear/editar/eliminar eventos: solo admin de la casa */
 function ensureEntradasAdminOnly(role: string) {
   if (role !== 'ADMIN') {
-    throw new Error('Solo administradores pueden gestionar el módulo de entradas')
+    throw new Error('Solo administradores pueden crear o modificar eventos')
   }
+}
+
+const ENTRADAS_MODULE_ROLES = ['ADMIN', 'CLIENTE_TICKETERA'] as const
+
+function ensureEntradasModuleAccess(role: string) {
+  if (!ENTRADAS_MODULE_ROLES.includes(role as (typeof ENTRADAS_MODULE_ROLES)[number])) {
+    throw new Error('No autorizado al módulo de entradas')
+  }
+}
+
+function isEntradasPlatformAdmin(role: string) {
+  return role === 'ADMIN'
+}
+
+/** null = ve todos los eventos (admin) */
+async function getEntradasEventIdScopeForUser(userId: string, role: string): Promise<string[] | null> {
+  if (role === 'ADMIN') return null
+  if (role !== 'CLIENTE_TICKETERA') return []
+  const rows = await prisma.userEventAssignment.findMany({
+    where: { userId },
+    select: { eventId: true },
+  })
+  return rows.map((r) => r.eventId)
+}
+
+async function assertEntradasEventAccess(userId: string, role: string, eventId: string) {
+  const scope = await getEntradasEventIdScopeForUser(userId, role)
+  if (scope === null) return
+  if (!scope.includes(eventId)) {
+    throw new Error('No tienes acceso a este evento')
+  }
+}
+
+async function assertEntryInEntradasScope(userId: string, role: string, entryId: string) {
+  const entry = await prisma.entry.findUnique({
+    where: { id: entryId },
+    select: { eventId: true },
+  })
+  if (!entry) throw new Error('Entrada no encontrada')
+  await assertEntradasEventAccess(userId, role, entry.eventId)
 }
 
 function ensureEntryScanAccess(role: string) {
@@ -89,7 +129,7 @@ function ensureEntryScanAccess(role: string) {
 export async function createUser(data: {
   username: string
   password: string
-  role: 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR'
+  role: 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR' | 'CLIENTE_TICKETERA'
   name?: string
 }) {
   const currentUser = await getCurrentUser()
@@ -125,7 +165,7 @@ export async function updateUser(
   data: {
     username?: string
     password?: string
-    role?: 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR'
+    role?: 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR' | 'CLIENTE_TICKETERA'
     name?: string | null
   }
 ) {
@@ -133,6 +173,11 @@ export async function updateUser(
   if (currentUser.role !== 'ADMIN') {
     throw new Error('Solo administradores pueden editar usuarios')
   }
+
+  const prev = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  })
 
   const updateData: any = {}
   if (data.username) updateData.username = data.username
@@ -147,6 +192,10 @@ export async function updateUser(
     where: { id: userId },
     data: updateData,
   })
+
+  if (prev?.role === 'CLIENTE_TICKETERA' && data.role && data.role !== 'CLIENTE_TICKETERA') {
+    await prisma.userEventAssignment.deleteMany({ where: { userId } })
+  }
 
   await createLog(LogAction.USER_UPDATED, currentUser.id, undefined, {
     updatedUserId: user.id,
@@ -438,7 +487,11 @@ export async function setOrderServed(orderId: string, served: boolean) {
 
   const order = await prisma.order.update({
     where: { id: orderId },
-    data: { served, prepStatus },
+    data: {
+      served,
+      prepStatus,
+      servedByUserId: served ? currentUser.id : null,
+    },
     include: {
       account: {
         select: {
@@ -782,7 +835,7 @@ export async function closeAccount(accountId: string) {
             served: false,
             rejected: false,
           },
-          data: { served: true, prepStatus: OrderPrepStatus.QUEUED },
+          data: { served: true, prepStatus: OrderPrepStatus.QUEUED, servedByUserId: currentUser.id },
         })
       )
     }
@@ -795,7 +848,7 @@ export async function closeAccount(accountId: string) {
             served: false,
             rejected: false,
           },
-          data: { served: true, prepStatus: OrderPrepStatus.NONE },
+          data: { served: true, prepStatus: OrderPrepStatus.NONE, servedByUserId: currentUser.id },
         })
       )
     }
@@ -909,7 +962,7 @@ export async function closeOldAccounts() {
                 served: false,
                 rejected: false,
               },
-              data: { served: true, prepStatus: OrderPrepStatus.QUEUED },
+              data: { served: true, prepStatus: OrderPrepStatus.QUEUED, servedByUserId: null },
             })
           )
         }
@@ -922,7 +975,7 @@ export async function closeOldAccounts() {
                 served: false,
                 rejected: false,
               },
-              data: { served: true, prepStatus: OrderPrepStatus.NONE },
+              data: { served: true, prepStatus: OrderPrepStatus.NONE, servedByUserId: null },
             })
           )
         }
@@ -1040,6 +1093,65 @@ function ensurePrepStationAccess(role: string, station: 'COCINA' | 'BAR') {
   }
 }
 
+async function hasGlobalPrepRouting(): Promise<boolean> {
+  try {
+    return (await prisma.prepCategoryStation.count()) > 0
+  } catch {
+    return false
+  }
+}
+
+function productCategoryKeyFromProduct(category: string | null | undefined): string {
+  return category == null || category === '' ? UNCATEGORIZED_PREP_CATEGORY : category
+}
+
+function productWhereFromCategoryList(cats: string[]): Prisma.ProductWhereInput {
+  const hasNone = cats.includes(UNCATEGORIZED_PREP_CATEGORY)
+  const named = cats.filter((c) => c !== UNCATEGORIZED_PREP_CATEGORY)
+  const parts: Prisma.ProductWhereInput[] = []
+  if (named.length) parts.push({ category: { in: named } })
+  if (hasNone) parts.push({ OR: [{ category: null }, { category: '' }] })
+  if (parts.length === 0) return { id: '__impossible_prep_category__' }
+  return parts.length === 1 ? parts[0]! : { OR: parts }
+}
+
+async function barCajeroExtraWhere(barUserId: string): Promise<
+  { ok: true; extra: Prisma.OrderWhereInput } | { ok: false; needsCajeros: true }
+> {
+  const watches = await prisma.barCajeroWatch.findMany({
+    where: { barUserId },
+    select: { cajeroId: true },
+  })
+  const ids = watches.map((w) => w.cajeroId)
+  if (ids.length === 0) return { ok: false, needsCajeros: true }
+  return {
+    ok: true,
+    extra: {
+      OR: [{ servedByUserId: { in: ids } }, { servedByUserId: null }],
+    },
+  }
+}
+
+const emptyOrderListWhere: Prisma.OrderWhereInput = { id: { in: [] } }
+
+const prepQueueOrderSelect = {
+  id: true,
+  quantity: true,
+  price: true,
+  prepStatus: true,
+  createdAt: true,
+  servedByUserId: true,
+  product: { select: { name: true, category: true } },
+  servedBy: { select: { username: true, name: true } },
+  account: {
+    select: {
+      id: true,
+      clientName: true,
+      table: { select: { name: true, shortCode: true, zone: true } },
+    },
+  },
+} satisfies Prisma.OrderSelect
+
 export async function getPrepCategoryKeys() {
   const u = await getCurrentUser()
   if (!['ADMIN', 'COCINA', 'BAR'].includes(u.role)) {
@@ -1103,28 +1215,96 @@ export async function getPrepQueue(_station: 'COCINA' | 'BAR') {
     prepStatus: { in: [OrderPrepStatus.QUEUED, OrderPrepStatus.PREPARING] },
   }
 
+  const stationEnum = _station === 'COCINA' ? PrepCategoryDestination.COCINA : PrepCategoryDestination.BAR
+  const useGlobal = await hasGlobalPrepRouting()
+
+  const mergeBarCajero = async (
+    where: Prisma.OrderWhereInput
+  ): Promise<{ where: Prisma.OrderWhereInput; needsCajeros: boolean }> => {
+    if (_station !== 'BAR' || u.role !== 'BAR') {
+      return { where, needsCajeros: false }
+    }
+    const bx = await barCajeroExtraWhere(u.id)
+    if (!bx.ok) return { where: { AND: [where, emptyOrderListWhere] }, needsCajeros: true }
+    return { where: { ...where, AND: [bx.extra] }, needsCajeros: false }
+  }
+
+  if (useGlobal) {
+    const routed = await prisma.prepCategoryStation.findMany({
+      where: { station: stationEnum },
+      select: { category: true },
+    })
+    const stationCats = routed.map((r) => r.category)
+    const pw = productWhereFromCategoryList(stationCats)
+
+    if (u.role === 'ADMIN') {
+      const orders =
+        stationCats.length === 0
+          ? []
+          : await prisma.order.findMany({
+              where: { ...baseWhere, product: pw },
+              orderBy: { createdAt: 'asc' },
+              take: 200,
+              select: prepQueueOrderSelect,
+            })
+      return {
+        orders,
+        needsCategories: false as const,
+        needsCajeros: false as const,
+        useGlobalRouting: true as const,
+      }
+    }
+
+    if (stationCats.length === 0) {
+      const needsBarCaj =
+        _station === 'BAR' && u.role === 'BAR' ? !(await barCajeroExtraWhere(u.id)).ok : false
+      return {
+        orders: [],
+        needsCategories: false as const,
+        needsCajeros: needsBarCaj,
+        useGlobalRouting: true as const,
+      }
+    }
+
+    let where: Prisma.OrderWhereInput = { ...baseWhere, product: pw }
+    let needsCajeros = false
+    if (_station === 'BAR' && u.role === 'BAR') {
+      const merged = await mergeBarCajero(where)
+      where = merged.where
+      needsCajeros = merged.needsCajeros
+    }
+
+    const orders = needsCajeros
+      ? []
+      : await prisma.order.findMany({
+          where,
+          orderBy: { createdAt: 'asc' },
+          take: 150,
+          select: prepQueueOrderSelect,
+        })
+
+    return {
+      orders,
+      needsCategories: false as const,
+      needsCajeros,
+      useGlobalRouting: true as const,
+    }
+  }
+
+  // —— Modo legacy: cada usuario elige categorías (cocina/bar) ——
   if (u.role === 'ADMIN') {
     const orders = await prisma.order.findMany({
       where: baseWhere,
       orderBy: { createdAt: 'asc' },
       take: 200,
-      select: {
-        id: true,
-        quantity: true,
-        price: true,
-        prepStatus: true,
-        createdAt: true,
-        product: { select: { name: true, category: true } },
-        account: {
-          select: {
-            id: true,
-            clientName: true,
-            table: { select: { name: true, shortCode: true, zone: true } },
-          },
-        },
-      },
+      select: prepQueueOrderSelect,
     })
-    return { orders, needsCategories: false as const }
+    return {
+      orders,
+      needsCategories: false as const,
+      needsCajeros: false as const,
+      useGlobalRouting: false as const,
+    }
   }
 
   const mine = await prisma.userPrepCategory.findMany({
@@ -1133,7 +1313,13 @@ export async function getPrepQueue(_station: 'COCINA' | 'BAR') {
   })
   const cats = mine.map((m) => m.category)
   if (cats.length === 0) {
-    return { orders: [], needsCategories: true as const }
+    const needsBarCaj = _station === 'BAR' && u.role === 'BAR' ? !(await barCajeroExtraWhere(u.id)).ok : false
+    return {
+      orders: [],
+      needsCategories: true as const,
+      needsCajeros: needsBarCaj,
+      useGlobalRouting: false as const,
+    }
   }
 
   const hasNone = cats.includes(UNCATEGORIZED_PREP_CATEGORY)
@@ -1147,31 +1333,32 @@ export async function getPrepQueue(_station: 'COCINA' | 'BAR') {
     productOr.push({ OR: [{ category: null }, { category: '' }] })
   }
 
-  const orders = await prisma.order.findMany({
-    where: {
-      ...baseWhere,
-      product: { OR: productOr },
-    },
-    orderBy: { createdAt: 'asc' },
-    take: 150,
-    select: {
-      id: true,
-      quantity: true,
-      price: true,
-      prepStatus: true,
-      createdAt: true,
-      product: { select: { name: true, category: true } },
-      account: {
-        select: {
-          id: true,
-          clientName: true,
-          table: { select: { name: true, shortCode: true, zone: true } },
-        },
-      },
-    },
-  })
+  let whereLegacy: Prisma.OrderWhereInput = {
+    ...baseWhere,
+    product: { OR: productOr },
+  }
+  let needsCajeros = false
+  if (_station === 'BAR' && u.role === 'BAR') {
+    const merged = await mergeBarCajero(whereLegacy)
+    whereLegacy = merged.where
+    needsCajeros = merged.needsCajeros
+  }
 
-  return { orders, needsCategories: false as const }
+  const orders = needsCajeros
+    ? []
+    : await prisma.order.findMany({
+        where: whereLegacy,
+        orderBy: { createdAt: 'asc' },
+        take: 150,
+        select: prepQueueOrderSelect,
+      })
+
+  return {
+    orders,
+    needsCategories: false as const,
+    needsCajeros,
+    useGlobalRouting: false as const,
+  }
 }
 
 export async function advancePrepStatus(
@@ -1184,23 +1371,66 @@ export async function advancePrepStatus(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { product: { select: { category: true } } },
+    select: {
+      id: true,
+      served: true,
+      rejected: true,
+      prepStatus: true,
+      servedByUserId: true,
+      product: { select: { category: true } },
+    },
   })
   if (!order || !order.served || order.rejected) {
     throw new Error('Pedido no válido')
   }
 
   if (u.role !== 'ADMIN') {
-    const mine = await prisma.userPrepCategory.findMany({
-      where: { userId: u.id },
-      select: { category: true },
-    })
-    const catKey =
-      order.product.category && order.product.category !== ''
-        ? order.product.category
-        : UNCATEGORIZED_PREP_CATEGORY
-    if (!mine.some((m) => m.category === catKey)) {
-      throw new Error('Este pedido no corresponde a tus categorías')
+    const catKey = productCategoryKeyFromProduct(order.product.category)
+    const useGlobal = await hasGlobalPrepRouting()
+    if (useGlobal) {
+      const row = await prisma.prepCategoryStation.findUnique({
+        where: { category: catKey },
+      })
+      const want = station === 'COCINA' ? PrepCategoryDestination.COCINA : PrepCategoryDestination.BAR
+      if (!row || row.station !== want) {
+        throw new Error('Este pedido no corresponde a esta estación')
+      }
+      if (station === 'BAR' && u.role === 'BAR') {
+        const bx = await barCajeroExtraWhere(u.id)
+        if (!bx.ok) {
+          throw new Error('Configura qué cajeros ves en tu comanda de bar')
+        }
+        const allowedIds = await prisma.barCajeroWatch.findMany({
+          where: { barUserId: u.id },
+          select: { cajeroId: true },
+        })
+        const idset = new Set(allowedIds.map((x) => x.cajeroId))
+        const sid = order.servedByUserId
+        if (sid != null && !idset.has(sid)) {
+          throw new Error('Este pedido no corresponde a tus cajeros')
+        }
+      }
+    } else {
+      const mine = await prisma.userPrepCategory.findMany({
+        where: { userId: u.id },
+        select: { category: true },
+      })
+      if (!mine.some((m) => m.category === catKey)) {
+        throw new Error('Este pedido no corresponde a tus categorías')
+      }
+      if (station === 'BAR' && u.role === 'BAR') {
+        const bx = await barCajeroExtraWhere(u.id)
+        if (!bx.ok) throw new Error('Configura qué cajeros ves en tu comanda de bar')
+        const allowedIds = await prisma.barCajeroWatch.findMany({
+          where: { barUserId: u.id },
+          select: { cajeroId: true },
+        })
+        const idset = new Set(allowedIds.map((x) => x.cajeroId))
+        const sid = order.servedByUserId
+        if (sid != null && !idset.has(sid)) {
+          throw new Error('Este pedido no corresponde a tus cajeros')
+        }
+      }
     }
   }
 
@@ -1218,6 +1448,113 @@ export async function advancePrepStatus(
   revalidatePath('/cocina')
   revalidatePath('/bar')
   revalidatePath('/cajero')
+}
+
+export async function getPrepRoutingAdmin() {
+  const u = await getCurrentUser()
+  if (u.role !== 'ADMIN') {
+    throw new Error('Solo administradores')
+  }
+  const keys = await getPrepCategoryKeys()
+  const rows = await prisma.prepCategoryStation.findMany({
+    select: { category: true, station: true },
+  })
+  const map = new Map(rows.map((r) => [r.category, r.station]))
+  return {
+    keys,
+    assignments: keys.map((k) => ({
+      category: k,
+      station: (map.get(k) as 'COCINA' | 'BAR' | undefined) ?? null,
+    })),
+    useGlobal: rows.length > 0,
+  }
+}
+
+export async function setPrepRoutingAdmin(assignments: { category: string; station: 'COCINA' | 'BAR' }[]) {
+  const u = await getCurrentUser()
+  if (u.role !== 'ADMIN') {
+    throw new Error('Solo administradores')
+  }
+  const allowed = new Set(await getPrepCategoryKeys())
+  for (const a of assignments) {
+    if (!allowed.has(a.category)) {
+      throw new Error(`Categoría no válida: ${a.category}`)
+    }
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.prepCategoryStation.deleteMany()
+    if (assignments.length) {
+      await tx.prepCategoryStation.createMany({
+        data: assignments.map((a) => ({
+          category: a.category,
+          station: a.station === 'COCINA' ? PrepCategoryDestination.COCINA : PrepCategoryDestination.BAR,
+        })),
+      })
+    }
+  })
+  revalidatePath('/admin/comandas')
+  revalidatePath('/cocina')
+  revalidatePath('/bar')
+}
+
+export async function clearPrepRoutingAdmin() {
+  const u = await getCurrentUser()
+  if (u.role !== 'ADMIN') {
+    throw new Error('Solo administradores')
+  }
+  await prisma.prepCategoryStation.deleteMany()
+  revalidatePath('/admin/comandas')
+  revalidatePath('/cocina')
+  revalidatePath('/bar')
+}
+
+export async function getCajerosForBarPickup() {
+  const u = await getCurrentUser()
+  if (!['BAR', 'ADMIN'].includes(u.role)) {
+    throw new Error('No autorizado')
+  }
+  return prisma.user.findMany({
+    where: { role: 'CAJERO' },
+    select: { id: true, username: true, name: true },
+    orderBy: { username: 'asc' },
+  })
+}
+
+export async function getMyBarCajeroWatches() {
+  const u = await getCurrentUser()
+  if (u.role !== 'BAR') {
+    throw new Error('No autorizado')
+  }
+  const rows = await prisma.barCajeroWatch.findMany({
+    where: { barUserId: u.id },
+    select: { cajeroId: true },
+  })
+  return rows.map((r) => r.cajeroId)
+}
+
+export async function setBarCajeroWatches(cajeroIds: string[]) {
+  const u = await getCurrentUser()
+  if (u.role !== 'BAR') {
+    throw new Error('Solo usuarios de bar pueden configurar cajeros')
+  }
+  const unique = Array.from(new Set(cajeroIds.filter(Boolean)))
+  if (unique.length === 0) {
+    await prisma.barCajeroWatch.deleteMany({ where: { barUserId: u.id } })
+    revalidatePath('/bar')
+    return
+  }
+  const valid = await prisma.user.findMany({
+    where: { id: { in: unique }, role: 'CAJERO' },
+    select: { id: true },
+  })
+  const okIds = valid.map((v) => v.id)
+  await prisma.$transaction([
+    prisma.barCajeroWatch.deleteMany({ where: { barUserId: u.id } }),
+    prisma.barCajeroWatch.createMany({
+      data: okIds.map((cajeroId) => ({ barUserId: u.id, cajeroId })),
+    }),
+  ])
+  revalidatePath('/bar')
 }
 
 /** Lectura pública (sin sesión) para landing /clientes */
@@ -2033,9 +2370,49 @@ export async function getUsers() {
       role: true,
       createdAt: true,
       name: true,
+      ticketeraEventAssignments: { select: { eventId: true } },
     },
     orderBy: { createdAt: 'desc' },
   })
+}
+
+/** Listado de eventos para asignar a clientes ticketera (solo admin) */
+export async function getEventsForTicketeraAssignment() {
+  const currentUser = await getCurrentUser()
+  if (currentUser.role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden ver este listado')
+  }
+  return prisma.event.findMany({
+    orderBy: { date: 'desc' },
+    select: { id: true, name: true, date: true, isActive: true },
+  })
+}
+
+/** Reemplaza las asignaciones de eventos de un usuario cliente ticketera */
+export async function setUserTicketeraEvents(userId: string, eventIds: string[]) {
+  const currentUser = await getCurrentUser()
+  if (currentUser.role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden asignar eventos')
+  }
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true },
+  })
+  if (!target) throw new Error('Usuario no encontrado')
+  if (target.role !== 'CLIENTE_TICKETERA') {
+    throw new Error('Solo aplica a usuarios con rol Cliente ticketera')
+  }
+  const unique = Array.from(new Set(eventIds.filter(Boolean)))
+  await prisma.$transaction(async (tx) => {
+    await tx.userEventAssignment.deleteMany({ where: { userId } })
+    if (unique.length) {
+      await tx.userEventAssignment.createMany({
+        data: unique.map((eventId) => ({ userId, eventId })),
+      })
+    }
+  })
+  revalidatePath('/admin/usuarios')
+  revalidatePath('/admin/entradas')
 }
 
 export async function getLogs(filters?: {
@@ -2627,7 +3004,8 @@ export async function createEntry(data: {
   numberOfEntries: number
 }) {
   const user = await getCurrentUser()
-  ensureEntradasAdminOnly(user.role)
+  ensureEntradasModuleAccess(user.role)
+  await assertEntradasEventAccess(user.id, user.role, data.eventId)
 
   // Get event to calculate price
   const event = await prisma.event.findUnique({
@@ -2696,7 +3074,8 @@ export async function createBulkEntries(data: {
   guestNames: string[]
 }) {
   const user = await getCurrentUser()
-  ensureEntradasAdminOnly(user.role)
+  ensureEntradasModuleAccess(user.role)
+  await assertEntradasEventAccess(user.id, user.role, data.eventId)
 
   const event = await prisma.event.findUnique({
     where: { id: data.eventId },
@@ -2769,8 +3148,26 @@ export async function getEntries(filters?: {
   status?: 'ACTIVE' | 'USED' | 'CANCELLED'
   search?: string
 }) {
+  const user = await getCurrentUser()
+  ensureEntradasModuleAccess(user.role)
+  const scope = await getEntradasEventIdScopeForUser(user.id, user.role)
+
   const where: any = {}
-  if (filters?.eventId) where.eventId = filters.eventId
+  if (scope !== null) {
+    if (!scope.length) {
+      return []
+    }
+    if (filters?.eventId) {
+      if (!scope.includes(filters.eventId)) {
+        throw new Error('No tienes acceso a este evento')
+      }
+      where.eventId = filters.eventId
+    } else {
+      where.eventId = { in: scope }
+    }
+  } else if (filters?.eventId) {
+    where.eventId = filters.eventId
+  }
   if (filters?.status) where.status = filters.status
   if (filters?.search) {
     where.OR = [
@@ -2792,10 +3189,23 @@ export async function getEntries(filters?: {
 
 export async function getEntradasDashboardData() {
   const user = await getCurrentUser()
-  ensureEntradasAdminOnly(user.role)
+  ensureEntradasModuleAccess(user.role)
+  const eventScope = await getEntradasEventIdScopeForUser(user.id, user.role)
+  if (eventScope !== null && eventScope.length === 0) {
+    const empty = {
+      events: [] as any[],
+      eventStats: [] as any[],
+      recentEntries: [] as any[],
+      todayStats: { totalSales: 0, totalEntries: 0, totalTransactions: 0 },
+    }
+    return JSON.parse(JSON.stringify(empty)) as typeof empty
+  }
+  const eventWhere = eventScope === null ? {} : { id: { in: eventScope } }
+  const entryEventFilter = eventScope === null ? {} : { eventId: { in: eventScope } }
 
   const [events, recentEntries, todayStats, soldByEvent] = await Promise.all([
     prisma.event.findMany({
+      where: eventWhere,
       orderBy: { date: 'desc' },
       include: {
         _count: { select: { entries: true } },
@@ -2803,6 +3213,7 @@ export async function getEntradasDashboardData() {
       },
     }),
     prisma.entry.findMany({
+      where: entryEventFilter,
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: {
@@ -2813,6 +3224,7 @@ export async function getEntradasDashboardData() {
     // Today stats
     prisma.entry.aggregate({
       where: {
+        ...entryEventFilter,
         createdAt: {
           gte: new Date(new Date().setHours(0, 0, 0, 0)),
         },
@@ -2822,7 +3234,7 @@ export async function getEntradasDashboardData() {
     }),
     prisma.entry.groupBy({
       by: ['eventId'],
-      where: { status: { not: 'CANCELLED' } },
+      where: { status: { not: 'CANCELLED' }, ...entryEventFilter },
       _sum: { numberOfEntries: true, totalPrice: true },
     }),
   ])
@@ -2989,7 +3401,10 @@ export async function markEntryUsed(entryId: string) {
 
 export async function revertEntryToActive(entryId: string) {
   const user = await getCurrentUser()
-  ensureEntradasAdminOnly(user.role)
+  ensureEntradasModuleAccess(user.role)
+  if (!isEntradasPlatformAdmin(user.role)) {
+    await assertEntryInEntradasScope(user.id, user.role, entryId)
+  }
 
   const entry = await prisma.entry.findUnique({
     where: { id: entryId },
@@ -3069,13 +3484,20 @@ async function persistRefundFailureAuditLog(params: {
 export async function cancelEntry(entryId: string): Promise<CancelEntryResult> {
   try {
     const user = await getCurrentUser()
-    ensureEntradasAdminOnly(user.role)
+    ensureEntradasModuleAccess(user.role)
 
     const entry = await prisma.entry.findUnique({
       where: { id: entryId },
     })
 
     if (!entry) return { ok: false, message: 'Entrada no encontrada' }
+    if (!isEntradasPlatformAdmin(user.role)) {
+      try {
+        await assertEntradasEventAccess(user.id, user.role, entry.eventId)
+      } catch {
+        return { ok: false, message: 'No tienes acceso a esta entrada' }
+      }
+    }
     if (entry.status === 'USED') return { ok: false, message: 'No se puede cancelar una entrada ya utilizada' }
     if (entry.status === 'CANCELLED') return { ok: false, message: 'Esta entrada ya fue cancelada' }
 
@@ -3292,6 +3714,11 @@ export async function validateEntryByToken(token: string) {
 }
 
 export async function markEntryEmailSent(entryId: string) {
+  const user = await getCurrentUser()
+  ensureEntradasModuleAccess(user.role)
+  if (!isEntradasPlatformAdmin(user.role)) {
+    await assertEntryInEntradasScope(user.id, user.role, entryId)
+  }
   await prisma.entry.update({
     where: { id: entryId },
     data: { emailSent: true },
@@ -3299,6 +3726,11 @@ export async function markEntryEmailSent(entryId: string) {
 }
 
 export async function markEntryWhatsappSent(entryId: string) {
+  const user = await getCurrentUser()
+  ensureEntradasModuleAccess(user.role)
+  if (!isEntradasPlatformAdmin(user.role)) {
+    await assertEntryInEntradasScope(user.id, user.role, entryId)
+  }
   await prisma.entry.update({
     where: { id: entryId },
     data: { whatsappSent: true },

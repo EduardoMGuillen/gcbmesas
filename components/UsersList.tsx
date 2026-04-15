@@ -1,15 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { createUser, updateUser, deleteUser } from '@/lib/actions'
+import { createUser, updateUser, deleteUser, setUserTicketeraEvents } from '@/lib/actions'
 import { formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
+type TicketeraEventOption = { id: string; name: string; date: Date | string; isActive: boolean }
+
 interface UsersListProps {
   initialUsers: any[]
+  ticketeraEvents: TicketeraEventOption[]
 }
 
-export function UsersList({ initialUsers }: UsersListProps) {
+export function UsersList({ initialUsers, ticketeraEvents }: UsersListProps) {
   const [users, setUsers] = useState(initialUsers)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
@@ -18,11 +21,12 @@ export function UsersList({ initialUsers }: UsersListProps) {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
-    role: 'MESERO' as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR',
+    role: 'MESERO' as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR' | 'CLIENTE_TICKETERA',
     name: '',
   })
   const router = useRouter()
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
+  const [selectedTicketeraEventIds, setSelectedTicketeraEventIds] = useState<string[]>([])
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,9 +40,20 @@ export function UsersList({ initialUsers }: UsersListProps) {
         role: formData.role,
         name: formData.name || undefined,
       })
-      setUsers([...users, newUser])
+      if (formData.role === 'CLIENTE_TICKETERA') {
+        await setUserTicketeraEvents(newUser.id, selectedTicketeraEventIds)
+      }
+      const mergedUser =
+        formData.role === 'CLIENTE_TICKETERA'
+          ? {
+              ...newUser,
+              ticketeraEventAssignments: selectedTicketeraEventIds.map((eventId) => ({ eventId })),
+            }
+          : newUser
+      setUsers([...users, mergedUser])
       setShowCreateModal(false)
       setFormData({ username: '', password: '', role: 'MESERO', name: '' })
+      setSelectedTicketeraEventIds([])
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Error al crear usuario')
@@ -60,9 +75,20 @@ export function UsersList({ initialUsers }: UsersListProps) {
       updateData.name = formData.name || null
 
       const updatedUser = await updateUser(editingUser.id, updateData)
-      setUsers(users.map((u) => (u.id === updatedUser.id ? updatedUser : u)))
+      if (updatedUser.role === 'CLIENTE_TICKETERA') {
+        await setUserTicketeraEvents(updatedUser.id, selectedTicketeraEventIds)
+      }
+      const mergedUpdate =
+        updatedUser.role === 'CLIENTE_TICKETERA'
+          ? {
+              ...updatedUser,
+              ticketeraEventAssignments: selectedTicketeraEventIds.map((eventId) => ({ eventId })),
+            }
+          : updatedUser
+      setUsers(users.map((u) => (u.id === mergedUpdate.id ? mergedUpdate : u)))
       setEditingUser(null)
       setFormData({ username: '', password: '', role: 'MESERO', name: '' })
+      setSelectedTicketeraEventIds([])
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Error al actualizar usuario')
@@ -79,6 +105,9 @@ export function UsersList({ initialUsers }: UsersListProps) {
       role: user.role,
       name: user.name || '',
     })
+    setSelectedTicketeraEventIds(
+      (user.ticketeraEventAssignments || []).map((a: { eventId: string }) => a.eventId)
+    )
   }
 
   const handleDeleteUser = async (user: any) => {
@@ -114,7 +143,10 @@ export function UsersList({ initialUsers }: UsersListProps) {
           </p>
         </div>
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => {
+            setSelectedTicketeraEventIds([])
+            setShowCreateModal(true)
+          }}
           className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm sm:text-base"
         >
           Crear Usuario
@@ -164,10 +196,12 @@ export function UsersList({ initialUsers }: UsersListProps) {
                         ? 'bg-rose-500/20 text-rose-300'
                         : user.role === 'BAR'
                         ? 'bg-cyan-500/20 text-cyan-300'
+                        : user.role === 'CLIENTE_TICKETERA'
+                        ? 'bg-violet-500/20 text-violet-300'
                         : 'bg-dark-200 text-white/70'
                     }`}
                   >
-                    {user.role}
+                    {user.role === 'CLIENTE_TICKETERA' ? 'Cliente ticketera' : user.role}
                   </span>
                   <span className="text-xs text-dark-400">
                     {formatDate(user.createdAt)}
@@ -253,10 +287,12 @@ export function UsersList({ initialUsers }: UsersListProps) {
                           ? 'bg-rose-500/20 text-rose-300'
                           : user.role === 'BAR'
                           ? 'bg-cyan-500/20 text-cyan-300'
+                          : user.role === 'CLIENTE_TICKETERA'
+                          ? 'bg-violet-500/20 text-violet-300'
                           : 'bg-dark-200 text-white/70'
                       }`}
                     >
-                      {user.role}
+                      {user.role === 'CLIENTE_TICKETERA' ? 'Cliente ticketera' : user.role}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-400">
@@ -350,7 +386,14 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR',
+                      role: e.target.value as
+                        | 'ADMIN'
+                        | 'MESERO'
+                        | 'CAJERO'
+                        | 'TAQUILLA'
+                        | 'COCINA'
+                        | 'BAR'
+                        | 'CLIENTE_TICKETERA',
                     })
                   }
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
@@ -361,14 +404,50 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   <option value="TAQUILLA">Taquilla</option>
                   <option value="COCINA">Cocina</option>
                   <option value="BAR">Bar</option>
+                  <option value="CLIENTE_TICKETERA">Cliente ticketera</option>
                 </select>
               </div>
+              {formData.role === 'CLIENTE_TICKETERA' && (
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-2">Eventos asignados</label>
+                  <p className="text-xs text-dark-400 mb-2">
+                    Solo verá y venderá entradas de estos eventos en Admin → Entradas.
+                  </p>
+                  <div className="max-h-40 overflow-y-auto border border-dark-200 rounded-lg p-2 space-y-2 bg-dark-50/50">
+                    {ticketeraEvents.length === 0 ? (
+                      <p className="text-xs text-dark-400 px-1">No hay eventos creados aún.</p>
+                    ) : (
+                      ticketeraEvents.map((ev) => (
+                        <label key={ev.id} className="flex items-start gap-2 text-sm text-white/90 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="mt-1 rounded border-dark-200"
+                            checked={selectedTicketeraEventIds.includes(ev.id)}
+                            onChange={() => {
+                              setSelectedTicketeraEventIds((prev) =>
+                                prev.includes(ev.id) ? prev.filter((x) => x !== ev.id) : [...prev, ev.id]
+                              )
+                            }}
+                          />
+                          <span>
+                            {ev.name}
+                            {!ev.isActive ? (
+                              <span className="text-amber-500 text-xs ml-1">(inactivo)</span>
+                            ) : null}
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setShowCreateModal(false)
                     setError('')
+                    setSelectedTicketeraEventIds([])
                     setFormData({
                       username: '',
                       password: '',
@@ -454,7 +533,14 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      role: e.target.value as 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR',
+                      role: e.target.value as
+                        | 'ADMIN'
+                        | 'MESERO'
+                        | 'CAJERO'
+                        | 'TAQUILLA'
+                        | 'COCINA'
+                        | 'BAR'
+                        | 'CLIENTE_TICKETERA',
                     })
                   }
                   className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
@@ -465,14 +551,50 @@ export function UsersList({ initialUsers }: UsersListProps) {
                   <option value="TAQUILLA">Taquilla</option>
                   <option value="COCINA">Cocina</option>
                   <option value="BAR">Bar</option>
+                  <option value="CLIENTE_TICKETERA">Cliente ticketera</option>
                 </select>
               </div>
+              {formData.role === 'CLIENTE_TICKETERA' && (
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-2">Eventos asignados</label>
+                  <p className="text-xs text-dark-400 mb-2">
+                    Solo verá y venderá entradas de estos eventos en Admin → Entradas.
+                  </p>
+                  <div className="max-h-40 overflow-y-auto border border-dark-200 rounded-lg p-2 space-y-2 bg-dark-50/50">
+                    {ticketeraEvents.length === 0 ? (
+                      <p className="text-xs text-dark-400 px-1">No hay eventos creados aún.</p>
+                    ) : (
+                      ticketeraEvents.map((ev) => (
+                        <label key={ev.id} className="flex items-start gap-2 text-sm text-white/90 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="mt-1 rounded border-dark-200"
+                            checked={selectedTicketeraEventIds.includes(ev.id)}
+                            onChange={() => {
+                              setSelectedTicketeraEventIds((prev) =>
+                                prev.includes(ev.id) ? prev.filter((x) => x !== ev.id) : [...prev, ev.id]
+                              )
+                            }}
+                          />
+                          <span>
+                            {ev.name}
+                            {!ev.isActive ? (
+                              <span className="text-amber-500 text-xs ml-1">(inactivo)</span>
+                            ) : null}
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setEditingUser(null)
                     setError('')
+                    setSelectedTicketeraEventIds([])
                     setFormData({
                       username: '',
                       password: '',

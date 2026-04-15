@@ -31,9 +31,11 @@ const authMiddleware = withAuth(
     if (token) {
       // Admin routes - ADMIN siempre; MESERO/CAJERO solo /admin/cuentas (entradas solo admin)
       if (path.startsWith('/admin')) {
+        const r = token.role as string
         const allowed =
-          token.role === 'ADMIN' ||
-          ((token.role === 'MESERO' || token.role === 'CAJERO') && path.startsWith('/admin/cuentas'))
+          r === 'ADMIN' ||
+          (r === 'CLIENTE_TICKETERA' && path.startsWith('/admin/entradas')) ||
+          ((r === 'MESERO' || r === 'CAJERO') && path.startsWith('/admin/cuentas'))
         if (!allowed) {
           return NextResponse.redirect(new URL('/login', req.url))
         }

@@ -17,6 +17,7 @@ export default async function Home() {
 
     if (session?.user?.role) {
       if (session.user.role === 'ADMIN')    redirect('/admin')
+      if (session.user.role === 'CLIENTE_TICKETERA') redirect('/admin/entradas')
       if (session.user.role === 'MESERO')   redirect('/mesero')
       if (session.user.role === 'CAJERO')   redirect('/cajero')
       if (session.user.role === 'TAQUILLA') redirect('/taquilla')

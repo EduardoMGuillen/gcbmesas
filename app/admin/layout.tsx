@@ -11,8 +11,8 @@ export default async function AdminLayout({
   const session = await getServerSession(authOptions)
 
   if (!session) redirect('/login')
-  const role = session.user.role as 'ADMIN' | 'MESERO' | 'CAJERO'
-  if (role !== 'ADMIN' && role !== 'MESERO' && role !== 'CAJERO') redirect('/login')
+  const role = session.user.role as 'ADMIN' | 'MESERO' | 'CAJERO' | 'CLIENTE_TICKETERA'
+  if (!['ADMIN', 'MESERO', 'CAJERO', 'CLIENTE_TICKETERA'].includes(role)) redirect('/login')
 
   return <AdminShell userRole={role}>{children}</AdminShell>
 }
