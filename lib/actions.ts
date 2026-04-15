@@ -8,6 +8,7 @@ import { LogAction, OrderPrepStatus, PrepCategoryDestination } from '@prisma/cli
 import { Prisma } from '@prisma/client'
 import { getClientSelfOrderingEnabled, ensureAppSettingsRow, UNCATEGORIZED_PREP_CATEGORY } from './app-settings'
 import { CyberSourceApiError, getCyberSourceApiHostForLogs, getCyberSourceEnvLabel } from './cybersource'
+import { WALK_IN_TABLE_NAME, WALK_IN_TABLE_SHORT_CODE, WALK_IN_TABLE_ZONE } from './walk-in-table'
 import {
   findOnlineSaleLogForEntry,
   perEntryRefundAmount,
@@ -63,6 +64,27 @@ async function generateUniqueTableCode() {
   }
 
   throw new Error('No se pudo generar un código corto único. Intenta nuevamente.')
+}
+
+async function getOrCreateWalkInTableRow() {
+  return prisma.table.upsert({
+    where: { shortCode: WALK_IN_TABLE_SHORT_CODE },
+    update: {
+      name: WALK_IN_TABLE_NAME,
+      zone: WALK_IN_TABLE_ZONE,
+    },
+    create: {
+      name: WALK_IN_TABLE_NAME,
+      zone: WALK_IN_TABLE_ZONE,
+      shortCode: WALK_IN_TABLE_SHORT_CODE,
+    },
+    select: {
+      id: true,
+      name: true,
+      shortCode: true,
+      zone: true,
+    },
+  })
 }
 
 function ensureCashierAccess(role: string) {
@@ -2097,6 +2119,14 @@ export async function getMeseroActiveTables() {
   })
 
   return accounts
+}
+
+export async function getWalkInTable() {
+  const currentUser = await getCurrentUser()
+  if (!['MESERO', 'ADMIN'].includes(currentUser.role)) {
+    throw new Error('Solo meseros o administradores pueden acceder')
+  }
+  return getOrCreateWalkInTableRow()
 }
 
 export async function getTables() {

@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { getTables, getProducts, getTableById, createAccount } from '@/lib/actions'
+import { getTables, getProducts, getTableById, createAccount, getWalkInTable } from '@/lib/actions'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { CustomerOrderView } from '@/components/CustomerOrderView'
@@ -23,8 +23,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
     redirect('/login')
   }
 
-  const tables = await getTables()
-  const products = await getProducts(true)
+  const [tables, products, walkInTable] = await Promise.all([getTables(), getProducts(true), getWalkInTable()])
   const initialTableId = searchParams.tableId || ''
   const isAdmin = session.user.role === 'ADMIN'
 
@@ -111,7 +110,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
             backUrl="/mesero/pedidos"
           />
         ) : (
-          <TableSelector tables={tablesForView} />
+          <TableSelector tables={tablesForView} walkInTableId={walkInTable.id} />
         )}
       </main>
       {!isAdmin && <Footer />}

@@ -3,6 +3,7 @@
 import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount } from '@/lib/utils'
 import Link from 'next/link'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
+import { getTableLabel, isWalkInTable } from '@/lib/walk-in-table'
 
 function pendingCount(orders: { served: boolean; rejected?: boolean | null }[]) {
   return orders.filter((o) => !o.served && o.rejected !== true).length
@@ -73,6 +74,7 @@ export function MesasActivasList({ accounts }: MesasActivasListProps) {
       {accounts.map((account) => {
         const totalConsumed =
           Number(account.initialBalance) - Number(account.currentBalance)
+        const walkIn = isWalkInTable(account.table)
         return (
           <div
             key={account.id}
@@ -80,9 +82,9 @@ export function MesasActivasList({ accounts }: MesasActivasListProps) {
           >
             <div>
               <h3 className="text-lg font-semibold text-white">
-                Mesa {account.table.shortCode} · {account.table.name}
+                {getTableLabel(account.table)}
               </h3>
-              {account.table.zone && (
+              {account.table.zone && !walkIn && (
                 <p className="text-sm text-white/80">Zona: {account.table.zone}</p>
               )}
               {account.clientName && (
@@ -116,7 +118,7 @@ export function MesasActivasList({ accounts }: MesasActivasListProps) {
               href={`/mesero/pedidos?tableId=${account.table.id}`}
               className="shrink-0 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors text-center"
             >
-              Ir a mesa
+              {walkIn ? 'Ir a cuenta' : 'Ir a mesa'}
             </Link>
           </div>
         )

@@ -9,6 +9,7 @@ import {
   type InvoiceSettingsLike,
   type HnInvoiceLine,
 } from '@/lib/invoice-print-hn'
+import { getTableLabel, isWalkInTable } from '@/lib/walk-in-table'
 
 interface CashierAccountsProps {
   invoiceSettings: InvoiceSettingsLike | null
@@ -68,9 +69,10 @@ export function CashierAccounts({
           taxExempt: o.product.isTaxExempt === true,
         }
       })
+      const tableLabel = getTableLabel(account.table)
       const receptorLines = [
-        `Mesa ${account.table.shortCode} · ${account.table.name}`,
-        ...(account.table.zone ? [`Zona: ${account.table.zone}`] : []),
+        tableLabel,
+        ...(account.table.zone && !isWalkInTable(account.table) ? [`Zona: ${account.table.zone}`] : []),
         ...(account.clientName ? [`Cliente: ${account.clientName}`] : []),
         `Mesero: ${account.openedBy?.name || account.openedBy?.username || '—'}`,
       ]
@@ -136,6 +138,7 @@ export function CashierAccounts({
           Number(account.initialBalance) - Number(account.currentBalance)
         const pending = pendingCount(account.orders)
         const isExpanded = expandedIds.has(account.id)
+        const walkIn = isWalkInTable(account.table)
         return (
           <div
             key={account.id}
@@ -163,9 +166,9 @@ export function CashierAccounts({
                   )}
                   <div>
                     <h3 className="text-lg font-semibold text-white">
-                      Mesa {account.table.shortCode} · {account.table.name}
+                      {getTableLabel(account.table)}
                     </h3>
-                    {account.table.zone && (
+                    {account.table.zone && !walkIn && (
                       <p className="text-sm text-white/80">Zona: {account.table.zone}</p>
                     )}
                     <p className="text-sm text-primary-400 font-medium">

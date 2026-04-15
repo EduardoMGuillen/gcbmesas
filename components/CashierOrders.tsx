@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { setOrderServed, rejectOrder } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
+import { getTableLabel, isWalkInTable } from '@/lib/walk-in-table'
 
 interface CashierOrdersProps {
   pendingOrders: Array<{
@@ -113,7 +114,9 @@ export function CashierOrders({
           </p>
         ) : (
           <div className="space-y-4">
-            {filteredPendingOrders.map((order) => (
+            {filteredPendingOrders.map((order) => {
+              const walkIn = isWalkInTable(order.account.table)
+              return (
               <div
                 key={order.id}
                 className="border border-dark-200 rounded-lg p-4 bg-dark-50"
@@ -121,9 +124,8 @@ export function CashierOrders({
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <p className="text-white font-semibold">
-                      Mesa {order.account.table.shortCode} ·{' '}
-                      {order.account.table.name}
-                      {order.account.table.zone && (
+                      {getTableLabel(order.account.table)}
+                      {order.account.table.zone && !walkIn && (
                         <span className="ml-2 text-xs bg-primary-600/20 text-primary-400 px-2 py-1 rounded-full">
                           {order.account.table.zone}
                         </span>
@@ -168,7 +170,8 @@ export function CashierOrders({
                   </button>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -201,9 +204,8 @@ export function CashierOrders({
                     {order.quantity} × {order.product.name}
                   </p>
                   <p className="text-xs text-white/70">
-                    Mesa {order.account.table.shortCode} ·{' '}
-                    {order.account.table.name}
-                    {order.account.table.zone && ` · ${order.account.table.zone}`}
+                    {getTableLabel(order.account.table)}
+                    {order.account.table.zone && !isWalkInTable(order.account.table) && ` · ${order.account.table.zone}`}
                   </p>
                 </div>
                 <div className="text-right">

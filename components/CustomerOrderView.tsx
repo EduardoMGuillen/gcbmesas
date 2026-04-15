@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition } from 'react'
 import { createCustomerOrder, createOrder, closeAccount, addBalanceToAccount, cancelOrderByCustomer, cancelOrderByMesero } from '@/lib/actions'
 import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount, OPEN_ACCOUNT_SENTINEL } from '@/lib/utils'
 import { isInsufficientBalanceError } from '@/lib/billing-errors'
+import { getTableLabel, isWalkInTable, WALK_IN_TABLE_ZONE } from '@/lib/walk-in-table'
 import { useRouter } from 'next/navigation'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import Image from 'next/image'
@@ -99,6 +100,7 @@ export function CustomerOrderView({
   const [insufficientTopUpError, setInsufficientTopUpError] = useState('')
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const isWalkIn = isWalkInTable(table)
   
   // Verificar si hay cuenta abierta (convertir a booleano explícitamente)
   const hasOpenAccount = !!(account && account.id)
@@ -506,12 +508,32 @@ export function CustomerOrderView({
                 className="w-full px-4 py-3 bg-dark-100 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
               <option value="">Selecciona una zona</option>
-              {Array.from(new Set(tables.map(t => t.zone).filter((zone): zone is string => Boolean(zone)))).sort().map((zone) => (
+              {Array.from(
+                new Set(
+                  tables
+                    .map((t) => t.zone)
+                    .filter((zone): zone is string => Boolean(zone) && zone !== WALK_IN_TABLE_ZONE)
+                )
+              ).sort().map((zone) => (
                 <option key={zone} value={zone}>
                   {zone}
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                const walkInTable = tables.find((t) => isWalkInTable(t))
+                if (!walkInTable) return
+                router.push(`${backUrl}?tableId=${walkInTable.id}`)
+                setTimeout(() => router.refresh(), 100)
+              }}
+              className="w-full px-4 py-3 bg-cyan-600/20 border border-cyan-500/40 rounded-lg text-cyan-100 hover:bg-cyan-600/30 transition-colors text-sm font-medium"
+            >
+              Cliente de pie (sin mesa)
+            </button>
           </div>
           {selectedZone && (
             <div>
@@ -646,11 +668,16 @@ export function CustomerOrderView({
 
           <div className="mb-6 flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Mesa: {table.name}</h1>
-              <p className="text-white">
-                Código: <span className="font-semibold">{table.shortCode || table.id.slice(0, 8)}</span>
-              </p>
-              {table.zone && <p className="text-white">Zona: {table.zone}</p>}
+              <h1 className="text-3xl font-bold text-white mb-2">
+                {isWalkIn ? 'Cuenta: Cliente de pie' : `Mesa: ${table.name}`}
+              </h1>
+              {!isWalkIn && (
+                <p className="text-white">
+                  Código: <span className="font-semibold">{table.shortCode || table.id.slice(0, 8)}</span>
+                </p>
+              )}
+              {table.zone && !isWalkIn && <p className="text-white">Zona: {table.zone}</p>}
+              {isWalkIn && <p className="text-cyan-200/90 text-sm">{getTableLabel(table)}</p>}
               {account.clientName && (
                 <p className="text-primary-400 font-medium">Cliente: {account.clientName}</p>
               )}

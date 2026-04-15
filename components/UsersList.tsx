@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { createUser, updateUser, deleteUser, setUserTicketeraEvents } from '@/lib/actions'
 import { formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
 type TicketeraEventOption = { id: string; name: string; date: Date | string; isActive: boolean }
+type UserRole = 'ADMIN' | 'MESERO' | 'CAJERO' | 'TAQUILLA' | 'COCINA' | 'BAR' | 'CLIENTE_TICKETERA'
+type TicketeraFilter = 'ALL' | 'ONLY_TICKETERA' | 'WITH_EVENTS' | 'WITHOUT_EVENTS'
 
 interface UsersListProps {
   initialUsers: any[]
@@ -27,6 +29,28 @@ export function UsersList({ initialUsers, ticketeraEvents }: UsersListProps) {
   const router = useRouter()
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
   const [selectedTicketeraEventIds, setSelectedTicketeraEventIds] = useState<string[]>([])
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState<'ALL' | UserRole>('ALL')
+  const [ticketeraFilter, setTicketeraFilter] = useState<TicketeraFilter>('ALL')
+
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return users.filter((user) => {
+      const matchesSearch =
+        q.length === 0 ||
+        user.username?.toLowerCase().includes(q) ||
+        user.name?.toLowerCase().includes(q)
+      const matchesRole = roleFilter === 'ALL' || user.role === roleFilter
+      const assignmentsCount = (user.ticketeraEventAssignments || []).length
+      const isTicketera = user.role === 'CLIENTE_TICKETERA'
+      const matchesTicketera =
+        ticketeraFilter === 'ALL' ||
+        (ticketeraFilter === 'ONLY_TICKETERA' && isTicketera) ||
+        (ticketeraFilter === 'WITH_EVENTS' && isTicketera && assignmentsCount > 0) ||
+        (ticketeraFilter === 'WITHOUT_EVENTS' && isTicketera && assignmentsCount === 0)
+      return matchesSearch && matchesRole && matchesTicketera
+    })
+  }, [users, search, roleFilter, ticketeraFilter])
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -159,14 +183,75 @@ export function UsersList({ initialUsers, ticketeraEvents }: UsersListProps) {
         </div>
       )}
 
+      <div className="mb-6 bg-dark-100 border border-dark-200 rounded-xl p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="md:col-span-2">
+            <label className="block text-xs text-dark-400 mb-1">Buscar usuario</label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Usuario o nombre"
+              className="w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Rol</label>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as 'ALL' | UserRole)}
+              className="w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+            >
+              <option value="ALL">Todos</option>
+              <option value="ADMIN">Administrador</option>
+              <option value="MESERO">Mesero</option>
+              <option value="CAJERO">Cajero</option>
+              <option value="TAQUILLA">Taquilla</option>
+              <option value="COCINA">Cocina</option>
+              <option value="BAR">Bar</option>
+              <option value="CLIENTE_TICKETERA">Cliente ticketera</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Filtro ticketera</label>
+            <select
+              value={ticketeraFilter}
+              onChange={(e) => setTicketeraFilter(e.target.value as TicketeraFilter)}
+              className="w-full px-3 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+            >
+              <option value="ALL">Todos</option>
+              <option value="ONLY_TICKETERA">Solo clientes ticketera</option>
+              <option value="WITH_EVENTS">Ticketera con eventos</option>
+              <option value="WITHOUT_EVENTS">Ticketera sin eventos</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex items-center justify-between mt-3 text-xs text-dark-400">
+          <span>
+            Mostrando {filteredUsers.length} de {users.length} usuarios
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setRoleFilter('ALL')
+              setTicketeraFilter('ALL')
+            }}
+            className="text-primary-400 hover:text-primary-300"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+
       {/* Vista móvil - Cards */}
       <div className="block md:hidden space-y-3">
-        {users.length === 0 ? (
+        {filteredUsers.length === 0 ? (
           <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center text-dark-400">
-            No hay usuarios registrados
+            No hay usuarios que coincidan con los filtros
           </div>
         ) : (
-          users.map((user) => (
+          filteredUsers.map((user) => (
           <div
             key={user.id}
             className="bg-dark-100 border border-dark-200 rounded-xl p-4 space-y-3"
@@ -255,14 +340,14 @@ export function UsersList({ initialUsers, ticketeraEvents }: UsersListProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-dark-200">
-            {users.length === 0 ? (
+            {filteredUsers.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-6 py-8 text-center text-dark-400">
-                  No hay usuarios registrados
+                  No hay usuarios que coincidan con los filtros
                 </td>
               </tr>
             ) : (
-              users.map((user) => (
+              filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-dark-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-white">
