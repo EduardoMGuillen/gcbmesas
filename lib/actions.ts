@@ -1620,7 +1620,7 @@ export async function createAndCloseFreeInvoiceAccount(data: {
   const uniqueProductIds = Array.from(new Set(rawLines.map((l) => l.productId)))
   const products = await prisma.product.findMany({
     where: { id: { in: uniqueProductIds }, isActive: true },
-    select: { id: true, name: true, price: true },
+    select: { id: true, name: true, price: true, requiresPrep: true },
   })
   const byId = new Map(products.map((p) => [p.id, p]))
 
@@ -1635,6 +1635,7 @@ export async function createAndCloseFreeInvoiceAccount(data: {
         unitPrice: Number(p.price),
         linePrice: Number(p.price) * quantity,
         productName: p.name,
+        requiresPrep: p.requiresPrep === true,
       }
     })
     .filter((x): x is NonNullable<typeof x> => x != null)
@@ -1672,7 +1673,7 @@ export async function createAndCloseFreeInvoiceAccount(data: {
         quantity: l.quantity,
         served: true,
         rejected: false,
-        prepStatus: OrderPrepStatus.NONE,
+        prepStatus: l.requiresPrep ? OrderPrepStatus.QUEUED : OrderPrepStatus.NONE,
         servedByUserId: u.id,
       })),
     })
@@ -1716,6 +1717,8 @@ export async function createAndCloseFreeInvoiceAccount(data: {
 
   revalidatePath('/cajero')
   revalidatePath('/admin/cuentas')
+  revalidatePath('/cocina')
+  revalidatePath('/bar')
 
   return {
     ok: true as const,
