@@ -569,10 +569,12 @@ export function CustomerOrderView({
       )}
 
       {/* Formulario para crear cuenta si es mesero y no hay cuenta */}
-      {isMesero && showCreateAccount && !hasOpenAccount && (
+      {isMesero && showCreateAccount && (!hasOpenAccount || isWalkIn) && (
         <div className="mb-6 bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4">
           <p className="text-yellow-400 mb-4">
-            Esta mesa no tiene cuenta abierta. Crea una cuenta primero.
+            {isWalkIn
+              ? 'Crear una nueva cuenta para cliente de pie.'
+              : 'Esta mesa no tiene cuenta abierta. Crea una cuenta primero.'}
           </p>
           <form onSubmit={handleCreateAccount} className="space-y-4">
             <div>
@@ -683,6 +685,21 @@ export function CustomerOrderView({
               )}
               {account.openedBy && (
                 <p className="text-white/90">Mesero: {account.openedBy.name || account.openedBy.username}</p>
+              )}
+              {isMesero && isWalkIn && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateAccount(true)
+                    setInitialBalance('')
+                    setClientName('')
+                    setCuentaAbierta(false)
+                    setError('')
+                  }}
+                  className="mt-3 px-3 py-2 rounded-lg bg-cyan-600/30 border border-cyan-500/40 text-cyan-100 text-sm hover:bg-cyan-600/40 transition-colors"
+                >
+                  Crear otra cuenta cliente de pie
+                </button>
               )}
             </div>
             {!isMesero && (
