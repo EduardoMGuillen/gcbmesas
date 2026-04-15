@@ -1169,6 +1169,7 @@ const prepQueueOrderSelect = {
     select: {
       id: true,
       clientName: true,
+      openedBy: { select: { username: true, name: true } },
       table: { select: { name: true, shortCode: true, zone: true } },
     },
   },
