@@ -33,10 +33,7 @@ export function Navbar() {
     { href: '/admin/entradas', label: 'Entradas', match: pathname?.startsWith('/admin/entradas') },
     { href: '/taquilla', label: 'Taquilla', match: pathname?.startsWith('/taquilla') },
     { href: '/cajero', label: 'Cajero', match: pathname === '/cajero' },
-    { href: '/cajero/marcajes', label: 'Marcaje cajero', match: pathname?.startsWith('/cajero/marcajes') },
     { href: '/mesero', label: 'Mesero', match: pathname === '/mesero' },
-    { href: '/mesero/mesas-activas', label: 'Mesas activas', match: pathname?.startsWith('/mesero/mesas-activas') },
-    { href: '/mesero/marcajes', label: 'Marcaje mesero', match: pathname?.startsWith('/mesero/marcajes') },
   ]
 
   const meseroLinks = [
