@@ -7,13 +7,15 @@ import { closeAccount } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { getTableLabel, isWalkInTable } from '@/lib/walk-in-table'
+import { buildHnInvoiceHtml, printHnInvoice, type InvoiceSettingsLike, type HnInvoiceLine } from '@/lib/invoice-print-hn'
 
 interface AccountsListProps {
   initialAccounts: any[]
   userRole?: string
+  invoiceSettings: InvoiceSettingsLike | null
 }
 
-export function AccountsList({ initialAccounts, userRole }: AccountsListProps) {
+export function AccountsList({ initialAccounts, userRole, invoiceSettings }: AccountsListProps) {
   const [accounts, setAccounts] = useState(initialAccounts)
   const [selectedZone, setSelectedZone] = useState<string>('')
   const [selectedStatus, setSelectedStatus] = useState<string>('')
@@ -122,6 +124,50 @@ export function AccountsList({ initialAccounts, userRole }: AccountsListProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handlePrintInvoice = (account: any) => {
+    if (typeof window === 'undefined') return
+    const lines: HnInvoiceLine[] = (account.orders || [])
+      .filter((o: any) => o.rejected !== true)
+      .map((o: any) => {
+        const qty = Math.max(1, Number(o.quantity) || 1)
+        const lineTotal = Number(o.price) || 0
+        const unitPrice = qty > 0 ? lineTotal / qty : lineTotal
+        return {
+          description: o.product?.name || 'Producto',
+          quantity: qty,
+          unitPrice,
+          lineTotal,
+          taxExempt: o.product?.isTaxExempt === true,
+        }
+      })
+
+    if (lines.length === 0) {
+      alert('Esta cuenta no tiene líneas válidas para facturar.')
+      return
+    }
+
+    const tableLabel = getTableLabel(account.table)
+    const ref = `CTA-${String(account.id).slice(-10).toUpperCase()}`
+    const receptorLines = [
+      tableLabel,
+      ...(account.table?.zone && !isWalkInTable(account.table) ? [`Zona: ${account.table.zone}`] : []),
+      ...(account.clientName ? [`Cliente: ${account.clientName}`] : []),
+      `Mesero: ${account.openedBy?.name || account.openedBy?.username || '—'}`,
+      `Estado cuenta: ${account.status === 'OPEN' ? 'Abierta' : 'Cerrada'}`,
+    ]
+
+    const html = buildHnInvoiceHtml({
+      logoUrl: `${window.location.origin.replace(/\/$/, '')}/LogoCasaBlanca.png`,
+      documentTitle: 'Factura',
+      ref,
+      settings: invoiceSettings,
+      receptorLines,
+      lines,
+      footerNote: 'Factura generada desde Cuentas.',
+    })
+    printHnInvoice(html)
   }
 
   return (
@@ -318,6 +364,13 @@ export function AccountsList({ initialAccounts, userRole }: AccountsListProps) {
               </div>
               <div className="flex gap-2">
                 <button
+                  onClick={() => handlePrintInvoice(account)}
+                  disabled={loading}
+                  className="bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
+                >
+                  Imprimir Factura
+                </button>
+                <button
                   onClick={() => handleExportExcel(account.id)}
                   disabled={loading}
                   className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
@@ -349,6 +402,13 @@ export function AccountsList({ initialAccounts, userRole }: AccountsListProps) {
                 Pedidos - {getTableLabel(selectedAccount.table)}
               </h2>
               <div className="flex gap-2">
+                <button
+                  onClick={() => handlePrintInvoice(selectedAccount)}
+                  disabled={loading}
+                  className="bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
+                >
+                  Imprimir Factura
+                </button>
                 <button
                   onClick={() => handleExportExcel(selectedAccount.id)}
                   disabled={loading}
