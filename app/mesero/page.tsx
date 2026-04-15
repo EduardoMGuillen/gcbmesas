@@ -6,7 +6,7 @@ import { Footer } from '@/components/Footer'
 import { CleanUrlParams } from '@/components/CleanUrlParams'
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { closeOldAccounts } from '@/lib/actions'
+import { closeOldAccounts, getWalkInTable } from '@/lib/actions'
 import { PushSubscriptionButton } from '@/components/PushSubscriptionButton'
 
 export default async function MeseroPage() {
@@ -19,6 +19,7 @@ export default async function MeseroPage() {
   // Cerrar cuentas antiguas en background (no bloquea)
   closeOldAccounts().catch((err) => console.error('[MeseroPage] Error al cerrar cuentas antiguas:', err))
 
+  const walkInTable = await getWalkInTable()
   const isAdmin = session.user.role === 'ADMIN'
 
   return (
@@ -95,6 +96,33 @@ export default async function MeseroPage() {
             </h2>
             <p className="text-xs sm:text-sm text-dark-400">
               Agrega productos a una cuenta manualmente
+            </p>
+          </Link>
+
+          <Link
+            href={`/mesero/pedidos?tableId=${walkInTable.id}`}
+            className="bg-dark-100 border border-cyan-500/40 rounded-xl p-4 sm:p-6 hover:border-cyan-400 active:border-cyan-400 transition-all hover:shadow-lg group touch-manipulation"
+          >
+            <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-cyan-600/20 rounded-lg mb-3 sm:mb-4 group-hover:bg-cyan-600/30 transition-colors">
+              <svg
+                className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 20h5V4H2v16h5m10 0v-6a3 3 0 00-3-3H10a3 3 0 00-3 3v6m10 0H7"
+                />
+              </svg>
+            </div>
+            <h2 className="text-lg sm:text-xl font-semibold text-white mb-1 sm:mb-2">
+              Cuenta sin mesa
+            </h2>
+            <p className="text-xs sm:text-sm text-dark-400">
+              Abre rápido una cuenta para cliente de pie
             </p>
           </Link>
 

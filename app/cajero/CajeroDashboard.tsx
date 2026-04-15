@@ -5,8 +5,15 @@ import { useRouter } from 'next/navigation'
 import { CashierOrders } from '@/components/CashierOrders'
 import { CashierAccounts } from '@/components/CashierAccounts'
 import { CashierFreeInvoiceModal } from '@/components/CashierFreeInvoiceModal'
-import { setCajeroMeseroWatches } from '@/lib/actions'
-import type { InvoiceSettingsLike } from '@/lib/invoice-print-hn'
+import { closeAccount, setCajeroMeseroWatches } from '@/lib/actions'
+import {
+  buildHnInvoiceHtml,
+  printHnInvoice,
+  type HnInvoiceLine,
+  type InvoiceSettingsLike,
+} from '@/lib/invoice-print-hn'
+import { formatCurrency } from '@/lib/utils'
+import { getTableLabel, isWalkInTable } from '@/lib/walk-in-table'
 
 type ActiveMesero = {
   id: string
@@ -154,6 +161,82 @@ export function CajeroDashboard({
   const allSelected = activeMeseros.length > 0 && selectedMeseroIds.size === activeMeseros.length
   const noneSelected = selectedMeseroIds.size === 0
   const [freeInvoiceOpen, setFreeInvoiceOpen] = useState(false)
+  const [printingWalkInId, setPrintingWalkInId] = useState<string | null>(null)
+  const [walkInQuery, setWalkInQuery] = useState('')
+  const walkInAccounts = accounts.filter((account) => isWalkInTable(account.table))
+  const regularAccounts = accounts.filter((account) => !isWalkInTable(account.table))
+  const normalizedWalkInQuery = walkInQuery.trim().toLowerCase()
+  const filteredWalkInAccounts = walkInAccounts.filter((account) => {
+    if (!normalizedWalkInQuery) return true
+    const orderKeywords = account.orders
+      .map((order) => order.product?.name || '')
+      .join(' ')
+      .toLowerCase()
+    const searchable = [
+      account.id,
+      account.clientName || '',
+      account.openedBy?.name || '',
+      account.openedBy?.username || '',
+      getTableLabel(account.table),
+      orderKeywords,
+    ]
+      .join(' ')
+      .toLowerCase()
+    return searchable.includes(normalizedWalkInQuery)
+  })
+
+  const handlePrintWalkIn = useCallback(
+    async (account: AccountItem) => {
+      if (typeof window === 'undefined') return
+      try {
+        setPrintingWalkInId(account.id)
+        const lines: HnInvoiceLine[] = (account.orders || [])
+          .filter((order) => order.rejected !== true)
+          .map((order) => {
+            const quantity = Math.max(1, Number(order.quantity) || 1)
+            const lineTotal = Number(order.price) || 0
+            const unitPrice = quantity > 0 ? lineTotal / quantity : lineTotal
+            return {
+              description: order.product?.name || 'Producto',
+              quantity,
+              unitPrice,
+              lineTotal,
+              taxExempt: order.product?.isTaxExempt === true,
+            }
+          })
+
+        if (lines.length === 0) {
+          throw new Error('Esta cuenta sin mesa no tiene líneas válidas para imprimir.')
+        }
+
+        const ref = `PIE-${String(account.id).slice(-10).toUpperCase()}`
+        const receptorLines = [
+          getTableLabel(account.table),
+          ...(account.clientName ? [`Cliente: ${account.clientName}`] : []),
+          `Mesero: ${account.openedBy?.name || account.openedBy?.username || '—'}`,
+        ]
+        const html = buildHnInvoiceHtml({
+          logoUrl: `${window.location.origin.replace(/\/$/, '')}/LogoCasaBlanca.png`,
+          documentTitle: 'Factura',
+          ref,
+          settings: invoiceSettings,
+          receptorLines,
+          lines,
+          footerNote: 'Factura generada desde Cuentas sin mesa.',
+        })
+
+        printHnInvoice(html)
+        await closeAccount(account.id)
+        router.refresh()
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'No se pudo imprimir esta cuenta sin mesa.'
+        alert(message)
+      } finally {
+        setPrintingWalkInId(null)
+      }
+    },
+    [invoiceSettings, router]
+  )
 
   return (
     <>
@@ -221,6 +304,62 @@ export function CajeroDashboard({
         />
       </section>
 
+      <section className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+          <div>
+            <h2 className="text-xl font-semibold text-white">Cuentas sin mesa</h2>
+            <span className="text-xs text-white/55">Pendientes por imprimir: {walkInAccounts.length}</span>
+          </div>
+          <input
+            type="text"
+            value={walkInQuery}
+            onChange={(e) => setWalkInQuery(e.target.value)}
+            placeholder="Buscar por cliente, mesero, producto o ID"
+            className="w-full md:w-96 bg-dark-50 border border-dark-200 rounded-lg px-3 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+          />
+        </div>
+        {filteredWalkInAccounts.length === 0 ? (
+          <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 text-sm text-white/60">
+            {walkInAccounts.length === 0
+              ? 'No hay cuentas sin mesa pendientes.'
+              : 'No hay resultados para esta búsqueda.'}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredWalkInAccounts.slice(0, 20).map((account) => (
+              <div
+                key={account.id}
+                className="bg-dark-100 border border-dark-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+              >
+                <div>
+                  <p className="text-white font-medium">{getTableLabel(account.table)}</p>
+                  <p className="text-sm text-white/70">
+                    {account.clientName || 'Cliente sin nombre'} ·{' '}
+                    {account.openedBy?.name || account.openedBy?.username || 'Mesero no asignado'}
+                  </p>
+                  <p className="text-xs text-white/50">
+                    {new Date(account.createdAt).toLocaleString('es-HN')} · {account.orders.length} líneas
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-white font-semibold">
+                    Total: {formatCurrency(Number(account.currentBalance) || 0)}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handlePrintWalkIn(account)}
+                    disabled={printingWalkInId === account.id}
+                    className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {printingWalkInId === account.id ? 'Imprimiendo...' : 'Imprimir y cerrar'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       <section>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h2 className="text-xl font-semibold text-white">Cuentas abiertas</h2>
@@ -241,7 +380,7 @@ export function CajeroDashboard({
           </button>
         </div>
         <CashierAccounts
-          accounts={accounts}
+          accounts={regularAccounts}
           selectedMeseroIds={selectedMeseroIds}
           allMeseroIds={allMeseroIds}
           noneSelected={noneSelected}

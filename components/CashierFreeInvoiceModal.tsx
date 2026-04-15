@@ -13,7 +13,7 @@ type ProductRow = {
   isTaxExempt: boolean
 }
 
-type Line = { productId: string; quantity: number }
+type Line = { productId: string; quantity: number; categoryKey: string }
 
 function IconReceipt(props: SVGProps<SVGSVGElement>) {
   return (
@@ -66,6 +66,7 @@ export function CashierFreeInvoiceModal({
   const [meseroId, setMeseroId] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [printing, setPrinting] = useState(false)
+  const [newLineCategory, setNewLineCategory] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -87,6 +88,7 @@ export function CashierFreeInvoiceModal({
       setMeseroId('')
       setSubmitError('')
       setPrinting(false)
+      setNewLineCategory('')
     }
   }, [open])
 
@@ -97,15 +99,26 @@ export function CashierFreeInvoiceModal({
 
   useEffect(() => {
     if (catalog.length === 0) return
+    const categoryKeys = Array.from(
+      new Set(catalog.map((p) => p.category?.trim() || 'Sin categoría'))
+    ).sort((a, b) => a.localeCompare(b, 'es'))
+    if (!newLineCategory && categoryKeys.length > 0) {
+      setNewLineCategory(categoryKeys[0])
+    }
+
     setLines((prev) =>
       prev.map((l) => {
-        if (!l.productId || !catalog.some((c) => c.id === l.productId)) {
-          return { ...l, productId: catalog[0].id }
+        const categoryKey = l.categoryKey || categoryKeys[0] || 'Sin categoría'
+        const productInCategory = catalog.filter((c) => (c.category?.trim() || 'Sin categoría') === categoryKey)
+        const stillExists = catalog.some((c) => c.id === l.productId)
+        const stillInCategory = productInCategory.some((c) => c.id === l.productId)
+        if (!l.productId || !stillExists || !stillInCategory) {
+          return { ...l, categoryKey, productId: productInCategory[0]?.id || catalog[0].id }
         }
-        return l
+        return { ...l, categoryKey }
       })
     )
-  }, [catalog])
+  }, [catalog, newLineCategory])
 
   useEffect(() => {
     if (!open) return
@@ -127,9 +140,11 @@ export function CashierFreeInvoiceModal({
   }, [catalog])
 
   const addLine = useCallback(() => {
-    const first = catalog[0]?.id || ''
-    setLines((prev) => [...prev, { productId: first, quantity: 1 }])
-  }, [catalog])
+    const categoryKey = newLineCategory || 'Sin categoría'
+    const products = catalog.filter((p) => (p.category?.trim() || 'Sin categoría') === categoryKey)
+    const first = products[0]?.id || catalog[0]?.id || ''
+    setLines((prev) => [...prev, { productId: first, quantity: 1, categoryKey }])
+  }, [catalog, newLineCategory])
 
   const updateLine = (i: number, patch: Partial<Line>) => {
     setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)))
@@ -337,6 +352,22 @@ export function CashierFreeInvoiceModal({
               </div>
             ) : lines.length === 0 ? (
               <div className="rounded-xl border border-dashed border-dark-200 bg-dark-50/30 py-10 px-4 text-center">
+                {catalogByCategory.length > 0 && (
+                  <div className="mb-4 text-left max-w-sm mx-auto">
+                    <label className="block text-xs text-dark-300 mb-1">Categoría para nuevo artículo</label>
+                    <select
+                      className="w-full rounded-xl bg-dark-100 border border-dark-200 px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      value={newLineCategory}
+                      onChange={(e) => setNewLineCategory(e.target.value)}
+                    >
+                      {catalogByCategory.map(([cat]) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <p className="text-sm text-white/60 mb-4">Añade al menos un artículo para imprimir la factura.</p>
                 <button
                   type="button"
@@ -351,6 +382,9 @@ export function CashierFreeInvoiceModal({
                 {lines.map((ln, i) => {
                   const d = lineDetails[i]
                   const p = d?.product
+                  const productsForCategory = catalog.filter(
+                    (prod) => (prod.category?.trim() || 'Sin categoría') === ln.categoryKey
+                  )
                   return (
                     <li
                       key={i}
@@ -370,7 +404,34 @@ export function CashierFreeInvoiceModal({
                             <IconTrash className="h-4 w-4" />
                           </button>
                         </div>
-                        <div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] text-dark-300 mb-1" htmlFor={`free-inv-cat-${i}`}>
+                              Categoría
+                            </label>
+                            <select
+                              id={`free-inv-cat-${i}`}
+                              className="w-full rounded-xl bg-dark-100 border border-dark-200 px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                              value={ln.categoryKey}
+                              onChange={(e) => {
+                                const nextCategory = e.target.value
+                                const inCategory = catalog.filter(
+                                  (prod) => (prod.category?.trim() || 'Sin categoría') === nextCategory
+                                )
+                                updateLine(i, {
+                                  categoryKey: nextCategory,
+                                  productId: inCategory[0]?.id || '',
+                                })
+                              }}
+                            >
+                              {catalogByCategory.map(([cat]) => (
+                                <option key={cat} value={cat}>
+                                  {cat}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
                           <label className="sr-only" htmlFor={`free-inv-prod-${i}`}>
                             Producto
                           </label>
@@ -380,17 +441,14 @@ export function CashierFreeInvoiceModal({
                             value={ln.productId}
                             onChange={(e) => updateLine(i, { productId: e.target.value })}
                           >
-                            {catalogByCategory.map(([cat, products]) => (
-                              <optgroup key={cat} label={cat}>
-                                {products.map((prod) => (
-                                  <option key={prod.id} value={prod.id}>
-                                    {prod.name} — {formatCurrency(Number(prod.price))}
-                                    {prod.isTaxExempt ? ' (ISV exento)' : ''}
-                                  </option>
-                                ))}
-                              </optgroup>
+                            {productsForCategory.map((prod) => (
+                              <option key={prod.id} value={prod.id}>
+                                {prod.name} — {formatCurrency(Number(prod.price))}
+                                {prod.isTaxExempt ? ' (ISV exento)' : ''}
+                              </option>
                             ))}
                           </select>
+                          </div>
                           {p?.isTaxExempt && (
                             <p className="text-[11px] text-emerald-400/90 mt-1.5">Este ítem va exento de ISV en la impresión.</p>
                           )}
@@ -455,11 +513,24 @@ export function CashierFreeInvoiceModal({
               <p className="text-2xl font-bold text-white tabular-nums tracking-tight">{formatCurrency(grandTotal)}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:justify-end">
+              {catalogByCategory.length > 0 && (
+                <select
+                  className="order-3 sm:order-1 px-3 py-2.5 rounded-xl border border-dark-200 bg-dark-50 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  value={newLineCategory}
+                  onChange={(e) => setNewLineCategory(e.target.value)}
+                >
+                  {catalogByCategory.map(([cat]) => (
+                    <option key={cat} value={cat}>
+                      Nueva línea: {cat}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 type="button"
                 onClick={addLine}
                 disabled={pending || catalog.length === 0}
-                className="order-2 sm:order-1 px-4 py-2.5 rounded-xl border border-dark-200 bg-dark-50 text-white text-sm font-medium hover:bg-dark-200 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                className="order-2 sm:order-2 px-4 py-2.5 rounded-xl border border-dark-200 bg-dark-50 text-white text-sm font-medium hover:bg-dark-200 transition-colors disabled:opacity-40 disabled:pointer-events-none"
               >
                 + Añadir artículo
               </button>
@@ -467,7 +538,7 @@ export function CashierFreeInvoiceModal({
                 type="button"
                 onClick={print}
                 disabled={validLinesCount === 0 || meseros.length === 0 || printing}
-                className="order-1 sm:order-2 px-5 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-500 shadow-lg shadow-primary-900/20 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                className="order-1 sm:order-3 px-5 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-500 shadow-lg shadow-primary-900/20 transition-colors disabled:opacity-40 disabled:pointer-events-none"
               >
                 {printing ? 'Generando…' : 'Imprimir factura'}
               </button>
