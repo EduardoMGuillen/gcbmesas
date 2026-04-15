@@ -48,10 +48,10 @@ export function TableSelector({ tables, walkInTableId }: TableSelectorProps) {
         </p>
         <button
           type="button"
-          onClick={() => router.push(`/mesero/pedidos?tableId=${walkInTableId}`)}
+          onClick={() => router.push(`/mesero/pedidos?tableId=${walkInTableId}&newWalkIn=1`)}
           className="mt-3 w-full sm:w-auto px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold transition-colors"
         >
-          Crear cuenta cliente de pie
+          Crear cuenta sin mesa
         </button>
       </div>
 

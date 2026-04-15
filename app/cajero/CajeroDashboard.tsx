@@ -238,6 +238,14 @@ export function CajeroDashboard({
     [invoiceSettings, router]
   )
 
+  const getWalkInDisplayTitle = useCallback((account: AccountItem) => {
+    const client = account.clientName?.trim()
+    if (client) return client
+    const waiter = account.openedBy?.name || account.openedBy?.username || 'Sin mesero'
+    const shortId = String(account.id).slice(-6).toUpperCase()
+    return `${waiter} - Cuenta #${shortId}`
+  }, [])
+
   return (
     <>
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 mb-6">
@@ -332,9 +340,9 @@ export function CajeroDashboard({
                 className="bg-dark-100 border border-dark-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
               >
                 <div>
-                  <p className="text-white font-medium">{getTableLabel(account.table)}</p>
+                  <p className="text-white font-medium">{getWalkInDisplayTitle(account)}</p>
                   <p className="text-sm text-white/70">
-                    {account.clientName || 'Cliente sin nombre'} ·{' '}
+                    {getTableLabel(account.table)} ·{' '}
                     {account.openedBy?.name || account.openedBy?.username || 'Mesero no asignado'}
                   </p>
                   <p className="text-xs text-white/50">
