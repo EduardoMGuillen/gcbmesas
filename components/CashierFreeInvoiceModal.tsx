@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition, useMemo, useCallback, type SVGProps } from 'react'
-import { getProductsForCashierInvoice } from '@/lib/actions'
+import { createAndCloseFreeInvoiceAccount, getProductsForCashierInvoice } from '@/lib/actions'
 import { formatCurrency } from '@/lib/utils'
 import { buildHnInvoiceHtml, printHnInvoice, type InvoiceSettingsLike, type HnInvoiceLine } from '@/lib/invoice-print-hn'
 
@@ -51,16 +51,21 @@ export function CashierFreeInvoiceModal({
   open,
   onClose,
   invoiceSettings,
+  meseros,
 }: {
   open: boolean
   onClose: () => void
   invoiceSettings: InvoiceSettingsLike | null
+  meseros: Array<{ id: string; name: string | null; username: string }>
 }) {
   const [pending, start] = useTransition()
   const [catalog, setCatalog] = useState<ProductRow[]>([])
   const [lines, setLines] = useState<Line[]>([])
   const [receptorName, setReceptorName] = useState('')
   const [receptorRtn, setReceptorRtn] = useState('')
+  const [meseroId, setMeseroId] = useState('')
+  const [submitError, setSubmitError] = useState('')
+  const [printing, setPrinting] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -79,8 +84,16 @@ export function CashierFreeInvoiceModal({
       setLines([])
       setReceptorName('')
       setReceptorRtn('')
+      setMeseroId('')
+      setSubmitError('')
+      setPrinting(false)
     }
   }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    if (!meseroId && meseros.length > 0) setMeseroId(meseros[0].id)
+  }, [open, meseroId, meseros])
 
   useEffect(() => {
     if (catalog.length === 0) return
@@ -140,8 +153,13 @@ export function CashierFreeInvoiceModal({
     [lineDetails]
   )
 
-  const print = () => {
+  const print = async () => {
     if (typeof window === 'undefined') return
+    setSubmitError('')
+    if (!meseroId) {
+      setSubmitError('Selecciona un mesero para registrar la cuenta sin mesa.')
+      return
+    }
     const origin = window.location.origin
     const hnLines: HnInvoiceLine[] = []
     for (const ln of lines) {
@@ -157,22 +175,43 @@ export function CashierFreeInvoiceModal({
         taxExempt: p.isTaxExempt === true,
       })
     }
-    if (hnLines.length === 0) return
+    if (hnLines.length === 0) {
+      setSubmitError('Agrega al menos un artículo válido para imprimir.')
+      return
+    }
+    setPrinting(true)
     const ref = `REF-${Date.now().toString(36).toUpperCase()}`
+    const mesero = meseros.find((m) => m.id === meseroId)
     const receptor: string[] = ['Factura mostrador / venta directa']
     if (receptorName.trim()) receptor.push(`Cliente: ${receptorName.trim()}`)
     if (receptorRtn.trim()) receptor.push(`RTN cliente: ${receptorRtn.trim()}`)
+    if (mesero) receptor.push(`Mesero asignado: ${mesero.name || mesero.username}`)
 
-    const html = buildHnInvoiceHtml({
-      logoUrl: `${origin}/LogoCasaBlanca.png`,
-      documentTitle: 'Factura',
-      ref,
-      settings: invoiceSettings,
-      receptorLines: receptor,
-      lines: hnLines,
-      footerNote: 'No afecta saldo de mesa. Comprobante interno.',
-    })
-    printHnInvoice(html)
+    try {
+      await createAndCloseFreeInvoiceAccount({
+        meseroId,
+        receptorName: receptorName.trim() || null,
+        receptorRtn: receptorRtn.trim() || null,
+        lines: lines
+          .filter((ln) => ln.productId && ln.quantity >= 1)
+          .map((ln) => ({ productId: ln.productId, quantity: ln.quantity })),
+      })
+      const html = buildHnInvoiceHtml({
+        logoUrl: `${origin}/LogoCasaBlanca.png`,
+        documentTitle: 'Factura',
+        ref,
+        settings: invoiceSettings,
+        receptorLines: receptor,
+        lines: hnLines,
+        footerNote: 'Factura libre registrada como cuenta sin mesa cerrada automáticamente.',
+      })
+      printHnInvoice(html)
+      onClose()
+    } catch (error: any) {
+      setSubmitError(error?.message || 'No se pudo crear la factura libre.')
+    } finally {
+      setPrinting(false)
+    }
   }
 
   if (!open) return null
@@ -204,7 +243,7 @@ export function CashierFreeInvoiceModal({
                 Factura libre
               </h2>
               <p className="text-sm text-white/55 mt-0.5 leading-snug">
-                Mostrador: arma el detalle e imprime. No abre cuenta ni registra consumo en mesas.
+                Mostrador: arma el detalle e imprime en formato ticket. Se crea y cierra una cuenta sin mesa.
               </p>
             </div>
             <button
@@ -221,12 +260,34 @@ export function CashierFreeInvoiceModal({
         <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-5">
           <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5">
             <p className="text-xs text-amber-200/90 leading-relaxed">
-              <span className="font-semibold text-amber-100/95">Solo comprobante impreso.</span> Úsala para ventas en
-              mostrador que no pasan por una mesa abierta en el sistema.
+              <span className="font-semibold text-amber-100/95">Requiere mesero asignado.</span> Esta factura crea una
+              cuenta de "Cliente de pie" y la cierra automáticamente para mantener trazabilidad en Cuentas.
             </p>
           </div>
 
           <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-white/40 mb-2">Datos de registro</p>
+            <div className="mb-3">
+              <label htmlFor="free-inv-mesero" className="block text-xs text-dark-300 mb-1">
+                Mesero asignado <span className="text-red-300">*</span>
+              </label>
+              <select
+                id="free-inv-mesero"
+                className="w-full rounded-xl bg-dark-50 border border-dark-200 px-3.5 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/40"
+                value={meseroId}
+                onChange={(e) => setMeseroId(e.target.value)}
+              >
+                {meseros.length === 0 ? (
+                  <option value="">No hay meseros disponibles</option>
+                ) : (
+                  meseros.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name || m.username}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
             <p className="text-xs font-medium uppercase tracking-wider text-white/40 mb-2">Datos en factura (opcional)</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -383,6 +444,11 @@ export function CashierFreeInvoiceModal({
         </div>
 
         <div className="shrink-0 border-t border-dark-200 bg-dark-100/95 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] space-y-3">
+          {submitError && (
+            <div className="rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+              {submitError}
+            </div>
+          )}
           <div className="flex items-end justify-between gap-3">
             <div>
               <p className="text-xs text-white/45">Total a imprimir</p>
@@ -400,10 +466,10 @@ export function CashierFreeInvoiceModal({
               <button
                 type="button"
                 onClick={print}
-                disabled={validLinesCount === 0}
+                disabled={validLinesCount === 0 || meseros.length === 0 || printing}
                 className="order-1 sm:order-2 px-5 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-500 shadow-lg shadow-primary-900/20 transition-colors disabled:opacity-40 disabled:pointer-events-none"
               >
-                Imprimir factura
+                {printing ? 'Generando…' : 'Imprimir factura'}
               </button>
             </div>
           </div>

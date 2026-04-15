@@ -148,19 +148,25 @@ export function buildHnInvoiceHtml(opts: {
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"/><title>${escapeHtml(opts.documentTitle)}</title>
 <style>
-  body{font-family:Georgia,serif;color:#111;margin:0;padding:20px;max-width:800px;margin:0 auto;background:#fff}
-  .hdr{display:flex;justify-content:space-between;gap:16px;border-bottom:2px solid #0f172a;padding-bottom:12px;margin-bottom:12px}
-  .hdr img{width:96px;height:auto}
-  .emisor{font-size:12px;line-height:1.5}
-  h1{font-size:18px;margin:8px 0;text-transform:uppercase;letter-spacing:.04em}
-  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
-  th{background:#f1f5f9;padding:8px;border:1px solid #94a3b8;text-align:left}
-  .tot{font-size:13px;margin-top:12px;max-width:320px;margin-left:auto}
-  .tot div{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #e2e8f0}
-  .tot .b{font-weight:700;font-size:14px;border:none;margin-top:6px}
-  .cai{font-size:11px;white-space:pre-wrap;margin-top:14px;color:#334155}
-  .pie{font-size:10px;color:#64748b;margin-top:16px;text-align:center;border-top:1px dashed #94a3b8;padding-top:8px}
-  @media print{body{padding:12px}}
+  @page{size:80mm auto;margin:2mm}
+  *{box-sizing:border-box}
+  body{font-family:"Segoe UI",Arial,sans-serif;color:#111;margin:0 auto;padding:3mm;width:76mm;max-width:76mm;background:#fff;font-size:10px;line-height:1.3}
+  .hdr{display:flex;justify-content:space-between;gap:6px;border-bottom:1px dashed #334155;padding-bottom:6px;margin-bottom:6px}
+  .hdr img{width:44px;height:auto}
+  .emisor{font-size:9px;line-height:1.3}
+  h1{font-size:11px;margin:4px 0 5px;text-transform:uppercase;letter-spacing:.05em}
+  .meta{font-size:9px;margin-bottom:6px}
+  .receptor{font-size:9px;line-height:1.35;margin-bottom:6px}
+  table{width:100%;border-collapse:collapse;font-size:9px;margin-top:6px}
+  th{background:#f8fafc;padding:4px 3px;border:1px solid #cbd5e1;text-align:left;font-weight:700}
+  td{padding:4px 3px;border:1px solid #cbd5e1;vertical-align:top}
+  .tot{font-size:9px;margin-top:8px}
+  .tot div{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dashed #cbd5e1}
+  .tot .b{font-weight:700;font-size:10px;border-bottom:none;margin-top:2px}
+  .letras{font-size:8.5px;margin-top:6px}
+  .cai{font-size:8px;white-space:pre-wrap;margin-top:8px;color:#334155}
+  .pie{font-size:8px;color:#64748b;margin-top:8px;text-align:center;border-top:1px dashed #94a3b8;padding-top:5px}
+  @media print{body{padding:1mm;width:76mm;max-width:76mm}}
 </style></head><body>
 <div class="hdr">
   <div class="emisor">
@@ -174,8 +180,8 @@ export function buildHnInvoiceHtml(opts: {
   <img src="${escapeHtml(opts.logoUrl)}" alt="Logo" />
 </div>
 <h1>${escapeHtml(opts.documentTitle)}</h1>
-<div style="font-size:12px;margin-bottom:10px"><strong>Ref.:</strong> ${escapeHtml(opts.ref)} · <strong>Fecha:</strong> ${dateStr} ${timeStr}</div>
-<div style="font-size:12px;line-height:1.6;margin-bottom:12px">
+<div class="meta"><strong>Ref.:</strong> ${escapeHtml(opts.ref)}<br/><strong>Fecha:</strong> ${dateStr} ${timeStr}</div>
+<div class="receptor">
   ${opts.receptorLines.map((l) => `<div>${escapeHtml(l)}</div>`).join('')}
 </div>
 <table><thead><tr>
@@ -187,7 +193,7 @@ export function buildHnInvoiceHtml(opts: {
   <div><span>ISV (${pct}%)</span><span>${formatCurrency(isv)}</span></div>
   <div class="b"><span>Total</span><span>${formatCurrency(total)}</span></div>
 </div>
-<div style="font-size:11px;margin-top:10px;font-style:italic">${escapeHtml(amountToSpanishWordsHn(total))}</div>
+<div class="letras"><em>${escapeHtml(amountToSpanishWordsHn(total))}</em></div>
 ${caiBlock ? `<div class="cai">${escapeHtml(caiBlock)}</div>` : ''}
 <div class="pie">${escapeHtml(opts.footerNote || foot || 'Documento informativo. Correlativo SAR no incluido hasta numeración oficial.')}</div>
 </body></html>`

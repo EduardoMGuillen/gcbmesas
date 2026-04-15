@@ -1596,6 +1596,133 @@ export async function getProductsForCashierInvoice() {
   })
 }
 
+export async function createAndCloseFreeInvoiceAccount(data: {
+  meseroId: string
+  receptorName?: string | null
+  receptorRtn?: string | null
+  lines: Array<{ productId: string; quantity: number }>
+}) {
+  const u = await getCurrentUser()
+  if (!['ADMIN', 'CAJERO'].includes(u.role)) {
+    throw new Error('No autorizado')
+  }
+
+  const mesero = await prisma.user.findFirst({
+    where: { id: data.meseroId, role: 'MESERO', username: { not: 'CLIENTE' } },
+    select: { id: true, name: true, username: true },
+  })
+  if (!mesero) throw new Error('Mesero no válido')
+
+  const rawLines = (data.lines || []).filter((l) => l.productId && Number.isFinite(l.quantity) && l.quantity >= 1)
+  if (rawLines.length === 0) throw new Error('Agrega al menos un artículo válido')
+
+  const uniqueProductIds = Array.from(new Set(rawLines.map((l) => l.productId)))
+  const products = await prisma.product.findMany({
+    where: { id: { in: uniqueProductIds }, isActive: true },
+    select: { id: true, name: true, price: true },
+  })
+  const byId = new Map(products.map((p) => [p.id, p]))
+
+  const normalized = rawLines
+    .map((l) => {
+      const p = byId.get(l.productId)
+      if (!p) return null
+      const quantity = Math.max(1, Math.floor(l.quantity))
+      return {
+        productId: p.id,
+        quantity,
+        unitPrice: Number(p.price),
+        linePrice: Number(p.price) * quantity,
+        productName: p.name,
+      }
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null)
+
+  if (normalized.length === 0) {
+    throw new Error('Los productos seleccionados no están disponibles')
+  }
+
+  const table = await getOrCreateWalkInTableRow()
+  const total = normalized.reduce((s, l) => s + l.linePrice, 0)
+  const clientLabel = data.receptorName?.trim() || null
+  const rtnLabel = data.receptorRtn?.trim() || null
+  const clientName = rtnLabel ? `${clientLabel || 'Factura libre'} · RTN ${rtnLabel}` : clientLabel || 'Factura libre'
+
+  const account = await prisma.$transaction(async (tx) => {
+    const created = await tx.account.create({
+      data: {
+        tableId: table.id,
+        initialBalance: total,
+        currentBalance: 0,
+        status: 'CLOSED',
+        closedAt: new Date(),
+        openedByUserId: mesero.id,
+        clientName,
+      },
+      select: { id: true, tableId: true },
+    })
+
+    await tx.order.createMany({
+      data: normalized.map((l) => ({
+        accountId: created.id,
+        productId: l.productId,
+        userId: mesero.id,
+        price: l.linePrice,
+        quantity: l.quantity,
+        served: true,
+        rejected: false,
+        prepStatus: OrderPrepStatus.NONE,
+        servedByUserId: u.id,
+      })),
+    })
+
+    await tx.log.create({
+      data: {
+        userId: u.id,
+        tableId: created.tableId,
+        action: LogAction.ACCOUNT_OPENED,
+        details: {
+          accountId: created.id,
+          type: 'FREE_INVOICE',
+          meseroId: mesero.id,
+          mesero: mesero.name || mesero.username,
+          total,
+          lines: normalized.map((l) => ({
+            productId: l.productId,
+            productName: l.productName,
+            quantity: l.quantity,
+            linePrice: l.linePrice,
+          })),
+        },
+      },
+    })
+
+    await tx.log.create({
+      data: {
+        userId: u.id,
+        tableId: created.tableId,
+        action: LogAction.ACCOUNT_CLOSED,
+        details: {
+          accountId: created.id,
+          reason: 'FREE_INVOICE_AUTO_CLOSE',
+          total,
+        },
+      },
+    })
+
+    return created
+  })
+
+  revalidatePath('/cajero')
+  revalidatePath('/admin/cuentas')
+
+  return {
+    ok: true as const,
+    accountId: account.id,
+    meseroName: mesero.name || mesero.username,
+  }
+}
+
 export async function addBalanceToAccount(accountId: string, amount: number) {
   const currentUser = await getCurrentUser()
 
