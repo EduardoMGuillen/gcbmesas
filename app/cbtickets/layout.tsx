@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import { CbTicketsHeader } from './CbTicketsHeader'
 
 const metadataBaseUrl = process.env.NEXT_PUBLIC_CBTICKETS_CANONICAL_BASE || 'https://gcbtickets.com'
@@ -38,6 +39,18 @@ export const metadata: Metadata = {
 export default function CbTicketsLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-W8KV5Z75GY"
+        strategy="afterInteractive"
+      />
+      <Script id="gtag-cbtickets" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-W8KV5Z75GY');
+        `}
+      </Script>
       <link
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap"
         rel="stylesheet"
