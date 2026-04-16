@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateQRCode } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import nodemailer from 'nodemailer'
 import path from 'path'
 import fs from 'fs'
 import { Prisma } from '@prisma/client'
@@ -18,6 +17,7 @@ import { cyberSourceDirectPaymentViaSdk, cyberSourceUnifiedPaymentViaSdk } from 
 import { persistCyberSourcePaymentAudit } from '@/lib/cybersource-payment-audit'
 import { assertEventEntryCapacity } from '@/lib/actions'
 import { escapeHtml } from '@/lib/html-escape'
+import { sendMailWithInlineImages } from '@/lib/send-mail'
 
 function maskMerchantId(merchantId: string | undefined) {
   if (!merchantId) return null
@@ -681,15 +681,7 @@ export async function POST(req: NextRequest) {
         </div>
       `).join('')
 
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-      })
-
-      await transporter.sendMail({
-        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      await sendMailWithInlineImages({
         to: String(pendingDetails?.clientEmail || clientEmail).trim(),
         subject: `${isBulk ? `Tus ${entries.length} entradas` : 'Tu entrada'} para ${eventName} - Casa Blanca`,
         html: `

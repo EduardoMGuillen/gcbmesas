@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { markEntryEmailSent } from '@/lib/actions'
 import { generateQRCode } from '@/lib/utils'
 import { escapeHtml } from '@/lib/html-escape'
-import nodemailer from 'nodemailer'
+import { sendMailWithInlineImages } from '@/lib/send-mail'
 import path from 'path'
 import fs from 'fs'
 
@@ -141,20 +141,7 @@ export async function POST(req: NextRequest) {
                 </div>
     `).join('')
 
-    // Configure SMTP transporter
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-
-    // Send email
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    await sendMailWithInlineImages({
       to: clientEmail,
       subject: `${isBulk ? `Tus ${entries.length} entradas` : 'Tu entrada'} para ${eventName} - Casa Blanca`,
       html: `
