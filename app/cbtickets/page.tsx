@@ -93,6 +93,11 @@ export default async function CbTicketsEventosPage() {
                 const onlinePrice = Number(event.paypalPrice)
                 const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
                 const venueLine = [event.venueName, event.venueAddress].filter(Boolean).join(' · ')
+                const soldOut =
+                  !freeOnly &&
+                  event.maxEntries != null &&
+                  event.maxEntries >= 1 &&
+                  Number(event.entriesSoldSum ?? 0) >= event.maxEntries
 
                 return (
                   <Link
@@ -138,6 +143,18 @@ export default async function CbTicketsEventosPage() {
                         <p className="text-lg font-bold text-stone-800 leading-none">{dayNum}</p>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800">{monthStr}</p>
                       </div>
+                      {soldOut ? (
+                        <div
+                          className="absolute top-4 right-4 text-center rounded-xl px-3 py-2"
+                          style={{
+                            background: 'rgba(255,248,244,0.95)',
+                            backdropFilter: 'blur(8px)',
+                            border: '1px solid rgba(225,29,72,0.45)',
+                          }}
+                        >
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-rose-700">Sold Out</p>
+                        </div>
+                      ) : null}
 
                       <div className="absolute bottom-0 left-0 right-0 p-5 [&_p]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.75)] [&_span]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.75)]">
                         <h3 className="text-xl font-bold text-white mb-1 drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]">
@@ -164,12 +181,12 @@ export default async function CbTicketsEventosPage() {
                       <span
                         className="text-sm font-semibold px-4 py-1.5 rounded-full transition-all duration-300 group-hover:scale-[1.02]"
                         style={{
-                          background: 'linear-gradient(135deg, #d4af37, #b8942f)',
-                          color: '#1a1510',
-                          boxShadow: '0 2px 14px rgba(180, 140, 60, 0.35)',
+                          background: soldOut ? 'rgba(225,29,72,0.15)' : 'linear-gradient(135deg, #d4af37, #b8942f)',
+                          color: soldOut ? '#9f1239' : '#1a1510',
+                          boxShadow: soldOut ? 'none' : '0 2px 14px rgba(180, 140, 60, 0.35)',
                         }}
                       >
-                        {freeOnly ? 'Ver evento' : 'Comprar entrada'}
+                        {freeOnly ? 'Ver evento' : soldOut ? 'Sold Out' : 'Comprar entrada'}
                       </span>
                     </div>
                   </Link>

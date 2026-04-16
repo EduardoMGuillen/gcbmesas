@@ -16,6 +16,8 @@ type PublicEvent = {
   coverImage: string | null
   coverPrice: number
   paypalPrice: string | null
+  maxEntries: number | null
+  entriesSoldSum: number
 }
 
 interface LandingPageProps {
@@ -440,6 +442,11 @@ export default function LandingPage({ events }: LandingPageProps) {
                 const weekday  = eventDate.toLocaleDateString('es-HN', { weekday: 'long', timeZone: 'UTC' })
                 const price    = Number(event.paypalPrice)
                 const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
+                const soldOut =
+                  !freeOnly &&
+                  event.maxEntries != null &&
+                  event.maxEntries >= 1 &&
+                  Number(event.entriesSoldSum ?? 0) >= event.maxEntries
                 return (
                   <div key={event.id} className="glass-card">
                     {event.coverImage && (
@@ -463,9 +470,18 @@ export default function LandingPage({ events }: LandingPageProps) {
                         <span style={{ color: '#00ffff', fontWeight: 700, fontSize: '1.1rem' }}>
                           {freeOnly ? 'Cover gratuito' : `L ${price.toFixed(2)}`}
                         </span>
-                        <Link href={`/eventos/${event.id}`} className="btn-primary" style={{ padding: '0.55rem 1.4rem', fontSize: '0.9rem' }}>
-                          {freeOnly ? 'Ver evento' : 'Comprar Entrada'}
-                        </Link>
+                        {soldOut ? (
+                          <span
+                            className="btn-primary"
+                            style={{ padding: '0.55rem 1.4rem', fontSize: '0.9rem', opacity: 0.7, pointerEvents: 'none' }}
+                          >
+                            Sold Out
+                          </span>
+                        ) : (
+                          <Link href={`/eventos/${event.id}`} className="btn-primary" style={{ padding: '0.55rem 1.4rem', fontSize: '0.9rem' }}>
+                            {freeOnly ? 'Ver evento' : 'Comprar Entrada'}
+                          </Link>
+                        )}
                       </div>
                     </div>
                   </div>

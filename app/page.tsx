@@ -37,6 +37,8 @@ export default async function Home() {
     coverImage: e.coverImage,
     coverPrice: Number(e.coverPrice),
     paypalPrice: e.paypalPrice != null ? e.paypalPrice.toString() : null,
+    maxEntries: e.maxEntries,
+    entriesSoldSum: e.entriesSoldSum,
   }))
 
   return <LandingPage events={events} />
