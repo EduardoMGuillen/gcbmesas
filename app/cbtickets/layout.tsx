@@ -13,7 +13,12 @@ export const metadata: Metadata = {
   description: 'GCBTickets es la ticketera en linea para comprar entradas de eventos en La Gran Casa Blanca.',
   keywords: [
     'GCBTickets',
+    'GCB Tickets',
+    'La Gran Casa Blanca Tickets',
+    'Casa Blanca Tickets',
     'ticketera Honduras',
+    'entradas Honduras',
+    'boletos Honduras',
     'entradas en linea',
     'comprar boletos',
     'eventos La Gran Casa Blanca',

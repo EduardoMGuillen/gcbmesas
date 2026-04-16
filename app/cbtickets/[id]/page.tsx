@@ -3,8 +3,35 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { EventPurchaseClient } from '@/app/eventos/[id]/EventPurchaseClient'
 import { FreeCoverEventView } from '@/app/eventos/_components/FreeCoverEventView'
+import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string }
+}): Promise<Metadata> {
+  const event = await getPublicEventById(params.id, { channel: 'cbtickets' })
+  if (!event) {
+    return {
+      title: 'Evento | GCBTickets',
+      description: 'Entradas en linea para eventos de La Gran Casa Blanca.',
+    }
+  }
+
+  const eventDate = new Date(event.date).toLocaleDateString('es-HN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+
+  return {
+    title: `${event.name} | GCBTickets`,
+    description: `${event.name} - ${eventDate}. Compra entradas en linea en GCBTickets, la ticketera oficial de La Gran Casa Blanca.`,
+  }
+}
 
 export default async function CbTicketsEventoPage({
   params,

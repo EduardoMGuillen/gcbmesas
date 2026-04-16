@@ -9,6 +9,18 @@ export const dynamic = 'force-dynamic'
 export const metadata = {
   title: 'La Gran Casa Blanca | Astronomical · Studio 54 · San Pedro Sula',
   description: 'La mejor experiencia nocturna de San Pedro Sula. Astronomical, Studio 54 y Casa Blanca. Compra tus entradas en línea.',
+  keywords: [
+    'La Gran Casa Blanca',
+    'Casa Blanca SPS',
+    'Astronomical',
+    'Studio 54',
+    'discoteca San Pedro Sula',
+    'discoteca Honduras',
+    'eventos San Pedro Sula',
+    'fiesta San Pedro Sula',
+    'vida nocturna Honduras',
+    'entradas en linea',
+  ],
 }
 
 export default async function Home() {
