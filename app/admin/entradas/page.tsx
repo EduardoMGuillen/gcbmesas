@@ -14,7 +14,14 @@ export default async function EntradasPage() {
   }
 
   const isTicketeraClient = session.user.role === 'CLIENTE_TICKETERA'
-  const { events, recentEntries, todayStats, eventStats } = await getEntradasDashboardData()
+  const {
+    events,
+    recentEntries,
+    todayStats,
+    eventStats,
+    entrySaleNotificationsEnabled,
+    canManageEntrySaleNotifications,
+  } = await getEntradasDashboardData()
 
   return (
     <div className="space-y-6">
@@ -50,6 +57,8 @@ export default async function EntradasPage() {
         recentEntries={recentEntries}
         eventStats={eventStats}
         isTicketeraClient={isTicketeraClient}
+        entrySaleNotificationsEnabled={entrySaleNotificationsEnabled}
+        canManageEntrySaleNotifications={canManageEntrySaleNotifications}
       />
     </div>
   )

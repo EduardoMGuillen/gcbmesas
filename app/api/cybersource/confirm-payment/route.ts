@@ -18,6 +18,7 @@ import { persistCyberSourcePaymentAudit } from '@/lib/cybersource-payment-audit'
 import { assertEventEntryCapacity } from '@/lib/actions'
 import { escapeHtml } from '@/lib/html-escape'
 import { sendMailWithInlineImages } from '@/lib/send-mail'
+import { notifyAdminsNewEntrySale } from '@/lib/push'
 
 function maskMerchantId(merchantId: string | undefined) {
   if (!merchantId) return null
@@ -636,6 +637,18 @@ export async function POST(req: NextRequest) {
     })
 
     revalidatePath('/admin/entradas')
+
+    {
+      const buyerLabel =
+        (names[0] && String(names[0]).trim()) ||
+        String(pendingDetails?.clientEmail || clientEmail).trim()
+      notifyAdminsNewEntrySale({
+        eventName: event.name,
+        entriesCount: entries.length,
+        clientLabel: buyerLabel,
+        source: 'online',
+      }).catch((e) => console.error('[Push EntrySale]', e))
+    }
 
     try {
       const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://gcbmesas.vercel.app'

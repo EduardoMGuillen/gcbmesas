@@ -9,6 +9,7 @@ import {
   deleteEvent,
   createEntry,
   createBulkEntries,
+  setEntrySaleNotificationsEnabled,
   markEntryUsed,
   revertEntryToActive,
   cancelEntry,
@@ -70,6 +71,9 @@ interface EntradasClientProps {
   eventStats: EventStatRow[]
   /** Cliente externo: sin pestañas de crear eventos ni escanear */
   isTicketeraClient?: boolean
+  /** Preferencia del usuario actual (solo ADMIN gestiona el interruptor) */
+  entrySaleNotificationsEnabled?: boolean
+  canManageEntrySaleNotifications?: boolean
 }
 
 type Tab = 'vender' | 'eventos' | 'historial' | 'escanear' | 'estadisticas'
@@ -306,8 +310,12 @@ export function EntradasClient({
   recentEntries,
   eventStats,
   isTicketeraClient = false,
+  entrySaleNotificationsEnabled = false,
+  canManageEntrySaleNotifications = false,
 }: EntradasClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('vender')
+  const router = useRouter()
+  const [entryNotifyPending, setEntryNotifyPending] = useState(false)
 
   const allTabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'vender', label: 'Vender Entrada', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
@@ -326,6 +334,19 @@ export function EntradasClient({
       setActiveTab('vender')
     }
   }, [isTicketeraClient, activeTab])
+
+  const handleEntryNotifyChange = async (checked: boolean) => {
+    setEntryNotifyPending(true)
+    try {
+      await setEntrySaleNotificationsEnabled(checked)
+      router.refresh()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'No se pudo guardar la preferencia'
+      window.alert(msg)
+    } finally {
+      setEntryNotifyPending(false)
+    }
+  }
 
   return (
     <div>
@@ -347,6 +368,30 @@ export function EntradasClient({
           </button>
         ))}
       </div>
+
+      {canManageEntrySaleNotifications && (
+        <div className="mb-5 rounded-xl border border-dark-200 bg-dark-100 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-white">Alertas de ventas de entradas</p>
+            <p className="text-xs text-dark-300 mt-0.5 max-w-xl">
+              Notificación push en tus dispositivos registrados cuando se venda una entrada (en línea o en taquilla). Cada
+              administrador configura la suya; en taquilla no se te avisa a ti mismo si fuiste quien vendió.
+            </p>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              className="w-5 h-5 rounded border-dark-200 accent-primary-600"
+              checked={entrySaleNotificationsEnabled}
+              disabled={entryNotifyPending}
+              onChange={(e) => void handleEntryNotifyChange(e.target.checked)}
+            />
+            <span className="text-sm text-white whitespace-nowrap">
+              {entryNotifyPending ? 'Guardando…' : 'Notificarme'}
+            </span>
+          </label>
+        </div>
+      )}
 
       {activeTab === 'vender' && <VenderEntrada events={events.filter((e) => e.isActive)} />}
       {activeTab === 'escanear' && <EscanearTab />}

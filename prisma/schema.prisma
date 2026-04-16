@@ -106,6 +106,8 @@ model User {
   name      String?
   password  String
   role      UserRole @default(MESERO)
+  /// Solo rol ADMIN en práctica: recibir push al venderse entradas (taquilla u online).
+  notifyEntrySales Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
