@@ -6,8 +6,9 @@ import Image from 'next/image'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Proximos eventos',
-  description: 'Descubre y compra entradas en linea para los proximos eventos en GCBTickets.',
+  title: 'Entradas La Gran Casa Blanca Tickets | GCBTickets',
+  description:
+    'Compra entradas en linea en Honduras con GCBTickets, la ticketera oficial de La Gran Casa Blanca para eventos y fiestas.',
 }
 
 export default async function CbTicketsEventosPage() {

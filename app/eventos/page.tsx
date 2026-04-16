@@ -7,8 +7,9 @@ import { PublicSiteVantaBackground } from '@/components/PublicSiteVantaBackgroun
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Eventos - Casa Blanca',
-  description: 'Compra tus entradas para los mejores eventos en Casa Blanca, San Pedro Sula',
+  title: 'Eventos Astronomical y Studio 54 | La Gran Casa Blanca',
+  description:
+    'Discoteca en San Pedro Sula, Honduras. Compra entradas para Astronomical, Studio 54 y eventos de La Gran Casa Blanca.',
 }
 
 export default async function EventosPage() {

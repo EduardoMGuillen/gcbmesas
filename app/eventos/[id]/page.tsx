@@ -5,8 +5,35 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { EventPurchaseClient } from './EventPurchaseClient'
 import { PublicSiteVantaBackground } from '@/components/PublicSiteVantaBackground'
+import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string }
+}): Promise<Metadata> {
+  const event = await getPublicEventById(params.id, { channel: 'lcb' })
+  if (!event) {
+    return {
+      title: 'Evento | La Gran Casa Blanca',
+      description: 'Eventos y entradas en linea de La Gran Casa Blanca.',
+    }
+  }
+
+  const eventDate = new Date(event.date).toLocaleDateString('es-HN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+
+  return {
+    title: `${event.name} | Astronomical · Studio 54 · La Gran Casa Blanca`,
+    description: `${event.name} - ${eventDate}. Compra entradas en linea para Astronomical, Studio 54 y eventos de La Gran Casa Blanca.`,
+  }
+}
 
 export default async function EventoPage({
   params,
