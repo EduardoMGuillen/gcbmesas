@@ -183,3 +183,42 @@ export async function sendPushToCajerosFollowingMesero(
   }
 }
 
+export type NotifyAdminsEntrySaleParams = {
+  eventName: string
+  entriesCount: number
+  /** Texto corto para el cuerpo (nombre cliente, email, etc.) */
+  clientLabel: string
+  source: 'online' | 'taquilla'
+  /** Evita notificar al vendedor (taquilla) para no duplicar en su propio teléfono */
+  excludeUserId?: string
+}
+
+/** Push a administradores que tengan activadas las alertas de venta de entradas. */
+export async function notifyAdminsNewEntrySale(params: NotifyAdminsEntrySaleParams) {
+  const admins = await prisma.user.findMany({
+    where: { role: 'ADMIN', notifyEntrySales: true },
+    select: { id: true },
+  })
+  if (admins.length === 0) return
+
+  const title = params.source === 'online' ? 'Venta en línea' : 'Venta en taquilla'
+  const body =
+    params.entriesCount > 1
+      ? `${params.entriesCount} entradas · ${params.eventName} · ${params.clientLabel}`
+      : `${params.eventName} · ${params.clientLabel}`
+
+  const data: Record<string, string> = {
+    type: 'entry_sale',
+    eventName: params.eventName,
+    entriesCount: String(params.entriesCount),
+    source: params.source,
+  }
+
+  for (const row of admins) {
+    if (params.excludeUserId && row.id === params.excludeUserId) continue
+    sendPushToUser(row.id, title, body, data).catch((e) =>
+      console.error('[Push EntrySale] Error enviando a', row.id, e)
+    )
+  }
+}
+

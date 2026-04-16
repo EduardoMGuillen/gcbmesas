@@ -3230,6 +3230,17 @@ export async function createEntry(data: {
     totalPrice,
   })
 
+  {
+    const { notifyAdminsNewEntrySale } = await import('@/lib/push')
+    notifyAdminsNewEntrySale({
+      eventName: entry.event.name,
+      entriesCount: entry.numberOfEntries,
+      clientLabel: data.clientName,
+      source: 'taquilla',
+      excludeUserId: user.id,
+    }).catch((e) => console.error('[Push EntrySale]', e))
+  }
+
   revalidatePath('/admin/entradas')
   return entry
 }
@@ -3306,6 +3317,17 @@ export async function createBulkEntries(data: {
     entryIds: entries.map((e) => e.id),
   })
 
+  {
+    const { notifyAdminsNewEntrySale } = await import('@/lib/push')
+    notifyAdminsNewEntrySale({
+      eventName: entries[0].event.name,
+      entriesCount: entries.length,
+      clientLabel: data.clientEmail,
+      source: 'taquilla',
+      excludeUserId: user.id,
+    }).catch((e) => console.error('[Push EntrySale]', e))
+  }
+
   revalidatePath('/admin/entradas')
   return entries
 }
@@ -3357,6 +3379,14 @@ export async function getEntries(filters?: {
 export async function getEntradasDashboardData() {
   const user = await getCurrentUser()
   ensureEntradasModuleAccess(user.role)
+
+  const notifyRow = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { notifyEntrySales: true },
+  })
+  const entrySaleNotificationsEnabled = notifyRow?.notifyEntrySales ?? false
+  const canManageEntrySaleNotifications = isEntradasPlatformAdmin(user.role)
+
   const eventScope = await getEntradasEventIdScopeForUser(user.id, user.role)
   if (eventScope !== null && eventScope.length === 0) {
     const empty = {
@@ -3364,6 +3394,8 @@ export async function getEntradasDashboardData() {
       eventStats: [] as any[],
       recentEntries: [] as any[],
       todayStats: { totalSales: 0, totalEntries: 0, totalTransactions: 0 },
+      entrySaleNotificationsEnabled,
+      canManageEntrySaleNotifications,
     }
     return JSON.parse(JSON.stringify(empty)) as typeof empty
   }
@@ -3471,9 +3503,24 @@ export async function getEntradasDashboardData() {
       totalEntries: Number(todayStats._sum.numberOfEntries ?? 0),
       totalTransactions: todayStats._count,
     },
+    entrySaleNotificationsEnabled,
+    canManageEntrySaleNotifications,
   }
 
   return JSON.parse(JSON.stringify(payload)) as typeof payload
+}
+
+/** Preferencia personal (solo rol ADMIN): push al venderse entradas. */
+export async function setEntrySaleNotificationsEnabled(enabled: boolean) {
+  const user = await getCurrentUser()
+  if (!isEntradasPlatformAdmin(user.role)) {
+    throw new Error('Solo administradores pueden cambiar esta preferencia')
+  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { notifyEntrySales: enabled },
+  })
+  revalidatePath('/admin/entradas')
 }
 
 const TAQUILLA_HISTORY_ROLES = ['ADMIN', 'TAQUILLA', 'MESERO', 'CAJERO'] as const
@@ -3973,6 +4020,16 @@ export async function createPublicEntry(data: {
       },
     },
   })
+
+  {
+    const { notifyAdminsNewEntrySale } = await import('@/lib/push')
+    notifyAdminsNewEntrySale({
+      eventName: event.name,
+      entriesCount: entries.length,
+      clientLabel: data.clientName,
+      source: 'online',
+    }).catch((e) => console.error('[Push EntrySale]', e))
+  }
 
   revalidatePath('/admin/entradas')
   return entries
