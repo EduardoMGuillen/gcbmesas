@@ -150,6 +150,11 @@ export default async function EventosPage() {
                   const onlinePrice = Number(event.paypalPrice)
                   const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
                   const venueLine = [event.venueName, event.venueAddress].filter(Boolean).join(' · ')
+                const soldOut =
+                  !freeOnly &&
+                  event.maxEntries != null &&
+                  event.maxEntries >= 1 &&
+                  Number(event.entriesSoldSum ?? 0) >= event.maxEntries
 
                   return (
                     <Link
@@ -193,6 +198,18 @@ export default async function EventosPage() {
                           <p className="text-lg font-bold text-white leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">{dayNum}</p>
                           <p className="text-[10px] font-bold uppercase tracking-wider text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">{monthStr}</p>
                         </div>
+                        {soldOut ? (
+                          <div
+                            className="absolute top-4 right-4 text-center rounded-xl px-3 py-2"
+                            style={{
+                              background: 'rgba(12,12,24,0.88)',
+                              backdropFilter: 'blur(10px)',
+                              border: '1px solid rgba(251,113,133,0.6)',
+                            }}
+                          >
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-rose-300">Sold Out</p>
+                          </div>
+                        ) : null}
 
                         <div className="absolute bottom-0 left-0 right-0 p-5 [&_p]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] [&_span]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
                           <h3 className="text-xl font-bold text-white mb-1 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] group-hover:text-white transition-colors duration-300">
@@ -218,12 +235,12 @@ export default async function EventosPage() {
                         <span
                           className="text-sm font-semibold px-4 py-1.5 rounded-full transition-all duration-300 group-hover:scale-105"
                           style={{
-                            background: 'linear-gradient(45deg, #00ffff, #a855f7)',
-                            color: '#0a0a15',
-                            boxShadow: '0 2px 16px rgba(0,255,255,0.25)',
+                            background: soldOut ? 'rgba(251,113,133,0.22)' : 'linear-gradient(45deg, #00ffff, #a855f7)',
+                            color: soldOut ? '#fecdd3' : '#0a0a15',
+                            boxShadow: soldOut ? 'none' : '0 2px 16px rgba(0,255,255,0.25)',
                           }}
                         >
-                          {freeOnly ? 'Ver evento' : 'Comprar Entrada'}
+                          {freeOnly ? 'Ver evento' : soldOut ? 'Sold Out' : 'Comprar Entrada'}
                         </span>
                       </div>
                     </Link>

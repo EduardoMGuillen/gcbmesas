@@ -21,7 +21,7 @@ function channelWhere(channel: PublicEventChannel) {
 export async function getPublicEvents(channel: PublicEventChannel = 'lcb') {
   const now = new Date()
   now.setHours(0, 0, 0, 0)
-  return prisma.event.findMany({
+  const events = await prisma.event.findMany({
     where: {
       isActive: true,
       date: { gte: now },
@@ -45,11 +45,33 @@ export async function getPublicEvents(channel: PublicEventChannel = 'lcb') {
       coverImage: true,
       coverPrice: true,
       paypalPrice: true,
+      maxEntries: true,
       venueName: true,
       venueAddress: true,
-      _count: { select: { entries: true } },
     },
   })
+
+  const eventIds = events.map((e) => e.id)
+  if (!eventIds.length) return events.map((e) => ({ ...e, entriesSoldSum: 0 }))
+
+  const soldByEvent = await prisma.entry.groupBy({
+    by: ['eventId'],
+    where: {
+      eventId: { in: eventIds },
+      status: { not: 'CANCELLED' },
+    },
+    _sum: { numberOfEntries: true },
+  })
+
+  const soldMap = new Map<string, number>()
+  for (const row of soldByEvent) {
+    soldMap.set(row.eventId, Number(row._sum.numberOfEntries ?? 0))
+  }
+
+  return events.map((e) => ({
+    ...e,
+    entriesSoldSum: soldMap.get(e.id) ?? 0,
+  }))
 }
 
 export async function getPublicEventById(id: string, opts?: { channel?: PublicEventChannel }) {
