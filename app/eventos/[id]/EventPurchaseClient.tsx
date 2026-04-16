@@ -316,18 +316,18 @@ export function EventPurchaseClient({
     const microform = flex.microform({
       styles: {
         input: {
-          color: '#ffffff',
+          color: p.isLight ? '#111827' : '#ffffff',
           'font-size': '16px',
           'font-family': 'Arial, sans-serif',
         },
         ':focus': {
-          color: '#ffffff',
+          color: p.isLight ? '#111827' : '#ffffff',
         },
         valid: {
-          color: '#86efac',
+          color: p.isLight ? '#166534' : '#86efac',
         },
         invalid: {
-          color: '#fca5a5',
+          color: p.isLight ? '#b91c1c' : '#fca5a5',
         },
       },
     })
