@@ -18,14 +18,15 @@ type FeaturedEvent = {
 
 export function FeaturedEventsCarousel({ events }: { events: FeaturedEvent[] }) {
   const [index, setIndex] = useState(0)
+  const [isPaused, setIsPaused] = useState(false)
 
   useEffect(() => {
-    if (events.length <= 1) return
+    if (events.length <= 1 || isPaused) return
     const timer = window.setInterval(() => {
       setIndex((prev) => (prev + 1) % events.length)
     }, 5000)
     return () => window.clearInterval(timer)
-  }, [events.length])
+  }, [events.length, isPaused])
 
   if (events.length === 0) {
     return (
@@ -50,7 +51,15 @@ export function FeaturedEventsCarousel({ events }: { events: FeaturedEvent[] }) 
     Number(event.entriesSoldSum ?? 0) >= event.maxEntries
 
   return (
-    <div className="relative overflow-hidden h-[320px] sm:h-[360px] rounded-2xl border border-amber-200/70 bg-white/85">
+    <div
+      className="relative overflow-hidden h-[320px] sm:h-[360px] rounded-2xl border border-amber-200/70 bg-white/85"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onFocusCapture={() => setIsPaused(true)}
+      onBlurCapture={() => setIsPaused(false)}
+      onTouchStart={() => setIsPaused(true)}
+      onTouchEnd={() => setTimeout(() => setIsPaused(false), 1200)}
+    >
       <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/5 to-black/15" />
 
       {event.coverImage ? (
