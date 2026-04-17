@@ -13,6 +13,9 @@ export const metadata = {
 
 export default async function CbTicketsEventosPage() {
   const events = await getPublicEvents('cbtickets')
+  const heroImages = ['/Eventos/1.png', '/Eventos/2.png', '/Eventos/3.png', '/Eventos/4.png', '/Eventos/5.png']
+  const featuredEvents = events.slice(0, 6)
+  const scrollingEvents = featuredEvents.length > 1 ? [...featuredEvents, ...featuredEvents] : featuredEvents
 
   return (
     <>
@@ -30,9 +33,31 @@ export default async function CbTicketsEventosPage() {
           0% { background-position: -200% center; }
           100% { background-position: 200% center; }
         }
+        @keyframes cbHeroBgFade {
+          0% { opacity: 0; transform: scale(1.02); }
+          6% { opacity: 1; }
+          26% { opacity: 1; transform: scale(1); }
+          36% { opacity: 0; transform: scale(1.01); }
+          100% { opacity: 0; }
+        }
+        @keyframes cbEventsTicker {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(-50%); }
+        }
         .cb-card:hover {
           border-color: rgba(180, 140, 70, 0.55) !important;
           box-shadow: 0 22px 48px rgba(120, 83, 30, 0.12), 0 4px 16px rgba(0,0,0,0.06) !important;
+        }
+        .cb-hero-bg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          opacity: 0;
+          animation: cbHeroBgFade 24s infinite;
+        }
+        .cb-events-track--animated {
+          animation: cbEventsTicker 30s linear infinite;
         }
         .cb-hero { animation: cbFadeInDown 0.55s ease both; }
         .cb-shimmer-bar {
@@ -57,7 +82,139 @@ export default async function CbTicketsEventosPage() {
       `}</style>
 
       <div className="cb-page flex flex-col flex-1">
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 sm:pt-10 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_0.85fr] gap-5 sm:gap-6">
+            <div
+              className="relative overflow-hidden rounded-3xl min-h-[320px] sm:min-h-[380px] border"
+              style={{
+                borderColor: 'rgba(180, 140, 70, 0.3)',
+                boxShadow: '0 18px 48px rgba(80, 60, 30, 0.18)',
+              }}
+            >
+              {heroImages.map((src, i) => (
+                <div
+                  key={src}
+                  className="cb-hero-bg"
+                  style={{ backgroundImage: `url(${src})`, animationDelay: `${i * 4.8}s` }}
+                />
+              ))}
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    'linear-gradient(120deg, rgba(14,10,6,0.8) 0%, rgba(14,10,6,0.48) 40%, rgba(14,10,6,0.72) 100%)',
+                }}
+              />
+              <div className="relative z-[1] h-full p-6 sm:p-8 lg:p-10 flex flex-col justify-between">
+                <div className="max-w-2xl">
+                  <p className="text-[11px] sm:text-xs tracking-[0.28em] uppercase text-amber-200/90 mb-4 font-semibold">
+                    Ticketera oficial
+                  </p>
+                  <div className="flex items-center gap-4 mb-5">
+                    <Image src="/LogoCasaBlanca.png" alt="La Gran Casa Blanca" width={90} height={90} className="w-14 h-14 sm:w-16 sm:h-16 object-contain" />
+                    <div>
+                      <p className="text-sm sm:text-base text-amber-100/90 font-semibold">La Gran Casa Blanca</p>
+                      <p className="text-xs sm:text-sm text-amber-200/70">GCBTickets</p>
+                    </div>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-white leading-tight">
+                    GCBTickets, tu mejor opción para boletos y tickets de eventos, conciertos y espectáculos en Honduras.
+                  </h2>
+                  <p className="text-sm sm:text-base text-amber-100/85 mt-4 max-w-xl">
+                    Compra en línea en minutos, recibe tu QR al instante y asegura tu entrada oficial.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 mt-6">
+                  <a
+                    href="#eventos-lista"
+                    className="inline-flex items-center justify-center px-5 py-2.5 rounded-full text-sm font-semibold transition-all hover:scale-[1.02]"
+                    style={{
+                      background: 'linear-gradient(135deg, #d4af37, #b8942f)',
+                      color: '#1a1510',
+                      boxShadow: '0 6px 20px rgba(180, 140, 60, 0.4)',
+                    }}
+                  >
+                    Ver eventos
+                  </a>
+                  <span className="text-xs sm:text-sm text-amber-100/80">
+                    Plataforma confiable para tus entradas en Honduras
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="rounded-3xl border p-4 sm:p-5"
+              style={{
+                borderColor: 'rgba(180, 140, 70, 0.3)',
+                background: 'linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,251,244,0.95))',
+                boxShadow: '0 16px 36px rgba(120, 83, 30, 0.12)',
+              }}
+            >
+              <div className="mb-3">
+                <p className="text-[11px] tracking-[0.24em] uppercase text-amber-700/80 font-semibold">Ahora disponibles</p>
+                <h3 className="text-lg sm:text-xl font-semibold text-stone-800">Eventos publicados</h3>
+              </div>
+              {scrollingEvents.length === 0 ? (
+                <div className="rounded-2xl border border-amber-200/80 bg-white/70 px-4 py-8 text-center">
+                  <p className="text-sm text-stone-600">Pronto verás aquí los eventos activos para compra en línea.</p>
+                </div>
+              ) : (
+                <div className="relative overflow-hidden h-[300px] sm:h-[330px] rounded-2xl">
+                  <div
+                    className={scrollingEvents.length > 1 ? 'cb-events-track--animated space-y-3' : 'space-y-3'}
+                    style={scrollingEvents.length > 1 ? { animationDuration: `${Math.max(26, featuredEvents.length * 6)}s` } : undefined}
+                  >
+                    {scrollingEvents.map((event, idx) => {
+                      const eventDate = new Date(event.date).toLocaleDateString('es-HN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        timeZone: 'UTC',
+                      })
+                      const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
+                      const soldOut =
+                        !freeOnly &&
+                        event.maxEntries != null &&
+                        event.maxEntries >= 1 &&
+                        Number(event.entriesSoldSum ?? 0) >= event.maxEntries
+
+                      return (
+                        <div
+                          key={`${event.id}-${idx}`}
+                          className="rounded-xl border p-3.5"
+                          style={{ borderColor: 'rgba(180,140,70,0.25)', background: 'rgba(255,255,255,0.88)' }}
+                        >
+                          <p className="text-[11px] text-amber-700/90 font-semibold tracking-wide mb-1">{eventDate}</p>
+                          <p className="text-sm font-semibold text-stone-800 line-clamp-2">{event.name}</p>
+                          <div className="mt-2.5 flex items-center justify-between gap-3">
+                            <span className="text-sm font-bold text-amber-800">
+                              {freeOnly ? 'Cover gratis' : `L ${Number(event.paypalPrice).toFixed(2)}`}
+                            </span>
+                            <Link
+                              href={`/cbtickets/${event.id}`}
+                              className="text-xs font-semibold px-3 py-1.5 rounded-full"
+                              style={{
+                                background: soldOut ? 'rgba(225,29,72,0.12)' : 'linear-gradient(135deg, #d4af37, #b8942f)',
+                                color: soldOut ? '#9f1239' : '#1a1510',
+                                pointerEvents: soldOut ? 'none' : 'auto',
+                              }}
+                            >
+                              {soldOut ? 'Sold Out' : 'Comprar'}
+                            </Link>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
         <div className="pt-8 sm:pt-10 pb-6 sm:pb-8 cb-hero text-center px-4">
+          <span id="eventos-lista" className="block -mt-2 mb-2" />
           <p className="text-xs sm:text-sm font-semibold tracking-[0.25em] uppercase text-amber-700/90 mb-2">Entradas en línea</p>
           <h1 className="cb-section-title mb-2">Próximos eventos</h1>
           <div className="cb-shimmer-bar w-32 h-0.5 mx-auto mb-4 rounded-full" />
