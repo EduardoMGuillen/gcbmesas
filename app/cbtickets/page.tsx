@@ -14,8 +14,7 @@ export const metadata = {
 export default async function CbTicketsEventosPage() {
   const events = await getPublicEvents('cbtickets')
   const heroImages = ['/Eventos/1.png', '/Eventos/2.png', '/Eventos/3.png', '/Eventos/4.png', '/Eventos/5.png']
-  const featuredEvents = events.slice(0, 6)
-  const scrollingEvents = featuredEvents.length > 1 ? [...featuredEvents, ...featuredEvents] : featuredEvents
+  const featuredEvents = events.slice(0, 5)
 
   return (
     <>
@@ -40,9 +39,12 @@ export default async function CbTicketsEventosPage() {
           36% { opacity: 0; transform: scale(1.01); }
           100% { opacity: 0; }
         }
-        @keyframes cbEventsTicker {
-          0% { transform: translateY(0); }
-          100% { transform: translateY(-50%); }
+        @keyframes cbFeaturedFade {
+          0% { opacity: 0; transform: scale(1.02); }
+          8% { opacity: 1; transform: scale(1); }
+          28% { opacity: 1; transform: scale(1); }
+          36% { opacity: 0; transform: scale(1.01); }
+          100% { opacity: 0; transform: scale(1.01); }
         }
         .cb-card:hover {
           border-color: rgba(180, 140, 70, 0.55) !important;
@@ -56,8 +58,11 @@ export default async function CbTicketsEventosPage() {
           opacity: 0;
           animation: cbHeroBgFade 24s infinite;
         }
-        .cb-events-track--animated {
-          animation: cbEventsTicker 30s linear infinite;
+        .cb-featured-slide {
+          position: absolute;
+          inset: 0;
+          opacity: 0;
+          animation: cbFeaturedFade 25s infinite;
         }
         .cb-hero { animation: cbFadeInDown 0.55s ease both; }
         .cb-shimmer-bar {
@@ -155,48 +160,62 @@ export default async function CbTicketsEventosPage() {
                 <p className="text-[11px] tracking-[0.24em] uppercase text-amber-700/80 font-semibold">Ahora disponibles</p>
                 <h3 className="text-lg sm:text-xl font-semibold text-stone-800">Eventos publicados</h3>
               </div>
-              {scrollingEvents.length === 0 ? (
+              {featuredEvents.length === 0 ? (
                 <div className="rounded-2xl border border-amber-200/80 bg-white/70 px-4 py-8 text-center">
                   <p className="text-sm text-stone-600">Pronto verás aquí los eventos activos para compra en línea.</p>
                 </div>
               ) : (
-                <div className="relative overflow-hidden h-[300px] sm:h-[330px] rounded-2xl">
-                  <div
-                    className={scrollingEvents.length > 1 ? 'cb-events-track--animated space-y-3' : 'space-y-3'}
-                    style={scrollingEvents.length > 1 ? { animationDuration: `${Math.max(26, featuredEvents.length * 6)}s` } : undefined}
-                  >
-                    {scrollingEvents.map((event, idx) => {
-                      const eventDate = new Date(event.date).toLocaleDateString('es-HN', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        timeZone: 'UTC',
-                      })
-                      const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
-                      const soldOut =
-                        !freeOnly &&
-                        event.maxEntries != null &&
-                        event.maxEntries >= 1 &&
-                        Number(event.entriesSoldSum ?? 0) >= event.maxEntries
+                <div className="relative overflow-hidden h-[320px] sm:h-[360px] rounded-2xl border border-amber-200/70 bg-white/85">
+                  {featuredEvents.map((event, idx) => {
+                    const eventDate = new Date(event.date).toLocaleDateString('es-HN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      timeZone: 'UTC',
+                    })
+                    const freeOnly = isPublicFreeCoverOnly(event.coverPrice, event.paypalPrice)
+                    const soldOut =
+                      !freeOnly &&
+                      event.maxEntries != null &&
+                      event.maxEntries >= 1 &&
+                      Number(event.entriesSoldSum ?? 0) >= event.maxEntries
 
-                      return (
-                        <div
-                          key={`${event.id}-${idx}`}
-                          className="rounded-xl border p-3.5"
-                          style={{ borderColor: 'rgba(180,140,70,0.25)', background: 'rgba(255,255,255,0.88)' }}
-                        >
-                          <p className="text-[11px] text-amber-700/90 font-semibold tracking-wide mb-1">{eventDate}</p>
-                          <p className="text-sm font-semibold text-stone-800 line-clamp-2">{event.name}</p>
+                    return (
+                      <div
+                        key={event.id}
+                        className="cb-featured-slide"
+                        style={
+                          featuredEvents.length > 1
+                            ? {
+                                animationDuration: `${Math.max(22, featuredEvents.length * 5)}s`,
+                                animationDelay: `${idx * 4.4}s`,
+                              }
+                            : { opacity: 1 }
+                        }
+                      >
+                        {event.coverImage ? (
+                          <img src={event.coverImage} alt={event.name} className="absolute inset-0 w-full h-full object-cover" />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-100 to-amber-50">
+                            <Image src="/LogoCasaBlanca.png" alt="Casa Blanca" width={96} height={96} className="w-20 h-20 object-contain opacity-45" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/45 to-transparent" />
+                        <div className="absolute top-3 left-3 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide bg-black/55 text-amber-200 border border-amber-200/35">
+                          {eventDate}
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 p-4">
+                          <p className="text-white font-semibold text-base line-clamp-2">{event.name}</p>
                           <div className="mt-2.5 flex items-center justify-between gap-3">
-                            <span className="text-sm font-bold text-amber-800">
+                            <span className="text-sm font-bold text-amber-300">
                               {freeOnly ? 'Cover gratis' : `L ${Number(event.paypalPrice).toFixed(2)}`}
                             </span>
                             <Link
                               href={`/cbtickets/${event.id}`}
                               className="text-xs font-semibold px-3 py-1.5 rounded-full"
                               style={{
-                                background: soldOut ? 'rgba(225,29,72,0.12)' : 'linear-gradient(135deg, #d4af37, #b8942f)',
-                                color: soldOut ? '#9f1239' : '#1a1510',
+                                background: soldOut ? 'rgba(225,29,72,0.18)' : 'linear-gradient(135deg, #d4af37, #b8942f)',
+                                color: soldOut ? '#fecdd3' : '#1a1510',
                                 pointerEvents: soldOut ? 'none' : 'auto',
                               }}
                             >
@@ -204,9 +223,9 @@ export default async function CbTicketsEventosPage() {
                             </Link>
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>

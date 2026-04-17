@@ -8,16 +8,6 @@ export function CbTicketsHeader() {
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-center">
-        <Link
-          href="/"
-          className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-medium text-stone-600 hover:text-amber-800 transition-colors flex items-center gap-1.5"
-        >
-          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          <span className="hidden sm:inline">Inicio</span>
-        </Link>
-
         <Link href="/cbtickets" className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Image
             src="/LogoCasaBlanca.png"
