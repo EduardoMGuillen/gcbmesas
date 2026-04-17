@@ -67,7 +67,7 @@ export function FeaturedEventsCarousel({ events }: { events: FeaturedEvent[] }) 
           key={event.id}
           src={event.coverImage}
           alt={event.name}
-          className="absolute inset-0 w-full h-full object-contain bg-black/70 p-2 sm:p-3"
+          className="absolute inset-0 w-full h-full object-cover"
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-100 to-amber-50">

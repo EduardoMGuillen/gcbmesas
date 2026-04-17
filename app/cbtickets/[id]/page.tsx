@@ -79,6 +79,17 @@ export default async function CbTicketsEventoPage({
   return (
     <>
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10 flex-1 w-full">
+        <div className="mb-5">
+          <Link
+            href="/cbtickets"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-stone-600 hover:text-amber-800 transition-colors"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Inicio GCBTickets
+          </Link>
+        </div>
         {venueLine ? (
           <p className="text-center text-stone-600 text-sm mb-6">{venueLine}</p>
         ) : null}
