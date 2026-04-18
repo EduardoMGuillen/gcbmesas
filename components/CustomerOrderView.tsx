@@ -44,6 +44,7 @@ interface CustomerOrderViewProps {
   tables?: Array<{
     id: string
     name: string
+    shortCode?: string
     zone?: string | null
     accounts?: Array<{
       id: string
@@ -54,8 +55,14 @@ interface CustomerOrderViewProps {
     }>
   }>
   initialTableId?: string
+  /** Para pie: abrir una cuenta concreta del mesero (query accountId). */
+  preferredOpenAccountId?: string
   isMesero?: boolean
-  onCreateAccount?: (tableId: string, initialBalance: number, clientName?: string | null) => Promise<void>
+  onCreateAccount?: (
+    tableId: string,
+    initialBalance: number,
+    clientName?: string | null
+  ) => Promise<void | string>
   onChangeTable?: (tableId: string) => void
   backUrl?: string
   forceCreateAccount?: boolean
@@ -69,6 +76,7 @@ export function CustomerOrderView({
   products,
   tables,
   initialTableId,
+  preferredOpenAccountId,
   isMesero = false,
   onCreateAccount,
   onChangeTable,
@@ -137,14 +145,26 @@ export function CustomerOrderView({
           if (newTable.zone) {
             setSelectedZone(newTable.zone)
           }
+          const rowShort = newTable.shortCode || ''
           setTable({
             id: newTable.id,
             name: newTable.name,
-            shortCode: newTable.name,
+            shortCode: rowShort || newTable.name,
             zone: newTable.zone || null,
           })
-          const newAccount = forceCreateAccount ? null : newTable.accounts?.[0]
-          if (newAccount && !forceCreateAccount) {
+          const walkInRow = isWalkInTable({
+            name: newTable.name,
+            shortCode: rowShort,
+            zone: newTable.zone ?? null,
+          })
+          const picked =
+            forceCreateAccount || !newTable.accounts?.length
+              ? null
+              : walkInRow && preferredOpenAccountId
+                ? newTable.accounts.find((a) => a.id === preferredOpenAccountId) ?? newTable.accounts[0]
+                : newTable.accounts[0]
+          const newAccount = picked
+          if (newAccount) {
             setAccount({
               id: newAccount.id,
               initialBalance: newAccount.initialBalance,
@@ -180,7 +200,16 @@ export function CustomerOrderView({
       setSelectedZone('')
       setSelectedTableId('')
     }
-  }, [initialTableId, initialTable, initialAccount, tables, isMesero, selectedTableId, forceCreateAccount])
+  }, [
+    initialTableId,
+    initialTable,
+    initialAccount,
+    tables,
+    isMesero,
+    selectedTableId,
+    forceCreateAccount,
+    preferredOpenAccountId,
+  ])
 
   // Si se pasa un initialTableId y no tiene cuenta, mostrar el formulario de crear cuenta automáticamente
   useEffect(() => {
@@ -236,13 +265,17 @@ export function CustomerOrderView({
       }
 
       if (onCreateAccount) {
-        await onCreateAccount(selectedTableId, balance, clientName.trim() || null)
+        const createdId = await onCreateAccount(selectedTableId, balance, clientName.trim() || null)
         setShowCreateAccount(false)
         setInitialBalance('')
         setClientName('')
         setCuentaAbierta(false)
         if (isMesero) {
-          router.push(`${backUrl}?tableId=${selectedTableId}`)
+          const params = new URLSearchParams({ tableId: selectedTableId })
+          if (isWalkIn && typeof createdId === 'string' && createdId) {
+            params.set('accountId', createdId)
+          }
+          router.push(`${backUrl}?${params.toString()}`)
         }
         router.refresh()
       }

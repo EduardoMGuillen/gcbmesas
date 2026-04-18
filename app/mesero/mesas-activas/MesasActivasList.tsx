@@ -115,7 +115,11 @@ export function MesasActivasList({ accounts }: MesasActivasListProps) {
               </div>
             </div>
             <Link
-              href={`/mesero/pedidos?tableId=${account.table.id}`}
+              href={
+                walkIn
+                  ? `/mesero/pedidos?tableId=${account.table.id}&accountId=${account.id}`
+                  : `/mesero/pedidos?tableId=${account.table.id}`
+              }
               className="shrink-0 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors text-center"
             >
               {walkIn ? 'Ir a cuenta' : 'Ir a mesa'}

@@ -1,24 +1,25 @@
 import type { MetadataRoute } from 'next'
 import { prisma } from '@/lib/prisma'
+import { isEventWithinPublicSalesWindow } from '@/lib/public-events'
 
 const CBTICKETS_BASE_URL = 'https://gcbtickets.com'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-
-  const events = await prisma.event.findMany({
+  const listingMinDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
+  const candidates = await prisma.event.findMany({
     where: {
       isActive: true,
       publishOnCbtickets: true,
-      date: { gte: now },
+      date: { gte: listingMinDate },
     },
     select: {
       id: true,
+      date: true,
       updatedAt: true,
     },
     orderBy: { date: 'asc' },
   })
+  const events = candidates.filter((e) => isEventWithinPublicSalesWindow(e.date))
 
   const staticUrls: MetadataRoute.Sitemap = [
     {
