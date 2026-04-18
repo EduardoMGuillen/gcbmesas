@@ -1499,6 +1499,36 @@ export async function advancePrepStatus(
   revalidatePath('/cajero')
 }
 
+/** Solo ADMIN: pasa a READY todos los pedidos visibles en la cola de cocina o bar (mismo criterio que getPrepQueue). */
+export async function adminMarkAllPrepOrdersReady(station: 'COCINA' | 'BAR') {
+  const u = await getCurrentUser()
+  if (u.role !== 'ADMIN') {
+    throw new Error('Solo administradores pueden usar esta acción')
+  }
+  ensurePrepStationAccess(u.role, station)
+
+  const queue = await getPrepQueue(station)
+  const ids = queue.orders.map((o) => o.id)
+  if (ids.length === 0) {
+    return { marked: 0 as const }
+  }
+
+  const r = await prisma.order.updateMany({
+    where: {
+      id: { in: ids },
+      served: true,
+      rejected: false,
+      prepStatus: { in: [OrderPrepStatus.QUEUED, OrderPrepStatus.PREPARING] },
+    },
+    data: { prepStatus: OrderPrepStatus.READY },
+  })
+
+  revalidatePath('/cocina')
+  revalidatePath('/bar')
+  revalidatePath('/cajero')
+  return { marked: r.count as number }
+}
+
 export async function getPrepRoutingAdmin() {
   const u = await getCurrentUser()
   if (u.role !== 'ADMIN') {

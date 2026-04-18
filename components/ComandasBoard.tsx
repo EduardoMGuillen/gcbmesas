@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
-import { setMyPrepCategories, advancePrepStatus, setBarCajeroWatches } from '@/lib/actions'
+import { setMyPrepCategories, advancePrepStatus, setBarCajeroWatches, adminMarkAllPrepOrdersReady } from '@/lib/actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 type PrepOrder = {
@@ -61,6 +61,7 @@ export function ComandasBoard({
   const [cajeroMine, setCajeroMine] = useState<string[]>(initialCajeroMine)
   const [savingCats, setSavingCats] = useState(false)
   const [savingCaj, setSavingCaj] = useState(false)
+  const [markingAll, setMarkingAll] = useState(false)
 
   useEffect(() => {
     setOrders(initialOrders)
@@ -135,6 +136,34 @@ export function ComandasBoard({
     })
   }
 
+  const handleMarkAllReady = () => {
+    if (!isAdmin) return
+    const n = orders.filter((o) => o.prepStatus === 'QUEUED' || o.prepStatus === 'PREPARING').length
+    if (n === 0) {
+      alert('No hay comandas en cola o en preparación.')
+      return
+    }
+    if (
+      !confirm(
+        `¿Marcar como listas las ${n} comanda(s) visibles en ${station === 'COCINA' ? 'cocina' : 'bar'}? Los pedidos pasarán directo a listo.`
+      )
+    ) {
+      return
+    }
+    setMarkingAll(true)
+    startTransition(async () => {
+      try {
+        const { marked } = await adminMarkAllPrepOrdersReady(station)
+        alert(marked > 0 ? `Se marcaron ${marked} comanda(s) como listas.` : 'No se actualizó ningún pedido.')
+        router.refresh()
+      } catch (e: any) {
+        alert(e?.message || 'Error')
+      } finally {
+        setMarkingAll(false)
+      }
+    })
+  }
+
   const showLegacyCategories = !isAdmin && !useGlobalRouting
   const showBarCajeros = !isAdmin && station === 'BAR' && cajeroOptions.length > 0
 
@@ -142,14 +171,26 @@ export function ComandasBoard({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold text-white">{title}</h1>
-        <button
-          type="button"
-          onClick={() => refresh()}
-          disabled={isPending}
-          className="px-4 py-2 rounded-lg bg-dark-200 text-white text-sm hover:bg-dark-100 disabled:opacity-50"
-        >
-          {isPending ? 'Actualizando…' : 'Actualizar'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => void handleMarkAllReady()}
+              disabled={isPending || markingAll}
+              className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm hover:bg-amber-500 disabled:opacity-50"
+            >
+              {markingAll ? 'Marcando…' : 'Marcar todas listas (admin)'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => refresh()}
+            disabled={isPending}
+            className="px-4 py-2 rounded-lg bg-dark-200 text-white text-sm hover:bg-dark-100 disabled:opacity-50"
+          >
+            {isPending ? 'Actualizando…' : 'Actualizar'}
+          </button>
+        </div>
       </div>
 
       {useGlobalRouting && (
