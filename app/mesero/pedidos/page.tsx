@@ -8,12 +8,13 @@ import { CustomerOrderView } from '@/components/CustomerOrderView'
 import { TableSelector } from '@/components/TableSelector'
 
 interface PedidosPageProps {
-  searchParams: { tableId?: string; newWalkIn?: string }
+  searchParams: { tableId?: string; newWalkIn?: string; accountId?: string }
 }
 
 async function createAccountAction(tableId: string, initialBalance: number, clientName?: string | null) {
   'use server'
-  await createAccount({ tableId, initialBalance, clientName })
+  const acc = await createAccount({ tableId, initialBalance, clientName })
+  return acc.id
 }
 
 export default async function PedidosPage({ searchParams }: PedidosPageProps) {
@@ -27,13 +28,17 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
   const initialTableId = searchParams.tableId || ''
   const forceNewWalkIn = searchParams.newWalkIn === '1' && initialTableId === walkInTable.id
   const isAdmin = session.user.role === 'ADMIN'
+  const accountIdParam = (searchParams.accountId || '').trim()
 
   // Si hay una mesa inicial seleccionada, obtener sus datos
   let initialTable = null
   let initialAccount = null
 
   if (initialTableId) {
-    const tableData = await getTableById(initialTableId)
+    const tableData = await getTableById(
+      initialTableId,
+      accountIdParam && !forceNewWalkIn ? { accountId: accountIdParam } : undefined
+    )
     if (tableData) {
       initialTable = {
         id: tableData.id,
@@ -65,6 +70,13 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
           }
         : null
     }
+
+    if (accountIdParam && !forceNewWalkIn && tableData) {
+      const acc = tableData.accounts[0]
+      if (!acc || acc.id !== accountIdParam) {
+        redirect(`/mesero/pedidos?tableId=${encodeURIComponent(initialTableId)}`)
+      }
+    }
   }
 
   // Preparar productos para la vista
@@ -80,6 +92,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
   const tablesForView = tables.map((t: any) => ({
     id: t.id,
     name: t.name,
+    shortCode: t.shortCode || '',
     zone: t.zone || null,
     accounts: t.accounts || [],
   }))
@@ -108,6 +121,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
             products={productsForView}
             tables={tablesForView}
             initialTableId={initialTableId}
+            preferredOpenAccountId={accountIdParam || undefined}
             isMesero={true}
             onCreateAccount={createAccountAction}
             forceCreateAccount={forceNewWalkIn}

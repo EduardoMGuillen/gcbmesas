@@ -2329,7 +2329,7 @@ export async function getTables() {
   return tables
 }
 
-export async function getTableById(tableId: string) {
+export async function getTableById(tableId: string, opts?: { accountId?: string | null }) {
   const currentUser = await getCurrentUser()
 
   const tableMeta = await prisma.table.findUnique({
@@ -2339,10 +2339,15 @@ export async function getTableById(tableId: string) {
   if (!tableMeta) return null
 
   const walkIn = isWalkInTable(tableMeta)
-  const accountWhere =
-    walkIn && currentUser.role === 'MESERO'
-      ? ({ status: 'OPEN' as const, openedByUserId: currentUser.id } satisfies Prisma.AccountWhereInput)
-      : ({ status: 'OPEN' as const } satisfies Prisma.AccountWhereInput)
+  const accountId = opts?.accountId?.trim() || null
+
+  const accountWhere: Prisma.AccountWhereInput = { status: 'OPEN' }
+  if (accountId) {
+    accountWhere.id = accountId
+  }
+  if (walkIn && currentUser.role === 'MESERO') {
+    accountWhere.openedByUserId = currentUser.id
+  }
 
   return prisma.table.findUnique({
     where: { id: tableId },

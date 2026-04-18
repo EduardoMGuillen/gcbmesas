@@ -357,7 +357,11 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
                   account.table?.id &&
                   (userRole === 'ADMIN' || userRole === 'MESERO') && (
                     <Link
-                      href={`/mesero/pedidos?tableId=${account.table.id}`}
+                      href={
+                        walkIn
+                          ? `/mesero/pedidos?tableId=${account.table.id}&accountId=${account.id}`
+                          : `/mesero/pedidos?tableId=${account.table.id}`
+                      }
                       className="text-primary-400 hover:text-primary-300 text-sm font-medium underline"
                     >
                       {walkIn ? 'Ir a cuenta' : 'Ir a mesa'}
