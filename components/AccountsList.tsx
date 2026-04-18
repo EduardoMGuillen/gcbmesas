@@ -74,6 +74,8 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
     return true
   })
 
+  const canCloseAccounts = userRole === 'ADMIN' || userRole === 'CAJERO'
+
   const handleCloseAccount = async (accountId: string) => {
     if (!confirm('¿Estás seguro de cerrar esta cuenta?')) {
       return
@@ -377,7 +379,7 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
                 >
                   Exportar Excel
                 </button>
-                {account.status === 'OPEN' && (
+                {account.status === 'OPEN' && canCloseAccounts && (
                   <button
                     onClick={() => handleCloseAccount(account.id)}
                     disabled={loading}
