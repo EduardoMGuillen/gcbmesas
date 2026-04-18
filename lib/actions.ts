@@ -8,7 +8,7 @@ import { LogAction, OrderPrepStatus, PrepCategoryDestination } from '@prisma/cli
 import { Prisma } from '@prisma/client'
 import { getClientSelfOrderingEnabled, ensureAppSettingsRow, UNCATEGORIZED_PREP_CATEGORY } from './app-settings'
 import { CyberSourceApiError, getCyberSourceApiHostForLogs, getCyberSourceEnvLabel } from './cybersource'
-import { WALK_IN_TABLE_NAME, WALK_IN_TABLE_SHORT_CODE, WALK_IN_TABLE_ZONE } from './walk-in-table'
+import { isWalkInTable, WALK_IN_TABLE_NAME, WALK_IN_TABLE_SHORT_CODE, WALK_IN_TABLE_ZONE } from './walk-in-table'
 import {
   findOnlineSaleLogForEntry,
   perEntryRefundAmount,
@@ -2267,8 +2267,8 @@ export async function getWalkInTable() {
 }
 
 export async function getTables() {
-  await getCurrentUser()
-  return prisma.table.findMany({
+  const currentUser = await getCurrentUser()
+  const tables = await prisma.table.findMany({
     include: {
       accounts: {
         where: { status: 'OPEN' },
@@ -2281,15 +2281,44 @@ export async function getTables() {
     },
     orderBy: { name: 'asc' },
   })
+
+  // Una sola mesa "Cliente de pie" comparte varias cuentas abiertas (una por mesero).
+  // Sin filtrar, el mesero ve la cuenta más reciente de otro mesero.
+  if (currentUser.role === 'MESERO') {
+    return tables.map((t) => {
+      if (!isWalkInTable(t)) return t
+      const accounts = t.accounts.filter((a) => a.openedByUserId === currentUser.id)
+      return {
+        ...t,
+        accounts,
+        _count: { ...t._count, accounts: accounts.length },
+      }
+    })
+  }
+
+  return tables
 }
 
 export async function getTableById(tableId: string) {
-  await getCurrentUser()
+  const currentUser = await getCurrentUser()
+
+  const tableMeta = await prisma.table.findUnique({
+    where: { id: tableId },
+    select: { name: true, shortCode: true, zone: true },
+  })
+  if (!tableMeta) return null
+
+  const walkIn = isWalkInTable(tableMeta)
+  const accountWhere =
+    walkIn && currentUser.role === 'MESERO'
+      ? ({ status: 'OPEN' as const, openedByUserId: currentUser.id } satisfies Prisma.AccountWhereInput)
+      : ({ status: 'OPEN' as const } satisfies Prisma.AccountWhereInput)
+
   return prisma.table.findUnique({
     where: { id: tableId },
     include: {
       accounts: {
-        where: { status: 'OPEN' },
+        where: accountWhere,
         include: {
           openedBy: { select: { name: true, username: true } },
           orders: {
