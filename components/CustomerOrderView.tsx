@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
-import { createCustomerOrder, createOrder, closeAccount, addBalanceToAccount, cancelOrderByCustomer, cancelOrderByMesero } from '@/lib/actions'
+import { createCustomerOrder, createOrder, addBalanceToAccount, cancelOrderByCustomer, cancelOrderByMesero } from '@/lib/actions'
 import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount, OPEN_ACCOUNT_SENTINEL } from '@/lib/utils'
 import { isInsufficientBalanceError } from '@/lib/billing-errors'
 import { getTableLabel, isWalkInTable, WALK_IN_TABLE_ZONE } from '@/lib/walk-in-table'
@@ -377,23 +377,6 @@ export function CustomerOrderView({
       finishOrderSuccessMesero()
     } catch (err: any) {
       setInsufficientTopUpError(err?.message || 'Error al agregar saldo o pedido')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleCloseAccount = async () => {
-    if (!confirm('¿Estás seguro de cerrar esta cuenta?')) {
-      return
-    }
-
-    setLoading(true)
-    try {
-      await closeAccount(account.id)
-      router.refresh()
-      setAccount({ ...account, status: 'CLOSED' as const })
-    } catch (err: any) {
-      setError(err.message || 'Error al cerrar cuenta')
     } finally {
       setLoading(false)
     }
@@ -781,13 +764,6 @@ export function CustomerOrderView({
                         className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm w-full sm:w-auto"
                       >
                         Agregar saldo a la cuenta
-                      </button>
-                      <button
-                        onClick={handleCloseAccount}
-                        disabled={loading}
-                        className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm w-full sm:w-auto"
-                      >
-                        Cerrar Cuenta
                       </button>
                     </div>
                   )}

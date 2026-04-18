@@ -33,6 +33,20 @@ async function createLog(
   })
 }
 
+/** Cliente y mesero que abrió la cuenta (para trazabilidad en ACCOUNT_CLOSED). */
+function snapshotAccountPartyForLog(account: {
+  clientName?: string | null
+  openedByUserId?: string | null
+  openedBy?: { name: string | null; username: string } | null
+}) {
+  return {
+    clientName: account.clientName?.trim() || null,
+    openedByUserId: account.openedByUserId ?? null,
+    openedByName: account.openedBy?.name?.trim() || null,
+    openedByUsername: account.openedBy?.username ?? null,
+  }
+}
+
 // Auth helper (exportado para otras acciones server si hace falta)
 export async function getCurrentUser() {
   const session = await getServerSession(authOptions)
@@ -818,11 +832,16 @@ export async function createAccount(data: {
 export async function closeAccount(accountId: string) {
   const currentUser = await getCurrentUser()
 
+  if (currentUser.role === 'MESERO') {
+    throw new Error('Solo caja o administración pueden cerrar cuentas')
+  }
+
   const account = await prisma.account.findUnique({
     where: { id: accountId },
     include: {
       orders: true,
       table: true,
+      openedBy: { select: { name: true, username: true } },
     },
   })
 
@@ -884,6 +903,7 @@ export async function closeAccount(accountId: string) {
       currentUser.id,
       account.tableId,
       {
+        ...snapshotAccountPartyForLog(account),
         accountId: accountId,
         autoAcceptedOrdersCount: pendingOrders.length,
         autoAcceptedOrderIds: pendingOrders.map((o) => o.id),
@@ -906,6 +926,7 @@ export async function closeAccount(accountId: string) {
   // Si no hubo pedidos pendientes, crear el log aquí
   if (pendingOrders.length === 0) {
     await createLog(LogAction.ACCOUNT_CLOSED, currentUser.id, account.tableId, {
+      ...snapshotAccountPartyForLog(account),
       accountId,
       initialBalance: account.initialBalance,
       totalConsumed,
@@ -915,6 +936,7 @@ export async function closeAccount(accountId: string) {
   } else {
     // Actualizar el log existente con información adicional
     await createLog(LogAction.ACCOUNT_CLOSED, currentUser.id, account.tableId, {
+      ...snapshotAccountPartyForLog(account),
       accountId,
       initialBalance: account.initialBalance,
       totalConsumed,
@@ -947,6 +969,9 @@ export async function closeOldAccounts() {
       createdAt: true,
       initialBalance: true,
       currentBalance: true,
+      clientName: true,
+      openedByUserId: true,
+      openedBy: { select: { name: true, username: true } },
       _count: { select: { orders: true } },
       orders: {
         where: { served: false, rejected: false },
@@ -1024,6 +1049,7 @@ export async function closeOldAccounts() {
         undefined, // Sin usuario (cierre automático del sistema)
         account.tableId,
         {
+          ...snapshotAccountPartyForLog(account),
           accountId: account.id,
           autoClosed: true,
           hoursOpen: Math.round(
@@ -1705,6 +1731,10 @@ export async function createAndCloseFreeInvoiceAccount(data: {
         tableId: created.tableId,
         action: LogAction.ACCOUNT_CLOSED,
         details: {
+          clientName,
+          openedByUserId: mesero.id,
+          openedByName: mesero.name?.trim() || null,
+          openedByUsername: mesero.username,
           accountId: created.id,
           reason: 'FREE_INVOICE_AUTO_CLOSE',
           total,
