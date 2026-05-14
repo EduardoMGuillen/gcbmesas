@@ -2713,6 +2713,84 @@ export async function getLogs(filters?: {
   })
 }
 
+export async function getOnlinePaymentRejections(filters?: {
+  reasonCategory?: string
+  eventId?: string
+  paymentReferenceContains?: string
+  limit?: number
+}) {
+  const currentUser = await getCurrentUser()
+  if (currentUser.role !== 'ADMIN' && currentUser.role !== 'CLIENTE_TICKETERA') {
+    throw new Error('No autorizado para ver rechazos de pago')
+  }
+
+  const limit = Math.min(Math.max(filters?.limit ?? 250, 1), 500)
+  const where: Prisma.OnlinePaymentRejectionWhereInput = {}
+
+  if (filters?.reasonCategory?.trim()) {
+    where.reasonCategory = filters.reasonCategory.trim()
+  }
+  if (filters?.paymentReferenceContains?.trim()) {
+    where.paymentReference = {
+      contains: filters.paymentReferenceContains.trim(),
+      mode: 'insensitive',
+    }
+  }
+
+  let ticketeraEventIds: string[] = []
+  if (currentUser.role === 'CLIENTE_TICKETERA') {
+    const assigned = await prisma.userEventAssignment.findMany({
+      where: { userId: currentUser.id },
+      select: { eventId: true },
+    })
+    ticketeraEventIds = assigned.map((a) => a.eventId)
+    if (!ticketeraEventIds.length) {
+      return { rows: [], eventOptions: [] as { id: string; name: string; date: Date }[] }
+    }
+    if (filters?.eventId?.trim()) {
+      if (!ticketeraEventIds.includes(filters.eventId.trim())) {
+        const eventOptions = await prisma.event.findMany({
+          where: { id: { in: ticketeraEventIds }, isActive: true },
+          select: { id: true, name: true, date: true },
+          orderBy: { date: 'desc' },
+        })
+        return { rows: [], eventOptions }
+      }
+      where.eventId = filters.eventId.trim()
+    } else {
+      where.eventId = { in: ticketeraEventIds }
+    }
+  } else if (filters?.eventId?.trim()) {
+    where.eventId = filters.eventId.trim()
+  }
+
+  const eventOptionsPromise =
+    currentUser.role === 'CLIENTE_TICKETERA'
+      ? prisma.event.findMany({
+          where: { id: { in: ticketeraEventIds }, isActive: true },
+          select: { id: true, name: true, date: true },
+          orderBy: { date: 'desc' },
+        })
+      : prisma.event.findMany({
+          where: { isActive: true },
+          select: { id: true, name: true, date: true },
+          orderBy: { date: 'desc' },
+          take: 120,
+        })
+
+  const [rows, eventOptions] = await Promise.all([
+    prisma.onlinePaymentRejection.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: { event: { select: { id: true, name: true, date: true } } },
+    }),
+    eventOptionsPromise,
+  ])
+
+  return { rows, eventOptions }
+}
+
 export async function getDashboardStats() {
   const currentUser = await getCurrentUser()
   if (currentUser.role !== 'ADMIN') {

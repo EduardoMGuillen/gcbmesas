@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { CyberSourceApiError, pickNumericEciFromConsumerAuth } from '@/lib/cybersource'
 import { cyberSourcePayerAuthValidateViaSdk } from '@/lib/cybersource-sdk-direct'
 import { formatPurchaseErrorForUser } from '@/lib/purchase-user-friendly-error'
+import { scheduleOnlinePaymentRejectionLog } from '@/lib/online-payment-rejection'
+
+function logPayerAuthResultReject(
+  httpStatus: number,
+  rawMessage: string,
+  ctx: { eventId?: string | null; paymentReference?: string | null; clientEmail?: string | null } = {}
+) {
+  const friendly = formatPurchaseErrorForUser(rawMessage)
+  scheduleOnlinePaymentRejectionLog({
+    source: 'payer-auth-result',
+    httpStatus,
+    rawMessage,
+    friendlyMessage: friendly,
+    eventId: ctx.eventId ?? undefined,
+    paymentReference: ctx.paymentReference ?? undefined,
+    clientEmail: ctx.clientEmail ?? undefined,
+  })
+  return friendly
+}
 
 function commerceIndicatorForBrand(cardType: string): string {
   const t = String(cardType || '').toLowerCase()
@@ -46,10 +65,8 @@ export async function POST(req: NextRequest) {
     const { authenticationTransactionId, paymentCardType } = body
 
     if (!authenticationTransactionId) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('authenticationTransactionId requerido.') },
-        { status: 400 }
-      )
+      const friendly = logPayerAuthResultReject(400, 'authenticationTransactionId requerido.')
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
 
     const result = await cyberSourcePayerAuthValidateViaSdk({
@@ -64,6 +81,8 @@ export async function POST(req: NextRequest) {
         status: result?.status,
         rawConsumerAuth: result?.consumerAuthenticationInformation,
       })
+      const rawFail = 'El resultado del challenge 3DS no contiene datos CAVV/ECI válidos.'
+      logPayerAuthResultReject(200, rawFail)
       return NextResponse.json({
         status: 'failed',
         consumerAuthenticationInformation: null,
@@ -85,18 +104,18 @@ export async function POST(req: NextRequest) {
         requestId: error.requestId,
         responseBody: error.responseBody,
       })
+      const rawCs = `CyberSource ${error.status}: ${error.message}`
+      const friendly = logPayerAuthResultReject(502, rawCs)
       return NextResponse.json(
         {
-          error: formatPurchaseErrorForUser(`CyberSource ${error.status}: ${error.message}`),
+          error: friendly,
           requestId: error.requestId,
         },
         { status: 502 }
       )
     }
     console.error('[CyberSource] payer-auth-result unexpected error:', error)
-    return NextResponse.json(
-      { error: formatPurchaseErrorForUser(error?.message || 'Error interno') },
-      { status: 500 }
-    )
+    const friendly = logPayerAuthResultReject(500, error?.message || 'Error interno')
+    return NextResponse.json({ error: friendly }, { status: 500 })
   }
 }

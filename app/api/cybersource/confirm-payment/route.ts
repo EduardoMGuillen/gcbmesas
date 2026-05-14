@@ -20,6 +20,26 @@ import { escapeHtml } from '@/lib/html-escape'
 import { sendMailWithInlineImages } from '@/lib/send-mail'
 import { notifyAdminsNewEntrySale } from '@/lib/push'
 import { formatPurchaseErrorForUser } from '@/lib/purchase-user-friendly-error'
+import { scheduleOnlinePaymentRejectionLog } from '@/lib/online-payment-rejection'
+
+function logConfirmReject(
+  status: number,
+  rawMessage: string,
+  ctx: { eventId?: string | null; paymentReference?: string | null; clientEmail?: string | null },
+  friendlyOverride?: string
+) {
+  const friendly = friendlyOverride ?? formatPurchaseErrorForUser(rawMessage)
+  scheduleOnlinePaymentRejectionLog({
+    source: 'confirm-payment',
+    httpStatus: status,
+    rawMessage,
+    friendlyMessage: friendly,
+    eventId: ctx.eventId ?? undefined,
+    paymentReference: ctx.paymentReference ?? undefined,
+    clientEmail: ctx.clientEmail ?? undefined,
+  })
+  return friendly
+}
 
 function maskMerchantId(merchantId: string | undefined) {
   if (!merchantId) return null
@@ -133,6 +153,7 @@ export async function POST(req: NextRequest) {
   const debugContext: {
     paymentReference?: string
     eventId?: string
+    clientEmail?: string
     numberOfEntries?: number
     eventPrice?: number
     transientToken?: unknown
@@ -177,6 +198,7 @@ export async function POST(req: NextRequest) {
     } = body
     debugContext.paymentReference = paymentReference
     debugContext.eventId = eventId
+    debugContext.clientEmail = clientEmail ? String(clientEmail).trim() : undefined
     debugContext.numberOfEntries = Number(numberOfEntries || 0)
     debugContext.transientToken = transientToken
     debugContext.cardNumber = cardNumber
@@ -194,7 +216,12 @@ export async function POST(req: NextRequest) {
     debugContext.hasConsumerAuthInfo = Boolean(consumerAuthenticationInformation)
 
     if (!paymentReference || !eventId || !clientEmail || !numberOfEntries) {
-      return NextResponse.json({ error: formatPurchaseErrorForUser('Datos incompletos') }, { status: 400 })
+      const friendly = logConfirmReject(400, 'Datos incompletos', {
+        eventId,
+        paymentReference,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
 
     const isMockMode = process.env.CYBERSOURCE_MOCK === 'true'
@@ -204,36 +231,40 @@ export async function POST(req: NextRequest) {
     const cardDigits = String(cardNumber || '').replace(/\D/g, '')
 
     if (!isMockMode && !isDirectMode && !transientToken) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('Falta transient token de Unified Checkout.') },
-        { status: 400 }
-      )
+      const friendly = logConfirmReject(400, 'Falta transient token de Unified Checkout.', {
+        eventId,
+        paymentReference,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
     if (!isMockMode && isDirectMode && (!cardNumber || !cardExpMonth || !cardExpYear || !cardCvv)) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('Faltan datos de tarjeta para pago directo.') },
-        { status: 400 }
-      )
+      const friendly = logConfirmReject(400, 'Faltan datos de tarjeta para pago directo.', {
+        eventId,
+        paymentReference,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
     if (
       !isMockMode &&
       isDirectMode &&
       (!billToAddress1 || !billToLocality || !billToAdministrativeArea || !billToPostalCode || !billToCountry)
     ) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('Faltan datos mínimos de facturación para pago directo.') },
-        { status: 400 }
-      )
+      const friendly = logConfirmReject(400, 'Faltan datos mínimos de facturación para pago directo.', {
+        eventId,
+        paymentReference,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
     if (!isMockMode && isDirectMode && !(cardDigits.length === 15 || cardDigits.length === 16)) {
-      return NextResponse.json(
-        {
-          error: formatPurchaseErrorForUser(
-            'Número de tarjeta inválido para prueba (usa 15 o 16 dígitos).'
-          ),
-        },
-        { status: 400 }
+      const friendly = logConfirmReject(
+        400,
+        'Número de tarjeta inválido para prueba (usa 15 o 16 dígitos).',
+        { eventId, paymentReference, clientEmail }
       )
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
 
     const pendingLog = await prisma.log.findFirst({
@@ -267,26 +298,32 @@ export async function POST(req: NextRequest) {
     })
 
     if (!pendingLog) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('No se encontró la orden pendiente de CyberSource') },
-        { status: 404 }
-      )
+      const friendly = logConfirmReject(404, 'No se encontró la orden pendiente de CyberSource', {
+        eventId,
+        paymentReference,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 404 })
     }
 
     const pendingDetails = pendingLog.details as any
     if (pendingDetails?.status === 'PROCESSED') {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('Esta transacción ya fue procesada anteriormente.') },
-        { status: 409 }
-      )
+      const friendly = logConfirmReject(409, 'Esta transacción ya fue procesada anteriormente.', {
+        eventId,
+        paymentReference,
+        clientEmail: String(pendingDetails?.clientEmail || clientEmail),
+      })
+      return NextResponse.json({ error: friendly }, { status: 409 })
     }
 
     const names: string[] = pendingDetails?.clientNames || []
     if (!names.length) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('Nombres de entradas requeridos') },
-        { status: 400 }
-      )
+      const friendly = logConfirmReject(400, 'Nombres de entradas requeridos', {
+        eventId,
+        paymentReference,
+        clientEmail: String(pendingDetails?.clientEmail || clientEmail),
+      })
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
 
     const event = await prisma.event.findFirst({
@@ -295,20 +332,25 @@ export async function POST(req: NextRequest) {
     debugContext.eventPrice = Number(event?.paypalPrice || 0)
 
     if (!event || !event.paypalPrice) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('Evento no encontrado o sin precio online') },
-        { status: 404 }
-      )
+      const friendly = logConfirmReject(404, 'Evento no encontrado o sin precio online', {
+        eventId,
+        paymentReference,
+        clientEmail: String(pendingDetails?.clientEmail || clientEmail),
+      })
+      return NextResponse.json({ error: friendly }, { status: 404 })
     }
 
     const qtyNeeded = Number(pendingDetails?.numberOfEntries || numberOfEntries)
     try {
       await assertEventEntryCapacity(event, qtyNeeded)
     } catch (capErr: any) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser(capErr?.message || 'Sin cupo para este evento.') },
-        { status: 409 }
-      )
+      const rawCap = capErr?.message || 'Sin cupo para este evento.'
+      const friendly = logConfirmReject(409, rawCap, {
+        eventId: event.id,
+        paymentReference,
+        clientEmail: String(pendingDetails?.clientEmail || clientEmail),
+      })
+      return NextResponse.json({ error: friendly }, { status: 409 })
     }
 
     const fallbackFullName = String(cardHolderName || names[0] || 'Cliente General').trim()
@@ -418,14 +460,13 @@ export async function POST(req: NextRequest) {
         captureStatus: null,
         extraNote: 'Autorización CyberSource no exitosa.',
       })
-      return NextResponse.json(
-        {
-          error: formatPurchaseErrorForUser(
-            `Pago rechazado por CyberSource (${reasonCode || status || 'sin-codigo'}).`
-          ),
-        },
-        { status: 402 }
-      )
+      const rawAuth = `Pago rechazado por CyberSource (${reasonCode || status || 'sin-codigo'}).`
+      const friendlyAuth = logConfirmReject(402, rawAuth, {
+        eventId: event.id,
+        paymentReference,
+        clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+      })
+      return NextResponse.json({ error: friendlyAuth }, { status: 402 })
     }
 
     const amountToCapture = amountStr
@@ -495,14 +536,13 @@ export async function POST(req: NextRequest) {
           captureStatus: captureStatus || 'FAILED',
           extraNote: 'Captura REST rechazada tras autorización OK.',
         })
-        return NextResponse.json(
-          {
-          error: formatPurchaseErrorForUser(
-            `Captura rechazada por CyberSource (${captureStatus || 'sin-estado'}).`
-          ),
-        },
-          { status: 402 }
-        )
+        const rawCap = `Captura rechazada por CyberSource (${captureStatus || 'sin-estado'}).`
+        const friendlyCap = logConfirmReject(402, rawCap, {
+          eventId: event.id,
+          paymentReference,
+          clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+        })
+        return NextResponse.json({ error: friendlyCap }, { status: 402 })
       }
     } else if (!isMockMode && !isDirectMode && transactionId) {
       let resolved = String((paymentResponse as any)?.captureId || '').trim()
@@ -556,14 +596,14 @@ export async function POST(req: NextRequest) {
         captureStatus: null,
         extraNote: 'Autorización OK pero no se resolvió captureId (unified o HAL).',
       })
-      return NextResponse.json(
-        {
-          error: formatPurchaseErrorForUser(
-            'No se pudo registrar el id de captura del pago. No se emitieron entradas; si ves un cargo, contacta soporte con tu referencia.'
-          ),
-        },
-        { status: 502 }
-      )
+      const rawNoCap =
+        'No se pudo registrar el id de captura del pago. No se emitieron entradas; si ves un cargo, contacta soporte con tu referencia.'
+      const friendlyNoCap = logConfirmReject(502, rawNoCap, {
+        eventId: event.id,
+        paymentReference,
+        clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+      })
+      return NextResponse.json({ error: friendlyNoCap }, { status: 502 })
     }
 
     let entries: any[] = []
@@ -599,16 +639,16 @@ export async function POST(req: NextRequest) {
       )
     } catch (txErr: any) {
       console.error('[CyberSource] Entry creation failed after successful payment:', txErr)
-      return NextResponse.json(
-        {
-          error: formatPurchaseErrorForUser(
-            txErr?.message?.includes('Cupo') || txErr?.message?.includes('disponible')
-              ? txErr.message
-              : 'No se pudieron emitir las entradas. Contacta soporte con tu referencia de pago.'
-          ),
-        },
-        { status: 409 }
-      )
+      const rawTx =
+        txErr?.message?.includes('Cupo') || txErr?.message?.includes('disponible')
+          ? txErr.message
+          : 'No se pudieron emitir las entradas. Contacta soporte con tu referencia de pago.'
+      const friendlyTx = logConfirmReject(409, rawTx, {
+        eventId: event.id,
+        paymentReference,
+        clientEmail: String(pendingDetails?.clientEmail || clientEmail).trim(),
+      })
+      return NextResponse.json({ error: friendlyTx }, { status: 409 })
     }
 
     await prisma.log.create({
@@ -858,9 +898,15 @@ export async function POST(req: NextRequest) {
             error.responseBody?.reason ||
             error.responseBody?.message ||
             error.message
+      const rawCs = `CyberSource ${error.status}: ${reason}`
+      const friendlyCs = logConfirmReject(502, rawCs, {
+        eventId: debugContext.eventId,
+        paymentReference: debugContext.paymentReference,
+        clientEmail: debugContext.clientEmail,
+      })
       return NextResponse.json(
         {
-          error: formatPurchaseErrorForUser(`CyberSource ${error.status}: ${reason}`),
+          error: friendlyCs,
           requestId: error.requestId,
           endpoint: error.endpoint,
         },
@@ -868,9 +914,11 @@ export async function POST(req: NextRequest) {
       )
     }
     console.error('[CyberSource] Confirm payment error:', error)
-    return NextResponse.json(
-      { error: formatPurchaseErrorForUser(error?.message || 'Error interno') },
-      { status: 500 }
-    )
+    const friendlyGen = logConfirmReject(500, error?.message || 'Error interno', {
+      eventId: debugContext.eventId,
+      paymentReference: debugContext.paymentReference,
+      clientEmail: debugContext.clientEmail,
+    })
+    return NextResponse.json({ error: friendlyGen }, { status: 500 })
   }
 }

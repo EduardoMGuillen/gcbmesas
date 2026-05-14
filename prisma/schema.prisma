@@ -320,6 +320,30 @@ model Log {
   @@map("logs")
 }
 
+/// Rechazos / fallos del flujo de pago online (entradas). Solo auditoría; no afecta cobros.
+model OnlinePaymentRejection {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  /// Origen: confirm-payment, create-payment, payer-auth, payer-auth-result
+  source           String
+  httpStatus       Int
+  /// Clave para filtro (validacion_datos, banco_rechazo, tres_ds, …)
+  reasonCategory   String
+  friendlyMessage  String   @db.Text
+  rawMessage       String   @db.Text
+  eventId          String?
+  paymentReference String?
+  clientEmail      String?
+
+  event Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([reasonCategory])
+  @@index([eventId])
+  @@index([paymentReference])
+  @@map("online_payment_rejections")
+}
+
 model Event {
   id              String   @id @default(cuid())
   name            String
@@ -344,6 +368,7 @@ model Event {
   createdBy User?   @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   entries   Entry[]
   ticketeraAssignments UserEventAssignment[]
+  onlinePaymentRejections OnlinePaymentRejection[]
 
   @@index([isActive])
   @@index([date])
