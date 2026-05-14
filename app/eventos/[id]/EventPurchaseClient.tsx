@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import QRCode from 'qrcode'
+import { formatPurchaseErrorForUser } from '@/lib/purchase-user-friendly-error'
 
 type EventData = {
   id: string
@@ -379,12 +380,12 @@ export function EventPurchaseClient({
           if (error) {
             const msg = String(error?.message || error?.details || JSON.stringify(error) || '')
             const isExpired = /expir|invalid.*context|context.*invalid/i.test(msg)
-            const err = Object.assign(
-              new Error(isExpired
-                ? 'La sesión de pago expiró. Ingresa tus datos de tarjeta nuevamente.'
-                : (msg || 'No se pudo tokenizar la tarjeta.')),
-              { expired: isExpired }
-            )
+            const friendly = isExpired
+              ? 'La sesión de pago expiró. Ingresa tus datos de tarjeta nuevamente.'
+              : msg.trim()
+                ? formatPurchaseErrorForUser(msg)
+                : 'No se pudo tokenizar la tarjeta. Revisa el número y el CVV.'
+            const err = Object.assign(new Error(friendly), { expired: isExpired })
             settle(reject, err)
             return
           }
@@ -397,12 +398,12 @@ export function EventPurchaseClient({
           .catch((err: any) => {
             const msg = String(err?.message || '')
             const isExpired = /expir|invalid.*context|context.*invalid/i.test(msg)
-            settle(reject, Object.assign(
-              new Error(isExpired
-                ? 'La sesión de pago expiró. Ingresa tus datos de tarjeta nuevamente.'
-                : (msg || 'No se pudo tokenizar la tarjeta.')),
-              { expired: isExpired }
-            ))
+            const friendlyCatch = isExpired
+              ? 'La sesión de pago expiró. Ingresa tus datos de tarjeta nuevamente.'
+              : msg.trim()
+                ? formatPurchaseErrorForUser(msg)
+                : 'No se pudo tokenizar la tarjeta. Revisa el número y el CVV.'
+            settle(reject, Object.assign(new Error(friendlyCatch), { expired: isExpired }))
           })
       }
     }).catch((err: any) => {
@@ -466,7 +467,11 @@ export function EventPurchaseClient({
 
       if (!payerAuthResponse.ok) {
         // HTTP error from our own API route — surface it to the user
-        throw new Error(rawPayerAuth?.error || `Error en validación 3DS (${payerAuthResponse.status})`)
+        throw new Error(
+          formatPurchaseErrorForUser(
+            rawPayerAuth?.error || `Error en validación 3DS (${payerAuthResponse.status})`
+          )
+        )
       }
 
       if (rawPayerAuth?.status === 'challenge_required') {
@@ -493,8 +498,10 @@ export function EventPurchaseClient({
 
       if (rawPayerAuth?.status === 'failed') {
         throw new Error(
-          rawPayerAuth?.reason ||
-          'La autenticación 3DS de la tarjeta falló. Intenta con otra tarjeta o consulta a tu banco.'
+          formatPurchaseErrorForUser(
+            rawPayerAuth?.reason ||
+              'La autenticación 3DS de la tarjeta falló. Intenta con otra tarjeta o consulta a tu banco.'
+          )
         )
       }
 
@@ -566,7 +573,9 @@ export function EventPurchaseClient({
       }),
     })
     const result = await confirmRes.json()
-    if (!confirmRes.ok) throw new Error(result.error || 'Error al confirmar el pago')
+    if (!confirmRes.ok) {
+      throw new Error(formatPurchaseErrorForUser(result.error || 'Error al confirmar el pago'))
+    }
     teardownUnifiedMicroform()
     requestAnimationFrame(() => setSuccess(result))
   }
@@ -599,7 +608,7 @@ export function EventPurchaseClient({
           }),
         })
         const resultData = await resultRes.json()
-        if (!resultRes.ok) throw new Error(resultData?.error || 'Error al obtener resultado 3DS del challenge.')
+        if (!resultRes.ok) throw new Error(formatPurchaseErrorForUser(resultData?.error || 'Error al obtener resultado 3DS del challenge.'))
         if (resultData?.status === 'authenticated' && resultData?.consumerAuthenticationInformation) {
           payerAuthResult = resultData
         }
@@ -619,7 +628,7 @@ export function EventPurchaseClient({
         storedBillingCountry: pending.billingCountry,
       })
     } catch (err: any) {
-      setError(err.message || 'Error al completar el pago con 3DS.')
+      setError(formatPurchaseErrorForUser(err?.message || 'Error al completar el pago con 3DS.'))
     } finally {
       setProcessing(false)
       challengeCompleteLockRef.current = false
@@ -663,7 +672,7 @@ export function EventPurchaseClient({
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'No se pudo iniciar el pago')
+      if (!res.ok) throw new Error(formatPurchaseErrorForUser(data.error || 'No se pudo iniciar el pago'))
 
       if (data.mock) {
         const confirmRes = await fetch('/api/cybersource/confirm-payment', {
@@ -679,7 +688,9 @@ export function EventPurchaseClient({
           }),
         })
         const result = await confirmRes.json()
-        if (!confirmRes.ok) throw new Error(result.error || 'Error al confirmar el pago')
+        if (!confirmRes.ok) {
+          throw new Error(formatPurchaseErrorForUser(result.error || 'Error al confirmar el pago'))
+        }
         setSuccess(result)
         return
       }
@@ -713,7 +724,9 @@ export function EventPurchaseClient({
           }),
         })
         const result = await confirmRes.json()
-        if (!confirmRes.ok) throw new Error(result.error || 'Error al confirmar el pago directo')
+        if (!confirmRes.ok) {
+          throw new Error(formatPurchaseErrorForUser(result.error || 'Error al confirmar el pago directo'))
+        }
         setSuccess(result)
         return
       }
@@ -731,7 +744,7 @@ export function EventPurchaseClient({
 
       throw new Error('CyberSource no devolvió datos válidos de Unified Checkout')
     } catch (err: any) {
-      setError(err.message || 'Error al procesar el pago')
+      setError(formatPurchaseErrorForUser(err?.message || 'Error al procesar el pago'))
     } finally {
       setProcessing(false)
     }
@@ -747,7 +760,7 @@ export function EventPurchaseClient({
       }
       await startCheckout()
     } catch (err: any) {
-      setError(err.message || 'Error al procesar el pago')
+      setError(formatPurchaseErrorForUser(err?.message || 'Error al procesar el pago'))
     } finally {
       setProcessing(false)
     }

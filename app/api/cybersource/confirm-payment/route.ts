@@ -19,6 +19,7 @@ import { assertEventEntryCapacity } from '@/lib/actions'
 import { escapeHtml } from '@/lib/html-escape'
 import { sendMailWithInlineImages } from '@/lib/send-mail'
 import { notifyAdminsNewEntrySale } from '@/lib/push'
+import { formatPurchaseErrorForUser } from '@/lib/purchase-user-friendly-error'
 
 function maskMerchantId(merchantId: string | undefined) {
   if (!merchantId) return null
@@ -193,7 +194,7 @@ export async function POST(req: NextRequest) {
     debugContext.hasConsumerAuthInfo = Boolean(consumerAuthenticationInformation)
 
     if (!paymentReference || !eventId || !clientEmail || !numberOfEntries) {
-      return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
+      return NextResponse.json({ error: formatPurchaseErrorForUser('Datos incompletos') }, { status: 400 })
     }
 
     const isMockMode = process.env.CYBERSOURCE_MOCK === 'true'
@@ -203,20 +204,36 @@ export async function POST(req: NextRequest) {
     const cardDigits = String(cardNumber || '').replace(/\D/g, '')
 
     if (!isMockMode && !isDirectMode && !transientToken) {
-      return NextResponse.json({ error: 'Falta transient token de Unified Checkout.' }, { status: 400 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('Falta transient token de Unified Checkout.') },
+        { status: 400 }
+      )
     }
     if (!isMockMode && isDirectMode && (!cardNumber || !cardExpMonth || !cardExpYear || !cardCvv)) {
-      return NextResponse.json({ error: 'Faltan datos de tarjeta para pago directo.' }, { status: 400 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('Faltan datos de tarjeta para pago directo.') },
+        { status: 400 }
+      )
     }
     if (
       !isMockMode &&
       isDirectMode &&
       (!billToAddress1 || !billToLocality || !billToAdministrativeArea || !billToPostalCode || !billToCountry)
     ) {
-      return NextResponse.json({ error: 'Faltan datos mínimos de facturación para pago directo.' }, { status: 400 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('Faltan datos mínimos de facturación para pago directo.') },
+        { status: 400 }
+      )
     }
     if (!isMockMode && isDirectMode && !(cardDigits.length === 15 || cardDigits.length === 16)) {
-      return NextResponse.json({ error: 'Número de tarjeta inválido para prueba (usa 15 o 16 dígitos).' }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: formatPurchaseErrorForUser(
+            'Número de tarjeta inválido para prueba (usa 15 o 16 dígitos).'
+          ),
+        },
+        { status: 400 }
+      )
     }
 
     const pendingLog = await prisma.log.findFirst({
@@ -250,20 +267,26 @@ export async function POST(req: NextRequest) {
     })
 
     if (!pendingLog) {
-      return NextResponse.json({ error: 'No se encontró la orden pendiente de CyberSource' }, { status: 404 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('No se encontró la orden pendiente de CyberSource') },
+        { status: 404 }
+      )
     }
 
     const pendingDetails = pendingLog.details as any
     if (pendingDetails?.status === 'PROCESSED') {
       return NextResponse.json(
-        { error: 'Esta transacción ya fue procesada anteriormente.' },
+        { error: formatPurchaseErrorForUser('Esta transacción ya fue procesada anteriormente.') },
         { status: 409 }
       )
     }
 
     const names: string[] = pendingDetails?.clientNames || []
     if (!names.length) {
-      return NextResponse.json({ error: 'Nombres de entradas requeridos' }, { status: 400 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('Nombres de entradas requeridos') },
+        { status: 400 }
+      )
     }
 
     const event = await prisma.event.findFirst({
@@ -272,7 +295,10 @@ export async function POST(req: NextRequest) {
     debugContext.eventPrice = Number(event?.paypalPrice || 0)
 
     if (!event || !event.paypalPrice) {
-      return NextResponse.json({ error: 'Evento no encontrado o sin precio online' }, { status: 404 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('Evento no encontrado o sin precio online') },
+        { status: 404 }
+      )
     }
 
     const qtyNeeded = Number(pendingDetails?.numberOfEntries || numberOfEntries)
@@ -280,7 +306,7 @@ export async function POST(req: NextRequest) {
       await assertEventEntryCapacity(event, qtyNeeded)
     } catch (capErr: any) {
       return NextResponse.json(
-        { error: capErr?.message || 'Sin cupo para este evento.' },
+        { error: formatPurchaseErrorForUser(capErr?.message || 'Sin cupo para este evento.') },
         { status: 409 }
       )
     }
@@ -393,7 +419,11 @@ export async function POST(req: NextRequest) {
         extraNote: 'Autorización CyberSource no exitosa.',
       })
       return NextResponse.json(
-        { error: `Pago rechazado por CyberSource (${reasonCode || status || 'sin-codigo'}).` },
+        {
+          error: formatPurchaseErrorForUser(
+            `Pago rechazado por CyberSource (${reasonCode || status || 'sin-codigo'}).`
+          ),
+        },
         { status: 402 }
       )
     }
@@ -466,7 +496,11 @@ export async function POST(req: NextRequest) {
           extraNote: 'Captura REST rechazada tras autorización OK.',
         })
         return NextResponse.json(
-          { error: `Captura rechazada por CyberSource (${captureStatus || 'sin-estado'}).` },
+          {
+          error: formatPurchaseErrorForUser(
+            `Captura rechazada por CyberSource (${captureStatus || 'sin-estado'}).`
+          ),
+        },
           { status: 402 }
         )
       }
@@ -524,8 +558,9 @@ export async function POST(req: NextRequest) {
       })
       return NextResponse.json(
         {
-          error:
-            'No se pudo registrar el id de captura del pago. No se emitieron entradas; si ves un cargo, contacta soporte con tu referencia.',
+          error: formatPurchaseErrorForUser(
+            'No se pudo registrar el id de captura del pago. No se emitieron entradas; si ves un cargo, contacta soporte con tu referencia.'
+          ),
         },
         { status: 502 }
       )
@@ -566,10 +601,11 @@ export async function POST(req: NextRequest) {
       console.error('[CyberSource] Entry creation failed after successful payment:', txErr)
       return NextResponse.json(
         {
-          error:
+          error: formatPurchaseErrorForUser(
             txErr?.message?.includes('Cupo') || txErr?.message?.includes('disponible')
               ? txErr.message
-              : 'No se pudieron emitir las entradas. Contacta soporte con tu referencia de pago.',
+              : 'No se pudieron emitir las entradas. Contacta soporte con tu referencia de pago.'
+          ),
         },
         { status: 409 }
       )
@@ -824,7 +860,7 @@ export async function POST(req: NextRequest) {
             error.message
       return NextResponse.json(
         {
-          error: `CyberSource ${error.status}: ${reason}`,
+          error: formatPurchaseErrorForUser(`CyberSource ${error.status}: ${reason}`),
           requestId: error.requestId,
           endpoint: error.endpoint,
         },
@@ -832,6 +868,9 @@ export async function POST(req: NextRequest) {
       )
     }
     console.error('[CyberSource] Confirm payment error:', error)
-    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json(
+      { error: formatPurchaseErrorForUser(error?.message || 'Error interno') },
+      { status: 500 }
+    )
   }
 }

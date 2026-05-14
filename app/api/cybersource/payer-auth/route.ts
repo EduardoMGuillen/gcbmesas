@@ -6,6 +6,7 @@ import {
   cyberSourcePayerAuthEnrollViaSdk,
   cyberSourcePayerAuthValidateViaSdk,
 } from '@/lib/cybersource-sdk-direct'
+import { formatPurchaseErrorForUser } from '@/lib/purchase-user-friendly-error'
 
 function parseJwtPayload(token: string): any | null {
   try {
@@ -81,7 +82,10 @@ export async function POST(req: NextRequest) {
     } = body
 
     if (!paymentReference || !eventId || !numberOfEntries || !transientToken) {
-      return NextResponse.json({ error: 'Datos incompletos para validación 3DS.' }, { status: 400 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('Datos incompletos para validación 3DS.') },
+        { status: 400 }
+      )
     }
 
     const is3dsEnabled = (process.env.CYBERSOURCE_ENABLE_3DS || 'true').toLowerCase() === 'true'
@@ -108,7 +112,10 @@ export async function POST(req: NextRequest) {
     })
 
     if (!pendingLog) {
-      return NextResponse.json({ error: 'No se encontró la orden pendiente para Payer Auth.' }, { status: 404 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('No se encontró la orden pendiente para Payer Auth.') },
+        { status: 404 }
+      )
     }
 
     const pendingDetails = pendingLog.details as any
@@ -116,7 +123,10 @@ export async function POST(req: NextRequest) {
       where: { id: pendingDetails?.eventId || eventId, isActive: true },
     })
     if (!event || !event.paypalPrice) {
-      return NextResponse.json({ error: 'Evento no encontrado o sin precio online.' }, { status: 404 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('Evento no encontrado o sin precio online.') },
+        { status: 404 }
+      )
     }
 
     const amount = (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2)
@@ -300,11 +310,18 @@ export async function POST(req: NextRequest) {
             error.responseBody?.message ||
             error.message
       return NextResponse.json(
-        { error: `CyberSource ${error.status}: ${reason}`, requestId: error.requestId, endpoint: error.endpoint },
+        {
+          error: formatPurchaseErrorForUser(`CyberSource ${error.status}: ${reason}`),
+          requestId: error.requestId,
+          endpoint: error.endpoint,
+        },
         { status: 502 }
       )
     }
     console.error('[CyberSource] Payer auth error:', error)
-    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json(
+      { error: formatPurchaseErrorForUser(error?.message || 'Error interno') },
+      { status: 500 }
+    )
   }
 }

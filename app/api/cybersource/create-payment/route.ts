@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { CyberSourceApiError, cyberSourcePost } from '@/lib/cybersource'
 import { assertEventEntryCapacity } from '@/lib/actions'
+import { formatPurchaseErrorForUser } from '@/lib/purchase-user-friendly-error'
 
 function parseJwtPayload(token: string) {
   try {
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     const { eventId, numberOfEntries, clientNames, clientEmail, clientPhone } = body
 
     if (!eventId || !numberOfEntries || numberOfEntries < 1 || !Array.isArray(clientNames) || !clientEmail) {
-      return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
+      return NextResponse.json({ error: formatPurchaseErrorForUser('Datos incompletos') }, { status: 400 })
     }
 
     const event = await prisma.event.findFirst({
@@ -32,17 +33,20 @@ export async function POST(req: NextRequest) {
     })
 
     if (!event) {
-      return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 })
+      return NextResponse.json({ error: formatPurchaseErrorForUser('Evento no encontrado') }, { status: 404 })
     }
     if (!event.paypalPrice) {
-      return NextResponse.json({ error: 'Este evento no acepta pagos en línea' }, { status: 400 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('Este evento no acepta pagos en línea') },
+        { status: 400 }
+      )
     }
 
     try {
       await assertEventEntryCapacity(event, Number(numberOfEntries))
     } catch (capErr: any) {
       return NextResponse.json(
-        { error: capErr?.message || 'Sin cupo para este evento.' },
+        { error: formatPurchaseErrorForUser(capErr?.message || 'Sin cupo para este evento.') },
         { status: 409 }
       )
     }
@@ -51,7 +55,10 @@ export async function POST(req: NextRequest) {
       .map((n: string) => String(n || '').trim())
       .filter((n: string) => n.length > 0)
     if (!cleanNames.length || cleanNames.length !== Number(numberOfEntries)) {
-      return NextResponse.json({ error: 'Nombres de entradas incompletos' }, { status: 400 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('Nombres de entradas incompletos') },
+        { status: 400 }
+      )
     }
 
     const total = (Number(event.paypalPrice) * Number(numberOfEntries)).toFixed(2)
@@ -99,7 +106,11 @@ export async function POST(req: NextRequest) {
     const required = [process.env.CYBERSOURCE_MERCHANT_ID, process.env.CYBERSOURCE_KEY_ID, process.env.CYBERSOURCE_SHARED_SECRET]
     if (required.some((v) => !v)) {
       return NextResponse.json(
-        { error: 'CyberSource REST no está configurado. Faltan merchant_id, key_id o shared_secret.' },
+        {
+          error: formatPurchaseErrorForUser(
+            'CyberSource REST no está configurado. Faltan merchant_id, key_id o shared_secret.'
+          ),
+        },
         { status: 503 }
       )
     }
@@ -170,7 +181,10 @@ export async function POST(req: NextRequest) {
     const captureContextJwt =
       captureContext?.captureContext || captureContext?.token || (typeof captureContext === 'string' ? captureContext : null)
     if (!captureContextJwt) {
-      return NextResponse.json({ error: 'CyberSource no devolvió capture context.' }, { status: 502 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('CyberSource no devolvió capture context.') },
+        { status: 502 }
+      )
     }
 
     const payload = parseJwtPayload(String(captureContextJwt))
@@ -208,7 +222,7 @@ export async function POST(req: NextRequest) {
             error.message
       return NextResponse.json(
         {
-          error: `CyberSource ${error.status}: ${reason}`,
+          error: formatPurchaseErrorForUser(`CyberSource ${error.status}: ${reason}`),
           requestId: error.requestId,
           endpoint: error.endpoint,
         },
@@ -216,6 +230,9 @@ export async function POST(req: NextRequest) {
       )
     }
     console.error('[CyberSource] Create payment error:', error)
-    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json(
+      { error: formatPurchaseErrorForUser(error?.message || 'Error interno') },
+      { status: 500 }
+    )
   }
 }
