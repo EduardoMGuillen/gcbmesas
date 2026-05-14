@@ -4,6 +4,25 @@ import crypto from 'crypto'
 import { CyberSourceApiError, cyberSourcePost } from '@/lib/cybersource'
 import { assertEventEntryCapacity } from '@/lib/actions'
 import { formatPurchaseErrorForUser } from '@/lib/purchase-user-friendly-error'
+import { scheduleOnlinePaymentRejectionLog } from '@/lib/online-payment-rejection'
+
+function logCreateReject(
+  status: number,
+  rawMessage: string,
+  ctx: { eventId?: string | null; paymentReference?: string | null; clientEmail?: string | null }
+) {
+  const friendly = formatPurchaseErrorForUser(rawMessage)
+  scheduleOnlinePaymentRejectionLog({
+    source: 'create-payment',
+    httpStatus: status,
+    rawMessage,
+    friendlyMessage: friendly,
+    eventId: ctx.eventId ?? undefined,
+    paymentReference: ctx.paymentReference ?? undefined,
+    clientEmail: ctx.clientEmail ?? undefined,
+  })
+  return friendly
+}
 
 function parseJwtPayload(token: string) {
   try {
@@ -19,12 +38,18 @@ function parseJwtPayload(token: string) {
 }
 
 export async function POST(req: NextRequest) {
+  let stash: { eventId?: string; paymentReference?: string; clientEmail?: string } = {}
   try {
     const body = await req.json()
     const { eventId, numberOfEntries, clientNames, clientEmail, clientPhone } = body
 
     if (!eventId || !numberOfEntries || numberOfEntries < 1 || !Array.isArray(clientNames) || !clientEmail) {
-      return NextResponse.json({ error: formatPurchaseErrorForUser('Datos incompletos') }, { status: 400 })
+      const friendly = logCreateReject(400, 'Datos incompletos', {
+        eventId,
+        paymentReference: null,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
 
     const event = await prisma.event.findFirst({
@@ -33,36 +58,53 @@ export async function POST(req: NextRequest) {
     })
 
     if (!event) {
-      return NextResponse.json({ error: formatPurchaseErrorForUser('Evento no encontrado') }, { status: 404 })
+      const friendly = logCreateReject(404, 'Evento no encontrado', {
+        eventId,
+        paymentReference: null,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 404 })
     }
+
+    stash.eventId = event.id
+    stash.clientEmail = String(clientEmail).trim()
+
     if (!event.paypalPrice) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('Este evento no acepta pagos en línea') },
-        { status: 400 }
-      )
+      const friendly = logCreateReject(400, 'Este evento no acepta pagos en línea', {
+        eventId: event.id,
+        paymentReference: null,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
 
     try {
       await assertEventEntryCapacity(event, Number(numberOfEntries))
     } catch (capErr: any) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser(capErr?.message || 'Sin cupo para este evento.') },
-        { status: 409 }
-      )
+      const rawCap = capErr?.message || 'Sin cupo para este evento.'
+      const friendly = logCreateReject(409, rawCap, {
+        eventId: event.id,
+        paymentReference: null,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 409 })
     }
 
     const cleanNames = clientNames
       .map((n: string) => String(n || '').trim())
       .filter((n: string) => n.length > 0)
     if (!cleanNames.length || cleanNames.length !== Number(numberOfEntries)) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('Nombres de entradas incompletos') },
-        { status: 400 }
-      )
+      const friendly = logCreateReject(400, 'Nombres de entradas incompletos', {
+        eventId: event.id,
+        paymentReference: null,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
 
     const total = (Number(event.paypalPrice) * Number(numberOfEntries)).toFixed(2)
     const paymentReference = `CS-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`.toUpperCase()
+    stash.paymentReference = paymentReference
 
     // Use the browser's actual origin (from the Origin request header) as the primary
     // targetOrigin so it always matches window.location.origin exactly.
@@ -105,14 +147,12 @@ export async function POST(req: NextRequest) {
 
     const required = [process.env.CYBERSOURCE_MERCHANT_ID, process.env.CYBERSOURCE_KEY_ID, process.env.CYBERSOURCE_SHARED_SECRET]
     if (required.some((v) => !v)) {
-      return NextResponse.json(
-        {
-          error: formatPurchaseErrorForUser(
-            'CyberSource REST no está configurado. Faltan merchant_id, key_id o shared_secret.'
-          ),
-        },
-        { status: 503 }
+      const friendly = logCreateReject(
+        503,
+        'CyberSource REST no está configurado. Faltan merchant_id, key_id o shared_secret.',
+        { eventId: event.id, paymentReference, clientEmail }
       )
+      return NextResponse.json({ error: friendly }, { status: 503 })
     }
 
     await prisma.log.create({
@@ -181,10 +221,12 @@ export async function POST(req: NextRequest) {
     const captureContextJwt =
       captureContext?.captureContext || captureContext?.token || (typeof captureContext === 'string' ? captureContext : null)
     if (!captureContextJwt) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('CyberSource no devolvió capture context.') },
-        { status: 502 }
-      )
+      const friendly = logCreateReject(502, 'CyberSource no devolvió capture context.', {
+        eventId: event.id,
+        paymentReference,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 502 })
     }
 
     const payload = parseJwtPayload(String(captureContextJwt))
@@ -220,9 +262,15 @@ export async function POST(req: NextRequest) {
             error.responseBody?.reason ||
             error.responseBody?.message ||
             error.message
+      const rawCs = `CyberSource ${error.status}: ${reason}`
+      const friendly = logCreateReject(502, rawCs, {
+        eventId: stash.eventId,
+        paymentReference: stash.paymentReference,
+        clientEmail: stash.clientEmail,
+      })
       return NextResponse.json(
         {
-          error: formatPurchaseErrorForUser(`CyberSource ${error.status}: ${reason}`),
+          error: friendly,
           requestId: error.requestId,
           endpoint: error.endpoint,
         },
@@ -230,9 +278,11 @@ export async function POST(req: NextRequest) {
       )
     }
     console.error('[CyberSource] Create payment error:', error)
-    return NextResponse.json(
-      { error: formatPurchaseErrorForUser(error?.message || 'Error interno') },
-      { status: 500 }
-    )
+    const friendly = logCreateReject(500, error?.message || 'Error interno', {
+      eventId: stash.eventId,
+      paymentReference: stash.paymentReference,
+      clientEmail: stash.clientEmail,
+    })
+    return NextResponse.json({ error: friendly }, { status: 500 })
   }
 }

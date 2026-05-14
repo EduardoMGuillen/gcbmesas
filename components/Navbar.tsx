@@ -30,7 +30,18 @@ export function Navbar() {
     { href: '/admin/logs', label: 'Logs', match: pathname?.startsWith('/admin/logs') },
     { href: '/admin/reportes', label: 'Reportes', match: pathname?.startsWith('/admin/reportes') },
     { href: '/admin/marcajes', label: 'Marcajes', match: pathname?.startsWith('/admin/marcajes') },
-    { href: '/admin/entradas', label: 'Entradas', match: pathname?.startsWith('/admin/entradas') },
+    {
+      href: '/admin/entradas',
+      label: 'Entradas',
+      match:
+        pathname === '/admin/entradas' ||
+        Boolean(pathname?.startsWith('/admin/entradas/') && !pathname?.startsWith('/admin/entradas/rechazos-pago')),
+    },
+    {
+      href: '/admin/entradas/rechazos-pago',
+      label: 'Rechazos pago',
+      match: Boolean(pathname?.startsWith('/admin/entradas/rechazos-pago')),
+    },
     { href: '/taquilla', label: 'Taquilla', match: pathname?.startsWith('/taquilla') },
     { href: '/cajero', label: 'Cajero', match: pathname === '/cajero' },
     { href: '/mesero', label: 'Mesero', match: pathname === '/mesero' },

@@ -7,6 +7,25 @@ import {
   cyberSourcePayerAuthValidateViaSdk,
 } from '@/lib/cybersource-sdk-direct'
 import { formatPurchaseErrorForUser } from '@/lib/purchase-user-friendly-error'
+import { scheduleOnlinePaymentRejectionLog } from '@/lib/online-payment-rejection'
+
+function logPayerAuthReject(
+  httpStatus: number,
+  rawMessage: string,
+  ctx: { eventId?: string | null; paymentReference?: string | null; clientEmail?: string | null }
+) {
+  const friendly = formatPurchaseErrorForUser(rawMessage)
+  scheduleOnlinePaymentRejectionLog({
+    source: 'payer-auth',
+    httpStatus,
+    rawMessage,
+    friendlyMessage: friendly,
+    eventId: ctx.eventId ?? undefined,
+    paymentReference: ctx.paymentReference ?? undefined,
+    clientEmail: ctx.clientEmail ?? undefined,
+  })
+  return friendly
+}
 
 function parseJwtPayload(token: string): any | null {
   try {
@@ -63,6 +82,7 @@ function looksLikeChallengeRequired(rawAuthResponse: any) {
 
 export async function POST(req: NextRequest) {
   const currency = 'HNL'
+  let stash: { eventId?: string; paymentReference?: string; clientEmail?: string } = {}
   try {
     const body = await req.json()
     const {
@@ -81,11 +101,17 @@ export async function POST(req: NextRequest) {
       browserInfo,
     } = body
 
+    stash.eventId = eventId ? String(eventId) : undefined
+    stash.paymentReference = paymentReference ? String(paymentReference) : undefined
+    stash.clientEmail = clientEmail ? String(clientEmail).trim() : undefined
+
     if (!paymentReference || !eventId || !numberOfEntries || !transientToken) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('Datos incompletos para validación 3DS.') },
-        { status: 400 }
-      )
+      const friendly = logPayerAuthReject(400, 'Datos incompletos para validación 3DS.', {
+        eventId,
+        paymentReference,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
 
     const is3dsEnabled = (process.env.CYBERSOURCE_ENABLE_3DS || 'true').toLowerCase() === 'true'
@@ -112,10 +138,12 @@ export async function POST(req: NextRequest) {
     })
 
     if (!pendingLog) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('No se encontró la orden pendiente para Payer Auth.') },
-        { status: 404 }
-      )
+      const friendly = logPayerAuthReject(404, 'No se encontró la orden pendiente para Payer Auth.', {
+        eventId,
+        paymentReference,
+        clientEmail,
+      })
+      return NextResponse.json({ error: friendly }, { status: 404 })
     }
 
     const pendingDetails = pendingLog.details as any
@@ -123,11 +151,15 @@ export async function POST(req: NextRequest) {
       where: { id: pendingDetails?.eventId || eventId, isActive: true },
     })
     if (!event || !event.paypalPrice) {
-      return NextResponse.json(
-        { error: formatPurchaseErrorForUser('Evento no encontrado o sin precio online.') },
-        { status: 404 }
-      )
+      const friendly = logPayerAuthReject(404, 'Evento no encontrado o sin precio online.', {
+        eventId,
+        paymentReference,
+        clientEmail: String(clientEmail || pendingDetails?.clientEmail || ''),
+      })
+      return NextResponse.json({ error: friendly }, { status: 404 })
     }
+
+    stash.eventId = event.id
 
     const amount = (Number(event.paypalPrice) * Number(pendingDetails?.numberOfEntries || numberOfEntries)).toFixed(2)
     const fallbackName = String(cardHolderName || pendingDetails?.clientNames?.[0] || 'Cliente General').trim()
@@ -145,6 +177,8 @@ export async function POST(req: NextRequest) {
       phoneNumber: String(pendingDetails?.clientPhone || '00000000').trim() || '00000000',
     }
 
+    stash.clientEmail = resolvedBillTo.email
+
     const tokenPayload = parseJwtPayload(String(transientToken))
     const tokenDetectedType = tokenPayload?.content?.paymentInformation?.card?.number?.detectedCardTypes?.[0]
     const resolvedCardType = String(paymentCardType || tokenDetectedType || '').trim()
@@ -161,6 +195,12 @@ export async function POST(req: NextRequest) {
 
     const referenceId = String(setupResponse?.consumerAuthenticationInformation?.referenceId || '').trim()
     if (!referenceId) {
+      const rawRef = 'No se recibió referenceId de Payer Auth setup.'
+      logPayerAuthReject(200, rawRef, {
+        eventId: event.id,
+        paymentReference,
+        clientEmail: resolvedBillTo.email,
+      })
       return NextResponse.json({
         enabled: true,
         status: 'failed',
@@ -250,6 +290,17 @@ export async function POST(req: NextRequest) {
     )
 
     if (!hasCavv && !(isAmex && hasEciOrXid)) {
+      const raw3ds = enrollmentDsError
+        ? `Error en servidor de directorio 3DS (${enrollmentDsError}): ${
+            enrollmentCai.directoryServerErrorDescription ||
+            'El merchant puede no estar registrado para 3DS2 en el ambiente de prueba.'
+          }`
+        : 'Payer Authentication no devolvió datos 3DS suficientes (CAVV/ECI/XID). La tarjeta puede no soportar 3DS en este ambiente.'
+      logPayerAuthReject(200, raw3ds, {
+        eventId: event.id,
+        paymentReference,
+        clientEmail: resolvedBillTo.email,
+      })
       return NextResponse.json({
         enabled: true,
         status: 'failed',
@@ -309,9 +360,11 @@ export async function POST(req: NextRequest) {
             error.responseBody?.reason ||
             error.responseBody?.message ||
             error.message
+      const rawCs = `CyberSource ${error.status}: ${reason}`
+      const friendly = logPayerAuthReject(502, rawCs, stash)
       return NextResponse.json(
         {
-          error: formatPurchaseErrorForUser(`CyberSource ${error.status}: ${reason}`),
+          error: friendly,
           requestId: error.requestId,
           endpoint: error.endpoint,
         },
@@ -319,9 +372,7 @@ export async function POST(req: NextRequest) {
       )
     }
     console.error('[CyberSource] Payer auth error:', error)
-    return NextResponse.json(
-      { error: formatPurchaseErrorForUser(error?.message || 'Error interno') },
-      { status: 500 }
-    )
+    const friendly = logPayerAuthReject(500, error?.message || 'Error interno', stash)
+    return NextResponse.json({ error: friendly }, { status: 500 })
   }
 }
