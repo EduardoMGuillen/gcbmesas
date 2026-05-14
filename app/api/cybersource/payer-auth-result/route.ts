@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CyberSourceApiError, pickNumericEciFromConsumerAuth } from '@/lib/cybersource'
 import { cyberSourcePayerAuthValidateViaSdk } from '@/lib/cybersource-sdk-direct'
+import { formatPurchaseErrorForUser } from '@/lib/purchase-user-friendly-error'
 
 function commerceIndicatorForBrand(cardType: string): string {
   const t = String(cardType || '').toLowerCase()
@@ -45,7 +46,10 @@ export async function POST(req: NextRequest) {
     const { authenticationTransactionId, paymentCardType } = body
 
     if (!authenticationTransactionId) {
-      return NextResponse.json({ error: 'authenticationTransactionId requerido.' }, { status: 400 })
+      return NextResponse.json(
+        { error: formatPurchaseErrorForUser('authenticationTransactionId requerido.') },
+        { status: 400 }
+      )
     }
 
     const result = await cyberSourcePayerAuthValidateViaSdk({
@@ -82,11 +86,17 @@ export async function POST(req: NextRequest) {
         responseBody: error.responseBody,
       })
       return NextResponse.json(
-        { error: `CyberSource ${error.status}: ${error.message}`, requestId: error.requestId },
+        {
+          error: formatPurchaseErrorForUser(`CyberSource ${error.status}: ${error.message}`),
+          requestId: error.requestId,
+        },
         { status: 502 }
       )
     }
     console.error('[CyberSource] payer-auth-result unexpected error:', error)
-    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json(
+      { error: formatPurchaseErrorForUser(error?.message || 'Error interno') },
+      { status: 500 }
+    )
   }
 }
