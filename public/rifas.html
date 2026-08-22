@@ -126,11 +126,11 @@
         }
 
         .wheel-frame {
+            --ring: 14px;
             position: relative;
             width: min(92vw, 62vh, 640px);
-            aspect-ratio: 1;
+            height: min(92vw, 62vh, 640px);
             border-radius: 50%;
-            padding: 14px;
             background:
                 repeating-conic-gradient(from -13deg, var(--gold-deep) 0 10deg, var(--gold) 10deg 12deg, var(--gold-soft) 12deg 14deg, var(--gold) 14deg 16deg);
             box-shadow:
@@ -140,9 +140,8 @@
         }
 
         .wheel-inner {
-            position: relative;
-            width: 100%;
-            height: 100%;
+            position: absolute;
+            inset: var(--ring);
             border-radius: 50%;
             overflow: hidden;
             background: #111;
@@ -150,9 +149,12 @@
         }
 
         #wheel {
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
             display: block;
+            border-radius: 50%;
             transform: rotate(0deg);
             transform-origin: 50% 50%;
             will-change: transform;
@@ -558,7 +560,11 @@
                 grid-template-columns: 1fr;
             }
             .spin-btn { width: 100%; }
-            .wheel-frame { width: min(94vw, 58vh, 580px); padding: 10px; }
+            .wheel-frame {
+                width: min(94vw, 58vh, 580px);
+                height: min(94vw, 58vh, 580px);
+                --ring: 10px;
+            }
             .hub { inset: 33%; }
         }
     </style>
@@ -736,13 +742,13 @@
             }
 
             function resize() {
-                const parent = canvas.parentElement;
-                const css = Math.floor(Math.min(parent.clientWidth, parent.clientHeight));
+                const rect = canvas.getBoundingClientRect();
+                const css = Math.max(1, Math.round(Math.min(rect.width, rect.height)));
                 const dpr = window.devicePixelRatio || 1;
                 canvas.width = css * dpr;
                 canvas.height = css * dpr;
-                canvas.style.width = css + 'px';
-                canvas.style.height = css + 'px';
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                 size = css;
                 drawWheel();
