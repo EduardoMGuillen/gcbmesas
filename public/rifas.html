@@ -128,24 +128,28 @@
         .wheel-frame {
             --ring: 14px;
             position: relative;
+            flex: 0 0 auto;
             width: min(92vw, 62vh, 640px);
-            height: min(92vw, 62vh, 640px);
+            aspect-ratio: 1 / 1;
             border-radius: 50%;
+        }
+
+        .wheel-ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            box-sizing: border-box;
+            border: var(--ring) solid transparent;
             background:
-                repeating-conic-gradient(from -13deg, var(--gold-deep) 0 10deg, var(--gold) 10deg 12deg, var(--gold-soft) 12deg 14deg, var(--gold) 14deg 16deg);
+                padding-box #050505,
+                border-box repeating-conic-gradient(from -13deg, var(--gold-deep) 0 10deg, var(--gold) 10deg 12deg, var(--gold-soft) 12deg 14deg, var(--gold) 14deg 16deg);
+            background-origin: padding-box, border-box;
+            background-clip: padding-box, border-box;
+            overflow: hidden;
             box-shadow:
                 0 0 0 3px #1a1406,
                 0 0 50px rgba(212,175,55,.28),
                 0 24px 60px rgba(0,0,0,.65);
-        }
-
-        .wheel-inner {
-            position: absolute;
-            inset: var(--ring);
-            border-radius: 50%;
-            overflow: hidden;
-            background: #111;
-            box-shadow: inset 0 0 0 3px #000;
         }
 
         #wheel {
@@ -562,7 +566,6 @@
             .spin-btn { width: 100%; }
             .wheel-frame {
                 width: min(94vw, 58vh, 580px);
-                height: min(94vw, 58vh, 580px);
                 --ring: 10px;
             }
             .hub { inset: 33%; }
@@ -579,7 +582,7 @@
             <div class="chips" id="chips"></div>
             <div class="wheel-frame">
                 <div class="pointer"></div>
-                <div class="wheel-inner">
+                <div class="wheel-ring">
                     <canvas id="wheel"></canvas>
                     <div class="gloss"></div>
                     <div class="hub">
@@ -747,8 +750,8 @@
                 const dpr = window.devicePixelRatio || 1;
                 canvas.width = css * dpr;
                 canvas.height = css * dpr;
-                canvas.style.width = '100%';
-                canvas.style.height = '100%';
+                canvas.removeAttribute('style');
+                canvas.style.transform = 'rotate(' + rotation + 'deg)';
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                 size = css;
                 drawWheel();
@@ -804,11 +807,6 @@
                     ctx.fillText(String(i + 1), 0, -textR);
                     ctx.restore();
                 }
-                ctx.beginPath();
-                ctx.arc(0, 0, r - 3, 0, Math.PI * 2);
-                ctx.strokeStyle = '#d4af37';
-                ctx.lineWidth = 5;
-                ctx.stroke();
                 ctx.restore();
             }
 
