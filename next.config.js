@@ -36,6 +36,15 @@ const nextConfig = {
         source: '/mesa/:id*',
         destination: '/clientes?tableId=:id*',
       },
+      // Hidden raffle wheel (static page, no navbar link)
+      {
+        source: '/rifas',
+        destination: '/rifas.html',
+      },
+      {
+        source: '/rifas/',
+        destination: '/rifas.html',
+      },
     ]
   },
   async redirects() {

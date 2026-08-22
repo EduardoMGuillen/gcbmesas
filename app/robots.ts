@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: ['/','/eventos','/eventos/','/cbtickets','/cbtickets/'],
-        disallow: ['/admin/','/api/','/login','/mesero/','/cajero/','/taquilla/','/cocina/','/bar/','/clientes/'],
+        disallow: ['/admin/','/api/','/login','/mesero/','/cajero/','/taquilla/','/cocina/','/bar/','/clientes/','/rifas','/rifas.html'],
       },
     ],
     sitemap: [
