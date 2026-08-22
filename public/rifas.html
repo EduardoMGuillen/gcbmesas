@@ -90,11 +90,13 @@
 
         .chips {
             min-height: 42px;
+            max-height: 88px;
+            overflow-y: auto;
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
             gap: 8px;
-            max-width: 720px;
+            max-width: 820px;
             padding: 0 12px;
         }
 
@@ -125,12 +127,12 @@
 
         .wheel-frame {
             position: relative;
-            width: min(86vw, 56vh, 560px);
+            width: min(92vw, 62vh, 640px);
             aspect-ratio: 1;
             border-radius: 50%;
             padding: 14px;
             background:
-                repeating-conic-gradient(from 8deg, var(--gold-deep) 0 10deg, var(--gold) 10deg 12deg, var(--gold-soft) 12deg 14deg, var(--gold) 14deg 16deg);
+                repeating-conic-gradient(from -13deg, var(--gold-deep) 0 10deg, var(--gold) 10deg 12deg, var(--gold-soft) 12deg 14deg, var(--gold) 14deg 16deg);
             box-shadow:
                 0 0 0 3px #1a1406,
                 0 0 50px rgba(212,175,55,.28),
@@ -152,6 +154,7 @@
             height: 100%;
             display: block;
             transform: rotate(0deg);
+            transform-origin: 50% 50%;
             will-change: transform;
         }
 
@@ -167,31 +170,31 @@
 
         .pointer {
             position: absolute;
-            top: -6px;
+            top: 0;
             left: 50%;
             z-index: 6;
             width: 0;
             height: 0;
             transform: translateX(-50%);
-            border-left: 16px solid transparent;
-            border-right: 16px solid transparent;
-            border-top: 34px solid var(--gold);
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 32px solid var(--gold);
             filter: drop-shadow(0 6px 8px rgba(0,0,0,.65));
         }
 
         .pointer::after {
             content: '';
             position: absolute;
-            top: -34px;
+            top: -32px;
             left: -8px;
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
-            border-top: 18px solid var(--gold-soft);
+            border-top: 16px solid var(--gold-soft);
         }
 
         .hub {
             position: absolute;
-            inset: 31%;
+            inset: 34%;
             z-index: 5;
             border-radius: 50%;
             background: #000;
@@ -555,8 +558,8 @@
                 grid-template-columns: 1fr;
             }
             .spin-btn { width: 100%; }
-            .wheel-frame { width: min(92vw, 52vh, 520px); padding: 10px; }
-            .hub { inset: 29%; }
+            .wheel-frame { width: min(94vw, 58vh, 580px); padding: 10px; }
+            .hub { inset: 33%; }
         }
     </style>
 </head>
@@ -590,7 +593,7 @@
                             <button type="button" data-target="participants" data-step="1" aria-label="Más participantes">+</button>
                         </span>
                     </label>
-                    <input type="range" id="participants" min="2" max="80" step="1" value="12">
+                    <input type="range" id="participants" min="2" max="500" step="1" value="12">
                 </div>
                 <div class="field">
                     <label>Ganadores
@@ -600,7 +603,7 @@
                             <button type="button" data-target="winners" data-step="1" aria-label="Más ganadores">+</button>
                         </span>
                     </label>
-                    <input type="range" id="winners" min="1" max="12" step="1" value="1">
+                    <input type="range" id="winners" min="1" max="80" step="1" value="1">
                 </div>
                 <button class="spin-btn" id="spinBtn" type="button">GIRAR</button>
                 <div class="persist">
@@ -632,6 +635,7 @@
             const STORAGE_KEY = 'casablanca-rifas-saved';
             const CURRENT_KEY = 'casablanca-rifas-current';
             const STREAK_KEY = 'casablanca-rifas-streak';
+            const MAX_PARTICIPANTS = 500;
             const DEFAULTS = { participants: 12, winners: 1 };
 
             const canvas = document.getElementById('wheel');
@@ -657,6 +661,7 @@
             let audioCtx = null;
             let lastTickIndex = -1;
             let tickRaf = null;
+            let wonSet = new Set();
 
             const initial = loadCurrent() || loadSaved();
             const streakState = loadStreak();
@@ -673,7 +678,7 @@
                 if (!raw) return fallback;
                 try {
                     const parsed = JSON.parse(raw);
-                    const participants = clamp(parsed.participants, 2, 80);
+                    const participants = clamp(parsed.participants, 2, MAX_PARTICIPANTS);
                     return {
                         participants: participants,
                         winners: clamp(parsed.winners, 1, participants)
@@ -731,46 +736,67 @@
             }
 
             function resize() {
-                const css = canvas.parentElement.clientWidth;
+                const parent = canvas.parentElement;
+                const css = Math.floor(Math.min(parent.clientWidth, parent.clientHeight));
                 const dpr = window.devicePixelRatio || 1;
                 canvas.width = css * dpr;
                 canvas.height = css * dpr;
+                canvas.style.width = css + 'px';
+                canvas.style.height = css + 'px';
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                 size = css;
                 drawWheel();
             }
 
+            function hubInsetFor(n) {
+                if (n >= 160) return '38%';
+                if (n >= 80) return '36%';
+                if (n >= 40) return '34%';
+                return '32%';
+            }
+
             function drawWheel() {
                 const n = Number(participantsInput.value);
+                const hub = document.querySelector('.hub');
+                if (hub) hub.style.inset = hubInsetFor(n);
+
                 const r = size / 2;
                 const slice = (Math.PI * 2) / n;
+                const startOffset = -Math.PI / 2 - slice / 2;
+                const arc = slice * r;
+                const digits = String(n).length;
+                const fontSize = Math.min(20, Math.max(7, (arc * 0.52) / (digits * 0.62)));
+                const textR = n > 140 ? r * 0.90 : n > 70 ? r * 0.86 : n > 36 ? r * 0.80 : r * 0.74;
+
                 ctx.clearRect(0, 0, size, size);
                 ctx.save();
                 ctx.translate(r, r);
                 for (let i = 0; i < n; i++) {
-                    const start = -Math.PI / 2 + i * slice;
+                    const start = startOffset + i * slice;
                     ctx.beginPath();
                     ctx.moveTo(0, 0);
                     ctx.arc(0, 0, r - 1, start, start + slice);
                     ctx.closePath();
                     ctx.fillStyle = colorFor(i, n);
                     ctx.fill();
-                    ctx.strokeStyle = 'rgba(0,0,0,.35)';
-                    ctx.lineWidth = n > 28 ? 1 : 2;
+                    if (wonSet.has(i)) {
+                        ctx.fillStyle = 'rgba(0,0,0,.42)';
+                        ctx.fill();
+                    }
+                    ctx.strokeStyle = wonSet.has(i) ? 'rgba(212,175,55,.85)' : 'rgba(0,0,0,.35)';
+                    ctx.lineWidth = n > 80 ? 0.6 : n > 28 ? 1 : 2;
                     ctx.stroke();
 
-                    if (n <= 40) {
-                        ctx.save();
-                        ctx.rotate(start + slice / 2);
-                        ctx.fillStyle = '#fff';
-                        ctx.font = '700 ' + (n > 24 ? 13 : 18) + 'px "Exo 2", sans-serif';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.shadowColor = 'rgba(0,0,0,.75)';
-                        ctx.shadowBlur = 5;
-                        ctx.fillText(String(i + 1), r * 0.74, 0);
-                        ctx.restore();
-                    }
+                    ctx.save();
+                    ctx.rotate(start + slice / 2 + Math.PI / 2);
+                    ctx.fillStyle = wonSet.has(i) ? '#f0d78c' : '#fff';
+                    ctx.font = '700 ' + fontSize + 'px "Exo 2", sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(0,0,0,.85)';
+                    ctx.shadowBlur = n > 80 ? 3 : 5;
+                    ctx.fillText(String(i + 1), 0, -textR);
+                    ctx.restore();
                 }
                 ctx.beginPath();
                 ctx.arc(0, 0, r - 3, 0, Math.PI * 2);
@@ -795,14 +821,13 @@
                 return new Promise(function (resolve) {
                     const n = Number(participantsInput.value);
                     const slice = 360 / n;
-                    const targetMod = (360 - (index * slice + slice / 2) + 360) % 360;
+                    const targetMod = (360 - ((index * slice) % 360)) % 360;
                     const currentMod = ((rotation % 360) + 360) % 360;
                     let delta = targetMod - currentMod;
                     if (delta < 0) delta += 360;
-                    const jitter = (Math.random() - 0.5) * slice * 0.55;
-                    const loops = 5 + Math.floor(Math.random() * 3);
-                    rotation += loops * 360 + delta + jitter;
-                    const duration = 4.6 + Math.random() * 0.7;
+                    const loops = 6 + Math.floor(Math.random() * 3);
+                    rotation += loops * 360 + delta;
+                    const duration = 5.6 + Math.random() * 0.7;
                     canvas.style.transition = 'transform ' + duration + 's cubic-bezier(0.12, 0.82, 0.08, 1)';
                     canvas.style.transform = 'rotate(' + rotation + 'deg)';
                     startTicks();
@@ -818,7 +843,7 @@
                         if (event.propertyName === 'transform') finish();
                     };
                     canvas.addEventListener('transitionend', onEnd);
-                    setTimeout(finish, duration * 1000 + 120);
+                    setTimeout(finish, duration * 1000 + 160);
                 });
             }
 
@@ -864,7 +889,7 @@
                     const slice = 360 / n;
                     const live = readLiveRotation();
                     const angle = (360 - (live % 360) + 360) % 360;
-                    const idx = Math.floor(angle / slice) % n;
+                    const idx = Math.floor((angle + slice / 2) / slice) % n;
                     if (idx !== lastTickIndex) {
                         lastTickIndex = idx;
                         playTick();
@@ -896,6 +921,9 @@
                 spinBtn.disabled = busy;
                 participantsInput.disabled = busy;
                 winnersInput.disabled = busy;
+                document.querySelectorAll('.stepper button').forEach(function (button) {
+                    button.disabled = busy;
+                });
                 spinBtn.textContent = busy ? 'GIRANDO' : 'GIRAR';
             }
 
@@ -1005,6 +1033,8 @@
                 chips.innerHTML = '';
                 confetti.innerHTML = '';
                 spark.innerHTML = '';
+                wonSet = new Set();
+                drawWheel();
             }
 
             async function runRaffle() {
@@ -1015,17 +1045,15 @@
                 const cfg = currentConfig();
                 setBusy(true);
                 const selected = pickWinners(cfg.participants, cfg.winners);
-                const sequential = selected.length <= 3;
-                if (sequential) {
-                    for (let i = 0; i < selected.length; i++) {
-                        await spinTo(selected[i]);
-                        addChip(i + 1, selected[i]);
-                        await wait(i === selected.length - 1 ? 900 : 900);
-                    }
-                } else {
-                    await spinTo(selected[0]);
-                    selected.forEach(function (index, i) { addChip(i + 1, index); });
-                    await wait(500);
+                wonSet = new Set();
+                drawWheel();
+                for (let i = 0; i < selected.length; i++) {
+                    await spinTo(selected[i]);
+                    wonSet.add(selected[i]);
+                    drawWheel();
+                    addChip(i + 1, selected[i]);
+                    chips.scrollTop = chips.scrollHeight;
+                    await wait(i === selected.length - 1 ? 1200 : 1600);
                 }
                 showFinale(selected);
                 registerStreak();
