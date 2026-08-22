@@ -126,26 +126,11 @@
         }
 
         .wheel-frame {
-            --ring: 14px;
             position: relative;
             flex: 0 0 auto;
             width: min(92vw, 62vh, 640px);
             aspect-ratio: 1 / 1;
             border-radius: 50%;
-        }
-
-        .wheel-ring {
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            box-sizing: border-box;
-            border: var(--ring) solid transparent;
-            background:
-                padding-box #050505,
-                border-box repeating-conic-gradient(from -13deg, var(--gold-deep) 0 10deg, var(--gold) 10deg 12deg, var(--gold-soft) 12deg 14deg, var(--gold) 14deg 16deg);
-            background-origin: padding-box, border-box;
-            background-clip: padding-box, border-box;
-            overflow: hidden;
             box-shadow:
                 0 0 0 3px #1a1406,
                 0 0 50px rgba(212,175,55,.28),
@@ -566,7 +551,6 @@
             .spin-btn { width: 100%; }
             .wheel-frame {
                 width: min(94vw, 58vh, 580px);
-                --ring: 10px;
             }
             .hub { inset: 33%; }
         }
@@ -582,12 +566,10 @@
             <div class="chips" id="chips"></div>
             <div class="wheel-frame">
                 <div class="pointer"></div>
-                <div class="wheel-ring">
-                    <canvas id="wheel"></canvas>
-                    <div class="gloss"></div>
-                    <div class="hub">
-                        <img src="/LogoCasaBlanca.png" alt="Logo Casa Blanca">
-                    </div>
+                <canvas id="wheel"></canvas>
+                <div class="gloss"></div>
+                <div class="hub">
+                    <img src="/LogoCasaBlanca.png" alt="Logo Casa Blanca">
                 </div>
             </div>
         </div>
@@ -764,27 +746,49 @@
                 return '32%';
             }
 
+            function drawRingBand(a0, a1, r0, r1, color) {
+                ctx.beginPath();
+                ctx.arc(0, 0, r1, a0, a1);
+                ctx.arc(0, 0, r0, a1, a0, true);
+                ctx.closePath();
+                ctx.fillStyle = color;
+                ctx.fill();
+            }
+
             function drawWheel() {
                 const n = Number(participantsInput.value);
                 const hub = document.querySelector('.hub');
                 if (hub) hub.style.inset = hubInsetFor(n);
 
                 const r = size / 2;
+                const ringW = Math.max(10, Math.round(size * 0.045));
+                const innerR = r - ringW;
                 const slice = (Math.PI * 2) / n;
                 const startOffset = -Math.PI / 2 - slice / 2;
-                const arc = slice * r;
+                const arc = slice * innerR;
                 const digits = String(n).length;
                 const fontSize = Math.min(20, Math.max(7, (arc * 0.52) / (digits * 0.62)));
-                const textR = n > 140 ? r * 0.90 : n > 70 ? r * 0.86 : n > 36 ? r * 0.80 : r * 0.74;
+                const textR = n > 140 ? innerR * 0.90 : n > 70 ? innerR * 0.86 : n > 36 ? innerR * 0.80 : innerR * 0.74;
 
                 ctx.clearRect(0, 0, size, size);
                 ctx.save();
                 ctx.translate(r, r);
+
+                const ringStep = 16 * Math.PI / 180;
+                const ringOffset = -Math.PI / 2 - 13 * Math.PI / 180;
+                for (let a = 0; a < Math.PI * 2 - 0.0001; a += ringStep) {
+                    const a0 = ringOffset + a;
+                    drawRingBand(a0, a0 + ringStep * 10 / 16, innerR, r - 0.5, '#8a6d1b');
+                    drawRingBand(a0 + ringStep * 10 / 16, a0 + ringStep * 12 / 16, innerR, r - 0.5, '#d4af37');
+                    drawRingBand(a0 + ringStep * 12 / 16, a0 + ringStep * 14 / 16, innerR, r - 0.5, '#f0d78c');
+                    drawRingBand(a0 + ringStep * 14 / 16, a0 + ringStep, innerR, r - 0.5, '#d4af37');
+                }
+
                 for (let i = 0; i < n; i++) {
                     const start = startOffset + i * slice;
                     ctx.beginPath();
                     ctx.moveTo(0, 0);
-                    ctx.arc(0, 0, r - 1, start, start + slice);
+                    ctx.arc(0, 0, innerR, start, start + slice);
                     ctx.closePath();
                     ctx.fillStyle = colorFor(i, n);
                     ctx.fill();
