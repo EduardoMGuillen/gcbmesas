@@ -127,7 +127,10 @@ export default function middleware(req: NextRequest, evt: NextFetchEvent) {
     path.startsWith('/_next') ||
     path === '/favicon.ico' ||
     path === '/sw.js' ||
-    path === '/manifest.json'
+    path === '/manifest.json' ||
+    path === '/rifas' ||
+    path.startsWith('/rifas/') ||
+    path === '/rifas.html'
 
   if (isCbtHost && (req.method === 'GET' || req.method === 'HEAD') && !isCbtSafePath) {
     const url = req.nextUrl.clone()
@@ -138,6 +141,11 @@ export default function middleware(req: NextRequest, evt: NextFetchEvent) {
   // Exclude public redirects and API auth routes from NextAuth/middleware
   // /api/auth/error must never reach NextAuth to avoid NO_SECRET
   if (path === '/api/auth/error' || path.startsWith('/api/auth')) {
+    return NextResponse.next()
+  }
+
+  // Hidden public raffle page (no auth, no navbar)
+  if (path === '/rifas' || path.startsWith('/rifas/') || path === '/rifas.html') {
     return NextResponse.next()
   }
 
