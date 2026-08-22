@@ -129,6 +129,7 @@
             position: relative;
             flex: 0 0 auto;
             width: min(92vw, 62vh, 640px);
+            height: min(92vw, 62vh, 640px);
             aspect-ratio: 1 / 1;
             border-radius: 50%;
             box-shadow:
@@ -185,8 +186,12 @@
 
         .hub {
             position: absolute;
-            inset: 34%;
+            top: 50%;
+            left: 50%;
             z-index: 5;
+            width: 32%;
+            height: 32%;
+            transform: translate(-50%, -50%);
             border-radius: 50%;
             background: #000;
             border: 3px solid var(--gold);
@@ -551,8 +556,8 @@
             .spin-btn { width: 100%; }
             .wheel-frame {
                 width: min(94vw, 58vh, 580px);
+                height: min(94vw, 58vh, 580px);
             }
-            .hub { inset: 33%; }
         }
     </style>
 </head>
@@ -647,6 +652,8 @@
             const againBtn = document.getElementById('againBtn');
 
             let size = 400;
+            let originX = 200;
+            let originY = 200;
             let rotation = 0;
             let spinning = false;
             let audioCtx = null;
@@ -727,22 +734,30 @@
             }
 
             function resize() {
-                const rect = canvas.getBoundingClientRect();
-                const css = Math.max(1, Math.round(Math.min(rect.width, rect.height)));
+                const frame = canvas.parentElement;
+                const rect = frame.getBoundingClientRect();
+                const cssW = Math.max(1, Math.round(rect.width));
+                const cssH = Math.max(1, Math.round(rect.height));
                 const dpr = window.devicePixelRatio || 1;
-                canvas.width = css * dpr;
-                canvas.height = css * dpr;
-                canvas.removeAttribute('style');
+                canvas.width = cssW * dpr;
+                canvas.height = cssH * dpr;
+                canvas.style.width = cssW + 'px';
+                canvas.style.height = cssH + 'px';
+                canvas.style.left = '0';
+                canvas.style.top = '0';
+                canvas.style.transformOrigin = (cssW / 2) + 'px ' + (cssH / 2) + 'px';
                 canvas.style.transform = 'rotate(' + rotation + 'deg)';
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                size = css;
+                size = Math.min(cssW, cssH);
+                originX = cssW / 2;
+                originY = cssH / 2;
                 drawWheel();
             }
 
-            function hubInsetFor(n) {
-                if (n >= 160) return '38%';
-                if (n >= 80) return '36%';
-                if (n >= 40) return '34%';
+            function hubSizeFor(n) {
+                if (n >= 160) return '24%';
+                if (n >= 80) return '28%';
+                if (n >= 40) return '30%';
                 return '32%';
             }
 
@@ -758,7 +773,11 @@
             function drawWheel() {
                 const n = Number(participantsInput.value);
                 const hub = document.querySelector('.hub');
-                if (hub) hub.style.inset = hubInsetFor(n);
+                if (hub) {
+                    const hubSize = hubSizeFor(n);
+                    hub.style.width = hubSize;
+                    hub.style.height = hubSize;
+                }
 
                 const r = size / 2;
                 const ringW = Math.max(10, Math.round(size * 0.045));
@@ -770,9 +789,9 @@
                 const fontSize = Math.min(20, Math.max(7, (arc * 0.52) / (digits * 0.62)));
                 const textR = n > 140 ? innerR * 0.90 : n > 70 ? innerR * 0.86 : n > 36 ? innerR * 0.80 : innerR * 0.74;
 
-                ctx.clearRect(0, 0, size, size);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.save();
-                ctx.translate(r, r);
+                ctx.translate(originX, originY);
 
                 const ringStep = 16 * Math.PI / 180;
                 const ringOffset = -Math.PI / 2 - 13 * Math.PI / 180;
