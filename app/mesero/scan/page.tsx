@@ -1,14 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Navbar } from '@/components/Navbar'
-import { Footer } from '@/components/Footer'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 
 export default function ScanPage() {
-  const { data: session } = useSession()
-  const isAdmin = session?.user?.role === 'ADMIN'
   const [manualCode, setManualCode] = useState('')
   const [error, setError] = useState('')
   const [isScanning, setIsScanning] = useState(false)
@@ -303,9 +298,7 @@ export default function ScanPage() {
   }
 
   return (
-    <div className="min-h-screen">
-      {!isAdmin && <Navbar />}
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div>
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
             Escanear Mesa
@@ -408,8 +401,6 @@ export default function ScanPage() {
             </code>
           </div>
         </div>
-      </main>
-      {!isAdmin && <Footer />}
     </div>
   )
 }

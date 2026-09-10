@@ -33,6 +33,17 @@ const config: Config = {
           800: '#f4f4f5',
           900: '#fafafa',
         },
+        staff: {
+          bg: 'var(--staff-bg)',
+          surface: 'var(--staff-surface)',
+          raised: 'var(--staff-raised)',
+          hover: 'var(--staff-hover)',
+          border: 'var(--staff-border)',
+          fg: 'var(--staff-fg)',
+          muted: 'var(--staff-muted)',
+          accent: 'var(--staff-accent)',
+          'accent-fg': 'var(--staff-accent-fg)',
+        },
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-in-out',

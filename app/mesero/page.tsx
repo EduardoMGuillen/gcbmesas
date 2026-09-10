@@ -1,13 +1,8 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { Navbar } from '@/components/Navbar'
-import { Footer } from '@/components/Footer'
-import { CleanUrlParams } from '@/components/CleanUrlParams'
-import { Suspense } from 'react'
 import Link from 'next/link'
 import { closeOldAccounts, getWalkInTable } from '@/lib/actions'
-import { PushSubscriptionButton } from '@/components/PushSubscriptionButton'
 
 export default async function MeseroPage() {
   const session = await getServerSession(authOptions)
@@ -20,17 +15,10 @@ export default async function MeseroPage() {
   closeOldAccounts().catch((err) => console.error('[MeseroPage] Error al cerrar cuentas antiguas:', err))
 
   const walkInTable = await getWalkInTable()
-  const isAdmin = session.user.role === 'ADMIN'
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Suspense fallback={null}>
-        <CleanUrlParams />
-      </Suspense>
-      {!isAdmin && <Navbar />}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 flex-1">
+    <>
         <div className="mb-6 sm:mb-8">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
                 Panel de Mesero
@@ -39,8 +27,6 @@ export default async function MeseroPage() {
                 Gestiona pedidos y cuentas de las mesas
               </p>
             </div>
-            <PushSubscriptionButton />
-          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -188,9 +174,7 @@ export default async function MeseroPage() {
             </Link>
           )}
         </div>
-      </main>
-      {!isAdmin && <Footer />}
-    </div>
+    </>
   )
 }
 

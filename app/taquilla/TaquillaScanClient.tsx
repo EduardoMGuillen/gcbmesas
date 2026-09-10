@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
   getTaquillaEventEntries,
@@ -361,20 +360,10 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
       : 'bg-red-500/20 border-red-500/40 text-red-300'
 
   return (
-    <div className="min-h-screen pt-safe">
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        <header className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">Taquilla</h1>
-            <p className="text-sm text-dark-400 mt-1">Escaneo de entradas por evento</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            className="bg-dark-200 hover:bg-dark-50 text-white px-4 py-2 rounded-lg text-sm font-medium"
-          >
-            Cerrar Sesion
-          </button>
+    <div className="space-y-6">
+        <header>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Taquilla</h1>
+          <p className="text-sm text-dark-400 mt-1">Escaneo de entradas por evento</p>
         </header>
 
         <section className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 space-y-4">
@@ -637,7 +626,6 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
             </ul>
           )}
         </section>
-      </main>
     </div>
   )
 }

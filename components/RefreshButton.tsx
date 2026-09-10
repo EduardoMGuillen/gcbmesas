@@ -18,7 +18,7 @@ export function RefreshButton() {
     <button
       type="button"
       onClick={handleRefresh}
-      className="p-2 text-white/60 hover:text-white hover:bg-dark-200 rounded-lg transition-colors touch-manipulation"
+      className="p-2 text-staff-muted hover:text-staff-fg hover:bg-staff-hover rounded-xl transition-colors touch-manipulation"
       title="Refrescar página"
       aria-label="Refrescar página"
     >
