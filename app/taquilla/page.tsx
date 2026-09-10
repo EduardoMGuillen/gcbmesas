@@ -3,8 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { TaquillaScanClient } from './TaquillaScanClient'
-import { Navbar } from '@/components/Navbar'
-import { AdminShell } from '@/components/AdminShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,8 +12,6 @@ export default async function TaquillaPage() {
   if (!session || !['TAQUILLA', 'ADMIN', 'MESERO', 'CAJERO'].includes(session.user.role)) {
     redirect('/login')
   }
-
-  const role = session.user.role
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -35,21 +31,5 @@ export default async function TaquillaPage() {
     },
   })
 
-  if (role === 'ADMIN') {
-    return (
-      <AdminShell userRole="ADMIN">
-        <TaquillaScanClient events={activeEvents} />
-      </AdminShell>
-    )
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
-        <TaquillaScanClient events={activeEvents} />
-      </div>
-    </div>
-  )
+  return <TaquillaScanClient events={activeEvents} />
 }
-

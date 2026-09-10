@@ -2,8 +2,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getTables, getProducts, getTableById, createAccount, getWalkInTable } from '@/lib/actions'
-import { Navbar } from '@/components/Navbar'
-import { Footer } from '@/components/Footer'
 import { CustomerOrderView } from '@/components/CustomerOrderView'
 import { TableSelector } from '@/components/TableSelector'
 
@@ -27,7 +25,6 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
   const [tables, products, walkInTable] = await Promise.all([getTables(), getProducts(true), getWalkInTable()])
   const initialTableId = searchParams.tableId || ''
   const forceNewWalkIn = searchParams.newWalkIn === '1' && initialTableId === walkInTable.id
-  const isAdmin = session.user.role === 'ADMIN'
   const accountIdParam = (searchParams.accountId || '').trim()
 
   // Si hay una mesa inicial seleccionada, obtener sus datos
@@ -98,9 +95,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
   }))
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(to bottom, transparent, rgb(30, 41, 59)) rgb(15, 23, 42)' }}>
-      {!isAdmin && <Navbar />}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+    <div>
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
             Agregar Pedido
@@ -123,6 +118,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
             initialTableId={initialTableId}
             preferredOpenAccountId={accountIdParam || undefined}
             isMesero={true}
+            variant="staff"
             onCreateAccount={createAccountAction}
             forceCreateAccount={forceNewWalkIn}
             backUrl="/mesero/pedidos"
@@ -130,8 +126,6 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
         ) : (
           <TableSelector tables={tablesForView} walkInTableId={walkInTable.id} />
         )}
-      </main>
-      {!isAdmin && <Footer />}
     </div>
   )
 }

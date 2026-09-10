@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { AdminShell } from '@/components/AdminShell'
+import { AppShell } from '@/components/staff/AppShell'
 
 export default async function MeseroLayout({
   children,
@@ -13,10 +13,9 @@ export default async function MeseroLayout({
   if (!session) redirect('/login')
   if (!['MESERO', 'ADMIN'].includes(session.user.role)) redirect('/login')
 
-  // En PC, ADMIN usa el sidebar lateral; MESERO usa Navbar (renderizado en cada página)
-  if (session.user.role === 'ADMIN') {
-    return <AdminShell userRole="ADMIN">{children}</AdminShell>
-  }
-
-  return <>{children}</>
+  return (
+    <AppShell userRole={session.user.role === 'ADMIN' ? 'ADMIN' : 'MESERO'}>
+      {children}
+    </AppShell>
+  )
 }

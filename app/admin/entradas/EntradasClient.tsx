@@ -17,6 +17,7 @@ import {
   markEntryWhatsappSent,
 } from '@/lib/actions'
 import { isPublicFreeCoverOnly } from '@/lib/public-event-pricing'
+import { StaffTabs } from '@/components/staff/ui'
 
 // ==================== TYPES ====================
 
@@ -350,24 +351,12 @@ export function EntradasClient({
 
   return (
     <div>
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
-              activeTab === tab.id
-                ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                : 'bg-dark-100 border border-dark-200 text-white/70 hover:text-white hover:bg-dark-50'
-            }`}
-          >
-            <svg className="w-4 h-4 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
-            </svg>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <StaffTabs
+        tabs={tabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        columns={tabs.length >= 5 ? 5 : 4}
+      />
 
       {canManageEntrySaleNotifications && (
         <div className="mb-5 rounded-xl border border-dark-200 bg-dark-100 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

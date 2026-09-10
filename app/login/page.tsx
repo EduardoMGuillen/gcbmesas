@@ -5,6 +5,8 @@ import { signIn, useSession, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { StaffThemeProvider } from '@/lib/staff-theme'
+import { ThemeToggle, Panel, StaffButton } from '@/components/staff/ui'
 
 export default function LoginPage() {
   const { data: session, status } = useSession()
@@ -102,108 +104,88 @@ export default function LoginPage() {
 
   if (!sessionCheckDone && (status === 'loading' || status === 'unauthenticated')) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#050015' }}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 mx-auto mb-4" style={{ borderColor: '#00ffff' }} />
-          <p className="text-white/60 text-sm">Verificando sesión...</p>
+      <StaffThemeProvider>
+        <div className="min-h-screen flex items-center justify-center bg-staff-bg">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-500 mx-auto mb-4" />
+            <p className="text-staff-muted text-sm">Verificando sesión...</p>
+          </div>
         </div>
-      </div>
+      </StaffThemeProvider>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'linear-gradient(180deg, #050015 0%, #0a0020 100%)' }}>
-      {/* Subtle grid background */}
-      <div className="fixed inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(0,255,255,0.04) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-
-      <div className="relative z-10 w-full max-w-sm">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Image src="/LogoCasaBlanca.png" alt="Casa Blanca" width={72} height={72} className="mx-auto mb-4 object-contain" />
-          <h1 className="text-2xl font-bold text-white mb-1">Acceso de Personal</h1>
-          <p className="text-white/40 text-sm">Ingresa tus credenciales para continuar</p>
+    <StaffThemeProvider>
+      <div className="min-h-screen flex items-center justify-center px-4 bg-staff-bg relative">
+        <div className="absolute top-4 right-4 z-20">
+          <ThemeToggle />
         </div>
 
-        {/* Card */}
-        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,255,255,0.15)', borderRadius: 20, padding: '2rem' }}>
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-white/60 mb-2">
-                Usuario
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                required
-                autoComplete="username"
-                autoCapitalize="none"
-                autoCorrect="off"
-                placeholder="Ingresa tu usuario"
-                style={{ fontSize: 16, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', padding: '12px 16px', width: '100%', outline: 'none' }}
-                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(0,255,255,0.5)')}
-                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)')}
-              />
-            </div>
+        <div className="relative z-10 w-full max-w-sm">
+          <div className="text-center mb-8">
+            <Image src="/LogoCasaBlanca.png" alt="Casa Blanca" width={72} height={72} className="mx-auto mb-4 object-contain" />
+            <h1 className="text-2xl font-bold text-staff-fg mb-1">Acceso de Personal</h1>
+            <p className="text-staff-muted text-sm">Ingresa tus credenciales para continuar</p>
+          </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-white/60 mb-2">
-                Contraseña
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                placeholder="Ingresa tu contraseña"
-                style={{ fontSize: 16, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', padding: '12px 16px', width: '100%', outline: 'none' }}
-                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(0,255,255,0.5)')}
-                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)')}
-              />
-            </div>
-
-            {error && (
-              <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 8, padding: '10px 14px', color: '#f87171', fontSize: 14 }}>
-                {error}
+          <Panel>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-staff-muted mb-2">
+                  Usuario
+                </label>
+                <input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  required
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  placeholder="Ingresa tu usuario"
+                  className="w-full px-4 py-3 bg-staff-raised border border-staff-border rounded-xl text-staff-fg placeholder:text-staff-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  style={{ fontSize: 16 }}
+                />
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: '100%', padding: '13px', borderRadius: 10, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
-                background: loading ? 'rgba(0,255,255,0.2)' : 'linear-gradient(45deg, #00ffff, #0099bb)',
-                color: loading ? 'rgba(255,255,255,0.4)' : '#000',
-                fontWeight: 700, fontSize: 16, transition: 'all 0.3s', minHeight: 48,
-                WebkitTapHighlightColor: 'transparent',
-              } as any}
-            >
-              {loading ? (
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                  <span style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
-                  Iniciando sesión...
-                </span>
-              ) : 'Iniciar Sesión'}
-            </button>
-          </form>
-        </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-staff-muted mb-2">
+                  Contraseña
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  placeholder="Ingresa tu contraseña"
+                  className="w-full px-4 py-3 bg-staff-raised border border-staff-border rounded-xl text-staff-fg placeholder:text-staff-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  style={{ fontSize: 16 }}
+                />
+              </div>
 
-        {/* Back link */}
-        <div className="text-center mt-6">
-          <Link href="/" style={{ color: 'rgba(0,255,255,0.5)', fontSize: 13, textDecoration: 'none' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'rgba(0,255,255,0.9)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(0,255,255,0.5)')}
-          >
-            ← Volver al inicio
-          </Link>
+              {error && (
+                <div className="bg-red-500/15 border border-red-500/40 rounded-lg px-3.5 py-2.5 text-red-400 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <StaffButton type="submit" disabled={loading} className="w-full py-3 min-h-12 text-base">
+                {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+              </StaffButton>
+            </form>
+          </Panel>
+
+          <div className="text-center mt-6">
+            <Link href="/" className="text-primary-500 hover:text-primary-400 text-[13px] no-underline">
+              ← Volver al inicio
+            </Link>
+          </div>
         </div>
       </div>
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+    </StaffThemeProvider>
   )
 }

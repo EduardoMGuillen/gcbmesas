@@ -1,7 +1,8 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { AdminShell } from '@/components/AdminShell'
+import { AppShell } from '@/components/staff/AppShell'
+import type { StaffRole } from '@/lib/staff-nav'
 
 export default async function AdminLayout({
   children,
@@ -11,8 +12,8 @@ export default async function AdminLayout({
   const session = await getServerSession(authOptions)
 
   if (!session) redirect('/login')
-  const role = session.user.role as 'ADMIN' | 'MESERO' | 'CAJERO' | 'CLIENTE_TICKETERA'
+  const role = session.user.role as StaffRole
   if (!['ADMIN', 'MESERO', 'CAJERO', 'CLIENTE_TICKETERA'].includes(role)) redirect('/login')
 
-  return <AdminShell userRole={role}>{children}</AdminShell>
+  return <AppShell userRole={role}>{children}</AppShell>
 }

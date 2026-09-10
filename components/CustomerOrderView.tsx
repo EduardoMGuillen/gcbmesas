@@ -68,6 +68,8 @@ interface CustomerOrderViewProps {
   forceCreateAccount?: boolean
   /** Si true, el cliente no puede agregar pedidos (configuración admin) */
   clientOrdersDisabled?: boolean
+  /** Vista interna de personal: oculta logo y enlace público. `/clientes` sigue en customer. */
+  variant?: 'customer' | 'staff'
 }
 
 export function CustomerOrderView({ 
@@ -83,6 +85,7 @@ export function CustomerOrderView({
   backUrl = '/clientes',
   forceCreateAccount = false,
   clientOrdersDisabled = false,
+  variant = 'customer',
 }: CustomerOrderViewProps) {
   const [selectedTableId, setSelectedTableId] = useState(initialTableId || initialTable.id)
   const [table, setTable] = useState(initialTable)
@@ -677,7 +680,7 @@ export function CustomerOrderView({
       {/* Mostrar contenido principal solo si hay cuenta abierta */}
       {hasOpenAccount && (
         <>
-          {/* Logo Casa Blanca */}
+          {variant !== 'staff' && (
           <div className="mb-6 text-center">
             <div className="mb-4 flex justify-center">
               <Image
@@ -698,6 +701,7 @@ export function CustomerOrderView({
               Ver eventos
             </a>
           </div>
+          )}
 
           <div className="mb-6 flex justify-between items-start">
             <div>
