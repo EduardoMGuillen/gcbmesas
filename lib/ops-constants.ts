@@ -9,6 +9,10 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 
 export const PAYMENT_METHODS = Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]
 
+export function isPaymentMethod(v: unknown): v is PaymentMethod {
+  return typeof v === 'string' && (PAYMENT_METHODS as string[]).includes(v)
+}
+
 export const STOCK_LOCATION_LABELS: Record<StockLocation, string> = {
   BODEGA: 'Bodega',
   BARRA: 'Barra',
