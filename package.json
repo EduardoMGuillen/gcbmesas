@@ -40,6 +40,7 @@
     "@vercel/blob": "^0.27.0",
     "bcryptjs": "^2.4.3",
     "cybersource-rest-client": "^0.0.76",
+    "exceljs": "^4.4.0",
     "firebase": "^12.8.0",
     "firebase-admin": "^12.0.0",
     "html5-qrcode": "^2.3.8",

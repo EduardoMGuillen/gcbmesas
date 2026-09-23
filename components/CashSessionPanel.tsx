@@ -1,11 +1,14 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { closeCashSession, openCashSession } from '@/lib/ops-actions'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { PageHeader, Panel, StaffButton, StatCard } from '@/components/staff/ui'
+import { Badge, EmptyState, PageHeader, Panel, StaffButton } from '@/components/staff/ui'
 import { venueZoneLabel } from '@/lib/venue-zones'
+
+const fieldClass =
+  'mt-1 w-full px-3 py-2.5 rounded-xl bg-staff-raised border border-staff-border text-staff-fg'
 
 type Register = {
   id: string
@@ -36,63 +39,121 @@ type Session = {
   closedBy?: { name: string | null; username: string } | null
 }
 
+type Preview = { systemTotal: number; byMethod: Record<string, number>; accountCount: number }
+
+function registerLabel(register: { name: string; venueZone?: string | null }) {
+  const zone = venueZoneLabel(register.venueZone)
+  return zone ? `${register.name} · ${zone}` : register.name
+}
+
+async function downloadExcel(url: string, fallbackName: string) {
+  const res = await fetch(url)
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || 'No se pudo descargar')
+  }
+  const blob = await res.blob()
+  const cd = res.headers.get('Content-Disposition')
+  const match = cd?.match(/filename="([^"]+)"/)
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = match?.[1] || fallbackName
+  a.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
 function OpenForm({
-  register,
+  registers,
   pending,
   onOpen,
 }: {
-  register: Register
+  registers: Register[]
   pending: boolean
   onOpen: (data: { registerId: string; openingFloat: number; deliveredByName: string; receivedByName: string }) => void
 }) {
-  const [openingFloat, setOpeningFloat] = useState(String(Number(register.defaultFloat || 4000)))
+  const [registerId, setRegisterId] = useState(registers[0]?.id || '')
+  const selected = registers.find((r) => r.id === registerId) || registers[0]
+  const [openingFloat, setOpeningFloat] = useState(String(Number(selected?.defaultFloat || 4000)))
   const [deliveredByName, setDeliveredByName] = useState('')
   const [receivedByName, setReceivedByName] = useState('')
+
+  useEffect(() => {
+    if (!registers.some((r) => r.id === registerId)) {
+      setRegisterId(registers[0]?.id || '')
+    }
+  }, [registers, registerId])
+
+  useEffect(() => {
+    if (selected) setOpeningFloat(String(Number(selected.defaultFloat || 4000)))
+  }, [selected?.id])
+
+  if (registers.length === 0) {
+    return (
+      <EmptyState
+        title="Todas las cajas están abiertas"
+        description="Cierra una abajo para poder abrirla de nuevo."
+      />
+    )
+  }
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <label className="text-sm text-staff-muted">
-        Fondo
-        <input
-          type="number"
-          min={0}
-          step="0.01"
-          value={openingFloat}
-          onChange={(e) => setOpeningFloat(e.target.value)}
-          className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
-        />
+    <div className="space-y-4">
+      <label className="block text-sm text-staff-muted">
+        ¿Cuál caja abres?
+        <select value={registerId} onChange={(e) => setRegisterId(e.target.value)} className={fieldClass}>
+          {registers.map((r) => (
+            <option key={r.id} value={r.id}>
+              {registerLabel(r)}
+            </option>
+          ))}
+        </select>
       </label>
-      <label className="text-sm text-staff-muted">
-        Entrega
-        <input
-          value={deliveredByName}
-          onChange={(e) => setDeliveredByName(e.target.value)}
-          className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
-        />
-      </label>
-      <label className="text-sm text-staff-muted sm:col-span-2">
-        Recibe
-        <input
-          value={receivedByName}
-          onChange={(e) => setReceivedByName(e.target.value)}
-          className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
-        />
-      </label>
-      <div className="sm:col-span-2">
-        <StaffButton
-          type="button"
-          onClick={() =>
-            onOpen({
-              registerId: register.id,
-              openingFloat: Number(openingFloat),
-              deliveredByName,
-              receivedByName,
-            })
-          }
-          disabled={pending}
-        >
-          Abrir {register.name}
-        </StaffButton>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="text-sm text-staff-muted">
+          Fondo
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={openingFloat}
+            onChange={(e) => setOpeningFloat(e.target.value)}
+            className={fieldClass}
+          />
+        </label>
+        <label className="text-sm text-staff-muted">
+          Entrega
+          <input
+            value={deliveredByName}
+            onChange={(e) => setDeliveredByName(e.target.value)}
+            placeholder="Quién entrega el fondo"
+            className={fieldClass}
+          />
+        </label>
+        <label className="text-sm text-staff-muted sm:col-span-2">
+          Recibe
+          <input
+            value={receivedByName}
+            onChange={(e) => setReceivedByName(e.target.value)}
+            placeholder="Quién recibe el fondo"
+            className={fieldClass}
+          />
+        </label>
       </div>
+      <StaffButton
+        type="button"
+        onClick={() =>
+          onOpen({
+            registerId,
+            openingFloat: Number(openingFloat),
+            deliveredByName,
+            receivedByName,
+          })
+        }
+        disabled={pending || !registerId}
+      >
+        Abrir {selected?.name || 'caja'}
+      </StaffButton>
     </div>
   )
 }
@@ -104,7 +165,7 @@ function CloseForm({
   onClose,
 }: {
   session: Session
-  preview: { systemTotal: number; byMethod: Record<string, number>; accountCount: number } | null
+  preview: Preview | null
   pending: boolean
   onClose: (data: {
     sessionId: string
@@ -137,18 +198,29 @@ function CloseForm({
         {session.deliveredByName ? ` · Entrega ${session.deliveredByName}` : ''}
       </p>
       {preview && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Total sistema" value={formatCurrency(preview.systemTotal)} accent />
-          <StatCard label="Cuentas" value={preview.accountCount} />
-          <StatCard label="Efectivo sistema" value={formatCurrency(preview.byMethod.CASH || 0)} />
-          <StatCard
-            label="POS + transfer"
-            value={formatCurrency(
-              (preview.byMethod.POS_BAC || 0) +
-                (preview.byMethod.POS_FICOHSA || 0) +
-                (preview.byMethod.TRANSFER || 0)
-            )}
-          />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+          <div className="rounded-xl bg-staff-raised border border-staff-border px-3 py-2">
+            <p className="text-xs text-staff-muted">Sistema</p>
+            <p className="font-semibold text-staff-fg">{formatCurrency(preview.systemTotal)}</p>
+          </div>
+          <div className="rounded-xl bg-staff-raised border border-staff-border px-3 py-2">
+            <p className="text-xs text-staff-muted">Cuentas</p>
+            <p className="font-semibold text-staff-fg">{preview.accountCount}</p>
+          </div>
+          <div className="rounded-xl bg-staff-raised border border-staff-border px-3 py-2">
+            <p className="text-xs text-staff-muted">Efectivo sistema</p>
+            <p className="font-semibold text-staff-fg">{formatCurrency(preview.byMethod.CASH || 0)}</p>
+          </div>
+          <div className="rounded-xl bg-staff-raised border border-staff-border px-3 py-2">
+            <p className="text-xs text-staff-muted">POS + transfer</p>
+            <p className="font-semibold text-staff-fg">
+              {formatCurrency(
+                (preview.byMethod.POS_BAC || 0) +
+                  (preview.byMethod.POS_FICOHSA || 0) +
+                  (preview.byMethod.TRANSFER || 0)
+              )}
+            </p>
+          </div>
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -160,7 +232,7 @@ function CloseForm({
             step="0.01"
             value={salesCash}
             onChange={(e) => setSalesCash(e.target.value)}
-            className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
+            className={fieldClass}
           />
         </label>
         <label className="text-sm text-staff-muted">
@@ -171,7 +243,7 @@ function CloseForm({
             step="0.01"
             value={salesPosFicohsa}
             onChange={(e) => setSalesPosFicohsa(e.target.value)}
-            className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
+            className={fieldClass}
           />
         </label>
         <label className="text-sm text-staff-muted">
@@ -182,7 +254,7 @@ function CloseForm({
             step="0.01"
             value={salesPosBac}
             onChange={(e) => setSalesPosBac(e.target.value)}
-            className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
+            className={fieldClass}
           />
         </label>
         <label className="text-sm text-staff-muted">
@@ -193,7 +265,7 @@ function CloseForm({
             step="0.01"
             value={salesTransfer}
             onChange={(e) => setSalesTransfer(e.target.value)}
-            className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
+            className={fieldClass}
           />
         </label>
         <label className="text-sm text-staff-muted sm:col-span-2">
@@ -204,7 +276,7 @@ function CloseForm({
             step="0.01"
             value={countedCash}
             onChange={(e) => setCountedCash(e.target.value)}
-            className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
+            className={fieldClass}
           />
         </label>
         <label className="text-sm text-staff-muted sm:col-span-2">
@@ -212,7 +284,7 @@ function CloseForm({
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
+            className={fieldClass}
             rows={2}
           />
         </label>
@@ -280,18 +352,7 @@ function ArqueosExport({ registers }: { registers: Register[] }) {
     try {
       const params = new URLSearchParams({ from, to })
       if (registerId) params.set('registerId', registerId)
-      const res = await fetch(`/api/arqueos?${params.toString()}`)
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        throw new Error(body?.error || 'No se pudo descargar')
-      }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `Arqueos_${from}_${to}.xlsx`
-      a.click()
-      URL.revokeObjectURL(url)
+      await downloadExcel(`/api/arqueos?${params.toString()}`, `Arqueos_${from}_${to}.xlsx`)
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'No se pudo descargar')
     } finally {
@@ -301,36 +362,20 @@ function ArqueosExport({ registers }: { registers: Register[] }) {
 
   return (
     <Panel>
-      <h2 className="font-semibold text-staff-fg mb-1">Exportar arqueos</h2>
-      <p className="text-sm text-staff-muted mb-4">
-        Descarga un Excel con fondo, ventas, POS, efectivo contado y diferencia. Sirve para el cierre de cada noche.
-      </p>
+      <h2 className="font-semibold text-staff-fg mb-1">Excel de varios días</h2>
+      <p className="text-sm text-staff-muted mb-4">Baja un reporte con todas las cajas del rango que elijas.</p>
       <div className="flex flex-col sm:flex-row sm:items-end gap-3">
         <label className="text-sm text-staff-muted">
           Desde
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
-          />
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fieldClass} />
         </label>
         <label className="text-sm text-staff-muted">
           Hasta
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
-          />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fieldClass} />
         </label>
         <label className="text-sm text-staff-muted">
           Caja
-          <select
-            value={registerId}
-            onChange={(e) => setRegisterId(e.target.value)}
-            className="mt-1 w-full px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
-          >
+          <select value={registerId} onChange={(e) => setRegisterId(e.target.value)} className={fieldClass}>
             <option value="">Todas</option>
             {registers.map((r) => (
               <option key={r.id} value={r.id}>
@@ -356,19 +401,23 @@ export function CashSessionPanel({
   registers: Register[]
   openAll: Session[]
   recent: Session[]
-  sessionPreviews: Record<string, { systemTotal: number; byMethod: Record<string, number>; accountCount: number }>
+  sessionPreviews: Record<string, Preview>
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [error, setError] = useState('')
+  const [closeId, setCloseId] = useState(openAll[0]?.id || '')
+  const [downloadingId, setDownloadingId] = useState('')
 
-  const openByRegister = useMemo(() => {
-    const map = new Map<string, Session>()
-    for (const session of openAll) {
-      map.set(session.registerId || session.register.name, session)
+  const openIds = useMemo(() => new Set(openAll.map((s) => s.registerId || s.register.name)), [openAll])
+  const availableToOpen = registers.filter((r) => !openIds.has(r.id) && !openIds.has(r.name))
+  const selectedClose = openAll.find((s) => s.id === closeId) || openAll[0] || null
+
+  useEffect(() => {
+    if (!openAll.some((s) => s.id === closeId)) {
+      setCloseId(openAll[0]?.id || '')
     }
-    return map
-  }, [openAll])
+  }, [openAll, closeId])
 
   const open = (data: {
     registerId: string
@@ -407,71 +456,105 @@ export function CashSessionPanel({
     })
   }
 
+  const downloadOne = async (session: Session) => {
+    setDownloadingId(session.id)
+    try {
+      await downloadExcel(`/api/arqueos?sessionId=${encodeURIComponent(session.id)}`, `Arqueo_${session.register.name}.xlsx`)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'No se pudo descargar')
+    } finally {
+      setDownloadingId('')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Caja"
-        description="Solo administración abre y cierra. Cada zona (Astro, Studio54, Garden) tiene su caja. Cover y Eventos siguen aparte."
+        description="Elige una caja para abrirla. Las que ya están abiertas se cierran una por una abajo."
       />
       {error && (
         <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2">{error}</p>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {registers.map((register) => {
-          const openSession =
-            openAll.find((s) => s.register.name === register.name) ||
-            Array.from(openByRegister.values()).find((s) => s.register.name === register.name)
-          const zone = venueZoneLabel(register.venueZone || '')
-          return (
-            <Panel key={register.id}>
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div>
-                  <h2 className="font-semibold text-staff-fg">{register.name}</h2>
-                  <p className="text-xs text-staff-muted">
-                    {zone ? `Zona ${zone}` : 'Sin zona de piso'} · Fondo {formatCurrency(Number(register.defaultFloat))}
-                  </p>
-                </div>
-                <span
-                  className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                    openSession ? 'bg-emerald-500/15 text-emerald-400' : 'bg-staff-raised text-staff-muted'
-                  }`}
-                >
-                  {openSession ? 'Abierta' : 'Cerrada'}
-                </span>
-              </div>
-              {openSession ? (
-                <CloseForm
-                  session={openSession}
-                  preview={sessionPreviews[openSession.id] || null}
-                  pending={pending}
-                  onClose={close}
-                />
-              ) : (
-                <OpenForm register={register} pending={pending} onOpen={open} />
-              )}
-            </Panel>
-          )
-        })}
-      </div>
+      {openAll.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {openAll.map((s) => (
+            <Badge key={s.id} tone="success">
+              {s.register.name} abierta
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      <Panel>
+        <h2 className="font-semibold text-staff-fg mb-1">1. Abrir caja</h2>
+        <p className="text-sm text-staff-muted mb-4">
+          Puedes tener varias abiertas. Una caja ya abierta no se vuelve a abrir hasta que se cierre.
+        </p>
+        <OpenForm registers={availableToOpen} pending={pending} onOpen={open} />
+      </Panel>
+
+      <Panel>
+        <h2 className="font-semibold text-staff-fg mb-1">2. Cerrar caja</h2>
+        <p className="text-sm text-staff-muted mb-4">Elige cuál de las abiertas quieres cerrar. Se cierra una por una.</p>
+        {openAll.length === 0 || !selectedClose ? (
+          <EmptyState title="No hay cajas abiertas" description="Abre una arriba para poder cerrarla aquí." />
+        ) : (
+          <div className="space-y-4">
+            <label className="block text-sm text-staff-muted">
+              ¿Cuál caja cierras?
+              <select value={selectedClose.id} onChange={(e) => setCloseId(e.target.value)} className={fieldClass}>
+                {openAll.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {registerLabel(s.register)} · desde {formatDate(s.openedAt)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <CloseForm
+              key={selectedClose.id}
+              session={selectedClose}
+              preview={sessionPreviews[selectedClose.id] || null}
+              pending={pending}
+              onClose={close}
+            />
+          </div>
+        )}
+      </Panel>
 
       <ArqueosExport registers={registers} />
 
       <Panel>
-        <h2 className="font-semibold text-staff-fg mb-3">Historial reciente</h2>
+        <h2 className="font-semibold text-staff-fg mb-1">Historial</h2>
+        <p className="text-sm text-staff-muted mb-4">Baja el Excel de un solo arqueo cuando ya esté cerrado.</p>
         {recent.length === 0 ? (
           <p className="text-sm text-staff-muted">Todavía no hay sesiones.</p>
         ) : (
           <ul className="space-y-2">
             {recent.map((s) => (
-              <li key={s.id} className="flex flex-wrap justify-between gap-2 text-sm border-b border-staff-border pb-2">
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm border-b border-staff-border pb-2"
+              >
                 <span className="text-staff-fg">
                   {s.register.name} · {s.status === 'OPEN' ? 'Abierta' : 'Cerrada'}
                 </span>
-                <span className="text-staff-muted">
-                  {formatDate(s.openedAt)}
-                  {s.systemTotal != null ? ` · sistema ${formatCurrency(Number(s.systemTotal))}` : ''}
-                  {s.difference != null ? ` · dif. ${formatCurrency(Number(s.difference))}` : ''}
+                <span className="flex flex-wrap items-center gap-3">
+                  <span className="text-staff-muted">
+                    {formatDate(s.openedAt)}
+                    {s.systemTotal != null ? ` · sistema ${formatCurrency(Number(s.systemTotal))}` : ''}
+                    {s.difference != null ? ` · dif. ${formatCurrency(Number(s.difference))}` : ''}
+                  </span>
+                  <StaffButton
+                    type="button"
+                    variant="secondary"
+                    className="!py-1.5 !px-3 !text-xs"
+                    onClick={() => void downloadOne(s)}
+                    disabled={downloadingId === s.id}
+                  >
+                    {downloadingId === s.id ? 'Bajando…' : 'Excel'}
+                  </StaffButton>
                 </span>
               </li>
             ))}

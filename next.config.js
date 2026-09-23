@@ -4,7 +4,7 @@ const nextConfig = {
   reactStrictMode: false,
   // Keep CyberSource SDK as external package on server build (Next 14: experimental key only).
   experimental: {
-    serverComponentsExternalPackages: ['cybersource-rest-client'],
+    serverComponentsExternalPackages: ['cybersource-rest-client', 'exceljs'],
   },
   async headers() {
     return [
