@@ -300,6 +300,25 @@ export async function getCashOpsData() {
   return { registers, openAll, recent, sessionPreviews }
 }
 
+const cashSessionExportInclude = {
+  register: true,
+  openedBy: { select: { name: true, username: true } },
+  closedBy: { select: { name: true, username: true } },
+  accounts: {
+    where: { status: 'CLOSED' as const },
+    select: {
+      id: true,
+      clientName: true,
+      initialBalance: true,
+      currentBalance: true,
+      paymentMethod: true,
+      closedAt: true,
+      table: { select: { name: true, zone: true, shortCode: true } },
+    },
+    orderBy: { closedAt: 'asc' as const },
+  },
+}
+
 export async function getCashSessionsForExport(fromStr: string, toStr: string, registerId?: string) {
   const user = await getCurrentUser()
   requireAdmin(user.role)
@@ -313,26 +332,20 @@ export async function getCashSessionsForExport(fromStr: string, toStr: string, r
       ...(registerId ? { registerId } : {}),
       OR: [{ openedAt: { gte: from, lte: to } }, { closedAt: { gte: from, lte: to } }],
     },
-    include: {
-      register: true,
-      openedBy: { select: { name: true, username: true } },
-      closedBy: { select: { name: true, username: true } },
-      accounts: {
-        where: { status: 'CLOSED' },
-        select: {
-          id: true,
-          clientName: true,
-          initialBalance: true,
-          currentBalance: true,
-          paymentMethod: true,
-          closedAt: true,
-          table: { select: { name: true, zone: true, shortCode: true } },
-        },
-        orderBy: { closedAt: 'asc' },
-      },
-    },
+    include: cashSessionExportInclude,
     orderBy: [{ openedAt: 'asc' }],
   })
+}
+
+export async function getCashSessionByIdForExport(sessionId: string) {
+  const user = await getCurrentUser()
+  requireAdmin(user.role)
+  const row = await prisma.cashSession.findUnique({
+    where: { id: sessionId },
+    include: cashSessionExportInclude,
+  })
+  if (!row) throw new Error('Arqueo no encontrado')
+  return row
 }
 
 async function computeSessionSystemTotals(sessionId: string) {
