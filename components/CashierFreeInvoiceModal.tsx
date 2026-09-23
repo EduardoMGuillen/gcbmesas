@@ -4,6 +4,8 @@ import { useState, useEffect, useTransition, useMemo, useCallback, type SVGProps
 import { createAndCloseFreeInvoiceAccount, getProductsForCashierInvoice } from '@/lib/actions'
 import { formatCurrency } from '@/lib/utils'
 import { buildHnInvoiceHtml, printHnInvoice, type InvoiceSettingsLike, type HnInvoiceLine } from '@/lib/invoice-print-hn'
+import { PaymentMethodPicker } from '@/components/CloseAccountDialog'
+import type { PaymentMethod } from '@prisma/client'
 
 type ProductRow = {
   id: string
@@ -67,6 +69,7 @@ export function CashierFreeInvoiceModal({
   const [submitError, setSubmitError] = useState('')
   const [printing, setPrinting] = useState(false)
   const [newLineCategory, setNewLineCategory] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('')
 
   useEffect(() => {
     if (!open) return
@@ -87,6 +90,7 @@ export function CashierFreeInvoiceModal({
       setReceptorRtn('')
       setMeseroId('')
       setSubmitError('')
+      setPaymentMethod('')
       setPrinting(false)
       setNewLineCategory('')
     }
@@ -175,6 +179,10 @@ export function CashierFreeInvoiceModal({
       setSubmitError('Selecciona un mesero para registrar la cuenta sin mesa.')
       return
     }
+    if (!paymentMethod) {
+      setSubmitError('Elige el método de pago.')
+      return
+    }
     const origin = window.location.origin
     const hnLines: HnInvoiceLine[] = []
     for (const ln of lines) {
@@ -207,6 +215,7 @@ export function CashierFreeInvoiceModal({
         meseroId,
         receptorName: receptorName.trim() || null,
         receptorRtn: receptorRtn.trim() || null,
+        paymentMethod,
         lines: lines
           .filter((ln) => ln.productId && ln.quantity >= 1)
           .map((ln) => ({ productId: ln.productId, quantity: ln.quantity })),
@@ -502,6 +511,10 @@ export function CashierFreeInvoiceModal({
         </div>
 
         <div className="shrink-0 border-t border-dark-200 bg-dark-100/95 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] space-y-3">
+          <div>
+            <p className="text-xs text-white/45 mb-2">Método de pago</p>
+            <PaymentMethodPicker value={paymentMethod} onChange={setPaymentMethod} />
+          </div>
           {submitError && (
             <div className="rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-2 text-xs text-red-200">
               {submitError}

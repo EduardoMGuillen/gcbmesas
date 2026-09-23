@@ -53,6 +53,36 @@ enum LogAction {
   ATTENDANCE_MARK
   /// Auditoría CyberSource (3DS, adquirente) por transacción — ver details.type
   CYBERSOURCE_PAYMENT_AUDIT
+  CASH_SESSION_OPENED
+  CASH_SESSION_CLOSED
+  EXPENSE_CREATED
+  STOCK_ADJUSTED
+}
+
+enum PaymentMethod {
+  CASH
+  POS_FICOHSA
+  POS_BAC
+  TRANSFER
+}
+
+enum StockLocation {
+  BODEGA
+  BARRA
+  ABIERTO
+  MERMA
+}
+
+enum StockMovementType {
+  PURCHASE
+  TRANSFER
+  MERMA
+  ADJUSTMENT
+}
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
 }
 
 enum AttendanceMarkType {
@@ -131,6 +161,10 @@ model User {
   ordersAcceptedAsCashier Order[] @relation("OrderServedByCashier")
   /// Eventos de ticketera visibles para este usuario (rol CLIENTE_TICKETERA)
   ticketeraEventAssignments UserEventAssignment[]
+  openedCashSessions        CashSession[]     @relation("CashOpenedBy")
+  closedCashSessions        CashSession[]     @relation("CashClosedBy")
+  expenses                  Expense[]
+  stockMovements            StockMovement[]
 
   @@map("users")
 }
@@ -244,13 +278,18 @@ model Account {
   closedAt        DateTime?
   openedByUserId  String?
   clientName      String?
+  paymentMethod   PaymentMethod?
+  cashSessionId   String?
 
-  table      Table   @relation(fields: [tableId], references: [id], onDelete: Cascade)
-  openedBy   User?   @relation(fields: [openedByUserId], references: [id], onDelete: SetNull)
-  orders     Order[]
+  table       Table        @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  openedBy    User?        @relation(fields: [openedByUserId], references: [id], onDelete: SetNull)
+  cashSession CashSession? @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  orders      Order[]
 
   @@index([status, createdAt])
   @@index([tableId, status])
+  @@index([cashSessionId])
+  @@index([paymentMethod])
   @@map("accounts")
 }
 
@@ -268,7 +307,8 @@ model Product {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  orders Order[]
+  orders     Order[]
+  stockItems StockItem[]
 
   @@map("products")
 }
@@ -438,4 +478,107 @@ model AttendanceSettings {
   updatedAt          DateTime @updatedAt
 
   @@map("attendance_settings")
+}
+
+model CashRegister {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String
+  defaultFloat Decimal  @default(4000) @db.Decimal(10, 2)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions CashSession[]
+
+  @@map("cash_registers")
+}
+
+model CashSession {
+  id               String            @id @default(cuid())
+  registerId       String
+  status           CashSessionStatus @default(OPEN)
+  openedAt         DateTime          @default(now())
+  closedAt         DateTime?
+  openedByUserId   String
+  closedByUserId   String?
+  deliveredByName  String?
+  receivedByName   String?
+  openingFloat     Decimal           @db.Decimal(10, 2)
+  salesCash        Decimal?          @db.Decimal(10, 2)
+  salesPosFicohsa  Decimal?          @db.Decimal(10, 2)
+  salesPosBac      Decimal?          @db.Decimal(10, 2)
+  salesTransfer    Decimal?          @db.Decimal(10, 2)
+  countedCash      Decimal?          @db.Decimal(10, 2)
+  systemTotal      Decimal?          @db.Decimal(10, 2)
+  difference       Decimal?          @db.Decimal(10, 2)
+  notes            String?           @db.Text
+
+  register CashRegister @relation(fields: [registerId], references: [id], onDelete: Restrict)
+  openedBy User         @relation("CashOpenedBy", fields: [openedByUserId], references: [id], onDelete: Restrict)
+  closedBy User?        @relation("CashClosedBy", fields: [closedByUserId], references: [id], onDelete: SetNull)
+  accounts Account[]
+
+  @@index([registerId, status])
+  @@index([openedAt])
+  @@map("cash_sessions")
+}
+
+model Expense {
+  id              String   @id @default(cuid())
+  date            DateTime
+  category        String
+  vendor          String?
+  amount          Decimal  @db.Decimal(10, 2)
+  notes           String?  @db.Text
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  createdBy User @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([date])
+  @@index([category])
+  @@map("expenses")
+}
+
+model StockItem {
+  id            String        @id @default(cuid())
+  name          String
+  presentation  String?
+  category      String?
+  supplier      String?
+  supplierPhone String?
+  location      StockLocation
+  quantity      Decimal       @db.Decimal(12, 2)
+  cost          Decimal?      @db.Decimal(10, 2)
+  expiresAt     DateTime?
+  notes         String?       @db.Text
+  productId     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  movements StockMovement[]
+
+  @@index([location])
+  @@index([category])
+  @@index([name])
+  @@index([expiresAt])
+  @@map("stock_items")
+}
+
+model StockMovement {
+  id             String            @id @default(cuid())
+  stockItemId    String
+  type           StockMovementType
+  quantityChange Decimal           @db.Decimal(12, 2)
+  note           String?
+  userId         String
+  createdAt      DateTime          @default(now())
+
+  stockItem StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([stockItemId, createdAt])
+  @@map("stock_movements")
 }
