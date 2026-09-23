@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
+import { CASH_REGISTERS } from '../lib/ops-constants'
+
 async function main() {
   console.log('🌱 Iniciando seed...')
 
@@ -25,6 +27,15 @@ async function main() {
   } else {
     console.log('✅ Usuario administrador ya existe (contraseña no modificada)')
   }
+
+  for (const r of CASH_REGISTERS) {
+    await prisma.cashRegister.upsert({
+      where: { slug: r.slug },
+      create: { slug: r.slug, name: r.name, defaultFloat: r.defaultFloat },
+      update: { name: r.name, isActive: true },
+    })
+  }
+  console.log('✅ Cajas Cover / Astro / Eventos listas')
 
 
   console.log('🎉 Seed completado!')

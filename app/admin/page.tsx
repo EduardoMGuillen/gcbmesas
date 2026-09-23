@@ -1,6 +1,9 @@
 import { getDashboardStats, closeOldAccounts } from '@/lib/actions'
+import { getMonthOpsSummary } from '@/lib/ops-actions'
 import { formatCurrency } from '@/lib/utils'
 import { PageHeader, Panel, StatCard } from '@/components/staff/ui'
+import Link from 'next/link'
+import { STOCK_LOCATION_LABELS } from '@/lib/ops-constants'
 
 export default async function AdminDashboard() {
   closeOldAccounts().catch((err) => console.error('[AdminDashboard] Error al cerrar cuentas antiguas:', err))
@@ -19,9 +22,66 @@ export default async function AdminDashboard() {
     }
   }
 
+  let month = null
+  try {
+    month = await getMonthOpsSummary()
+  } catch (error: unknown) {
+    console.error('Error fetching month ops:', error)
+  }
+
   return (
     <>
       <PageHeader title="Dashboard" description="Resumen general del sistema" />
+
+      {month && (
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-staff-muted mb-3">
+            Mes · {month.monthLabel}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <StatCard label="Ventas (piso + entradas)" value={formatCurrency(month.sales)} accent />
+            <StatCard label="Gastos" value={formatCurrency(month.expenses)} />
+            <StatCard label="Margen operativo" value={formatCurrency(month.margin)} />
+            <StatCard label="Unidades en merma" value={month.mermaUnits} />
+          </div>
+          {(month.openSessions.length > 0 || month.expiring.length > 0) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {month.openSessions.length > 0 && (
+                <Panel>
+                  <h3 className="font-semibold text-staff-fg mb-2">Cajas abiertas</h3>
+                  <ul className="text-sm space-y-1">
+                    {month.openSessions.map((s) => (
+                      <li key={s.id} className="text-staff-muted">
+                        {s.register.name} · {s.openedBy.name || s.openedBy.username}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/admin/caja" className="text-sm text-primary-500 mt-2 inline-block">
+                    Ir a caja
+                  </Link>
+                </Panel>
+              )}
+              {month.expiring.length > 0 && (
+                <Panel>
+                  <h3 className="font-semibold text-staff-fg mb-2">Por vencer / vencido</h3>
+                  <ul className="text-sm space-y-1">
+                    {month.expiring.map((s) => (
+                      <li key={s.id} className="text-staff-muted">
+                        {s.name}
+                        {s.presentation ? ` ${s.presentation}` : ''} · {STOCK_LOCATION_LABELS[s.location]} ·{' '}
+                        {s.expiresAt ? new Date(s.expiresAt).toLocaleDateString('es-HN') : ''}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/admin/inventario" className="text-sm text-primary-500 mt-2 inline-block">
+                    Ir a stock
+                  </Link>
+                </Panel>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <StatCard label="Consumo Hoy" value={formatCurrency(stats.totalConsumedToday)} accent />

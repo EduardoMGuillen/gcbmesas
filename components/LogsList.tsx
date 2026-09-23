@@ -34,6 +34,10 @@ const actionLabels: Record<LogAction, string> = {
   PAYMENT_REFUNDED: 'Reembolso de pago',
   ATTENDANCE_MARK: 'Marcaje de Asistencia',
   CYBERSOURCE_PAYMENT_AUDIT: 'CyberSource · Auditoría de pago',
+  CASH_SESSION_OPENED: 'Caja abierta',
+  CASH_SESSION_CLOSED: 'Caja cerrada',
+  EXPENSE_CREATED: 'Gasto registrado',
+  STOCK_ADJUSTED: 'Ajuste de inventario',
 }
 
 function getActionLabel(action: string): string {

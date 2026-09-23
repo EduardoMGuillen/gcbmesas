@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { createOrder, createAccount, closeAccount } from '@/lib/actions'
+import { createOrder, createAccount } from '@/lib/actions'
 import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount, OPEN_ACCOUNT_SENTINEL } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
+import { CloseAccountDialog } from '@/components/CloseAccountDialog'
 
 interface TableViewProps {
   table: any
@@ -18,6 +19,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
   const [quantity, setQuantity] = useState<string>('1') // Cambiar a string para manejar input temporal
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showClose, setShowClose] = useState(false)
   const [showCreateAccount, setShowCreateAccount] = useState(!account)
   const [initialBalance, setInitialBalance] = useState('')
   const [clientName, setClientName] = useState('')
@@ -118,22 +120,7 @@ export function TableView({ table, account: initialAccount, products }: TableVie
     }
   }
 
-  const handleCloseAccount = async () => {
-    if (!confirm('¿Estás seguro de cerrar esta cuenta?')) {
-      return
-    }
-
-    setLoading(true)
-    try {
-      await closeAccount(account.id)
-      router.refresh()
-      setAccount({ ...account, status: 'CLOSED' })
-    } catch (err: any) {
-      setError(err.message || 'Error al cerrar cuenta')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const handleCloseAccount = () => setShowClose(true)
 
   // Filtrar productos por término de búsqueda
   const filteredProducts = products.filter((product) =>
@@ -472,6 +459,17 @@ export function TableView({ table, account: initialAccount, products }: TableVie
             </form>
           </div>
         </div>
+      )}
+      {showClose && (
+        <CloseAccountDialog
+          accountId={account.id}
+          onCancel={() => setShowClose(false)}
+          onDone={() => {
+            setShowClose(false)
+            setAccount({ ...account, status: 'CLOSED', closedAt: new Date() })
+            router.refresh()
+          }}
+        />
       )}
     </div>
   )

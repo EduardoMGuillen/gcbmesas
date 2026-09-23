@@ -4,7 +4,7 @@ import { prisma } from './prisma'
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
-import { LogAction, OrderPrepStatus, PrepCategoryDestination } from '@prisma/client'
+import { LogAction, OrderPrepStatus, PrepCategoryDestination, PaymentMethod } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { getClientSelfOrderingEnabled, ensureAppSettingsRow, UNCATEGORIZED_PREP_CATEGORY } from './app-settings'
 import { CyberSourceApiError, getCyberSourceApiHostForLogs, getCyberSourceEnvLabel } from './cybersource'
@@ -829,11 +829,15 @@ export async function createAccount(data: {
   return account
 }
 
-export async function closeAccount(accountId: string) {
+export async function closeAccount(accountId: string, paymentMethod?: PaymentMethod) {
   const currentUser = await getCurrentUser()
 
   if (currentUser.role === 'MESERO') {
     throw new Error('Solo caja o administración pueden cerrar cuentas')
+  }
+
+  if (['ADMIN', 'CAJERO'].includes(currentUser.role) && !paymentMethod) {
+    throw new Error('Elige el método de pago para cerrar la cuenta')
   }
 
   const account = await prisma.account.findUnique({
@@ -914,11 +918,22 @@ export async function closeAccount(accountId: string) {
   const totalConsumed =
     Number(account.initialBalance) - Number(account.currentBalance)
 
+  let cashSessionId: string | null = null
+  if (paymentMethod) {
+    const openSession = await prisma.cashSession.findFirst({
+      where: { status: 'OPEN', openedByUserId: currentUser.id },
+      select: { id: true },
+    })
+    cashSessionId = openSession?.id ?? null
+  }
+
   const closedAccount = await prisma.account.update({
     where: { id: accountId },
     data: {
       status: 'CLOSED',
       closedAt: new Date(),
+      paymentMethod: paymentMethod || null,
+      cashSessionId,
     },
   })
 
@@ -932,9 +947,10 @@ export async function closeAccount(accountId: string) {
       totalConsumed,
       finalBalance: account.currentBalance,
       ordersCount: account.orders.length,
+      paymentMethod: paymentMethod || null,
+      cashSessionId,
     })
   } else {
-    // Actualizar el log existente con información adicional
     await createLog(LogAction.ACCOUNT_CLOSED, currentUser.id, account.tableId, {
       ...snapshotAccountPartyForLog(account),
       accountId,
@@ -943,6 +959,8 @@ export async function closeAccount(accountId: string) {
       finalBalance: account.currentBalance,
       ordersCount: account.orders.length,
       autoAcceptedOrdersCount: pendingOrders.length,
+      paymentMethod: paymentMethod || null,
+      cashSessionId,
     })
   }
 
@@ -1657,12 +1675,14 @@ export async function createAndCloseFreeInvoiceAccount(data: {
   meseroId: string
   receptorName?: string | null
   receptorRtn?: string | null
+  paymentMethod: PaymentMethod
   lines: Array<{ productId: string; quantity: number }>
 }) {
   const u = await getCurrentUser()
   if (!['ADMIN', 'CAJERO'].includes(u.role)) {
     throw new Error('No autorizado')
   }
+  if (!data.paymentMethod) throw new Error('Elige el método de pago')
 
   const mesero = await prisma.user.findFirst({
     where: { id: data.meseroId, role: 'MESERO', username: { not: 'CLIENTE' } },
@@ -1706,6 +1726,11 @@ export async function createAndCloseFreeInvoiceAccount(data: {
   const rtnLabel = data.receptorRtn?.trim() || null
   const clientName = rtnLabel ? `${clientLabel || 'Factura libre'} · RTN ${rtnLabel}` : clientLabel || 'Factura libre'
 
+  const openSession = await prisma.cashSession.findFirst({
+    where: { status: 'OPEN', openedByUserId: u.id },
+    select: { id: true },
+  })
+
   const account = await prisma.$transaction(async (tx) => {
     const created = await tx.account.create({
       data: {
@@ -1716,6 +1741,8 @@ export async function createAndCloseFreeInvoiceAccount(data: {
         closedAt: new Date(),
         openedByUserId: mesero.id,
         clientName,
+        paymentMethod: data.paymentMethod,
+        cashSessionId: openSession?.id ?? null,
       },
       select: { id: true, tableId: true },
     })

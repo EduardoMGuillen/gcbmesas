@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount } from '@/lib/utils'
-import { closeAccount } from '@/lib/actions'
-import { useRouter } from 'next/navigation'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { getTableLabel, isWalkInTable } from '@/lib/walk-in-table'
 import { buildHnInvoiceHtml, printHnInvoice, type InvoiceSettingsLike, type HnInvoiceLine } from '@/lib/invoice-print-hn'
+import { CloseAccountDialog } from '@/components/CloseAccountDialog'
+import { useRouter } from 'next/navigation'
 
 interface AccountsListProps {
   initialAccounts: any[]
@@ -23,6 +23,7 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
   const [endDate, setEndDate] = useState<string>('')
   const [selectedAccount, setSelectedAccount] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [closingId, setClosingId] = useState<string | null>(null)
   const router = useRouter()
   
   // Auto-refresh cada 30 segundos para ver cambios en cuentas
@@ -75,29 +76,6 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
   })
 
   const canCloseAccounts = userRole === 'ADMIN' || userRole === 'CAJERO'
-
-  const handleCloseAccount = async (accountId: string) => {
-    if (!confirm('¿Estás seguro de cerrar esta cuenta?')) {
-      return
-    }
-
-    setLoading(true)
-    try {
-      await closeAccount(accountId)
-      setAccounts(
-        accounts.map((acc) =>
-          acc.id === accountId
-            ? { ...acc, status: 'CLOSED', closedAt: new Date() }
-            : acc
-        )
-      )
-      router.refresh()
-    } catch (err: any) {
-      alert(err.message || 'Error al cerrar cuenta')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const totalConsumed = (account: any) =>
     Number(account.initialBalance) - Number(account.currentBalance)
@@ -385,7 +363,7 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
                 </button>
                 {account.status === 'OPEN' && canCloseAccounts && (
                   <button
-                    onClick={() => handleCloseAccount(account.id)}
+                    onClick={() => setClosingId(account.id)}
                     disabled={loading}
                     className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm"
                   >
@@ -468,6 +446,21 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
             </div>
           </div>
         </div>
+      )}
+      {closingId && (
+        <CloseAccountDialog
+          accountId={closingId}
+          onCancel={() => setClosingId(null)}
+          onDone={() => {
+            setAccounts((prev) =>
+              prev.map((acc) =>
+                acc.id === closingId ? { ...acc, status: 'CLOSED', closedAt: new Date() } : acc
+              )
+            )
+            setClosingId(null)
+            router.refresh()
+          }}
+        />
       )}
     </div>
   )

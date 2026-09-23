@@ -12,6 +12,7 @@ import { StaffThemeProvider } from '@/lib/staff-theme'
 import {
   adminNavGroups,
   cajeroLinks,
+  cajeroMoreLinks,
   groupContainsPath,
   homeForRole,
   isNavActive,
@@ -122,7 +123,7 @@ function AppShellInner({
 
   const floorLinks = userRole === 'CAJERO' ? cajeroLinks : meseroDesktopLinks
   const overflowLinks = userRole === 'MESERO' ? meseroDesktopOverflow : []
-  const moreLinks = userRole === 'MESERO' ? meseroMoreLinks : []
+  const moreLinks = userRole === 'MESERO' ? meseroMoreLinks : userRole === 'CAJERO' ? cajeroMoreLinks : []
   const bottomLinks = userRole === 'CAJERO' ? cajeroLinks : meseroBottomLinks
 
   const displayName = session?.user.name || session?.user.username || ''

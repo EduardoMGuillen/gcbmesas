@@ -6,6 +6,8 @@ import { CashierOrders } from '@/components/CashierOrders'
 import { CashierAccounts } from '@/components/CashierAccounts'
 import { CashierFreeInvoiceModal } from '@/components/CashierFreeInvoiceModal'
 import { closeAccount, setCajeroMeseroWatches } from '@/lib/actions'
+import { PaymentMethodPicker } from '@/components/CloseAccountDialog'
+import type { PaymentMethod } from '@prisma/client'
 import {
   buildHnInvoiceHtml,
   printHnInvoice,
@@ -163,6 +165,8 @@ export function CajeroDashboard({
   const [freeInvoiceOpen, setFreeInvoiceOpen] = useState(false)
   const [printingWalkInId, setPrintingWalkInId] = useState<string | null>(null)
   const [walkInQuery, setWalkInQuery] = useState('')
+  const [printTarget, setPrintTarget] = useState<AccountItem | null>(null)
+  const [printMethod, setPrintMethod] = useState<PaymentMethod | ''>('')
   const walkInAccounts = accounts.filter((account) => isWalkInTable(account.table))
   const regularAccounts = accounts.filter((account) => !isWalkInTable(account.table))
   const normalizedWalkInQuery = walkInQuery.trim().toLowerCase()
@@ -186,7 +190,7 @@ export function CajeroDashboard({
   })
 
   const handlePrintWalkIn = useCallback(
-    async (account: AccountItem) => {
+    async (account: AccountItem, paymentMethod: PaymentMethod) => {
       if (typeof window === 'undefined') return
       try {
         setPrintingWalkInId(account.id)
@@ -226,7 +230,7 @@ export function CajeroDashboard({
         })
 
         printHnInvoice(html)
-        await closeAccount(account.id)
+        await closeAccount(account.id, paymentMethod)
         router.refresh()
       } catch (err) {
         const message = err instanceof Error ? err.message : 'No se pudo imprimir esta cuenta sin mesa.'
@@ -355,7 +359,10 @@ export function CajeroDashboard({
                   </p>
                   <button
                     type="button"
-                    onClick={() => void handlePrintWalkIn(account)}
+                    onClick={() => {
+                      setPrintTarget(account)
+                      setPrintMethod('')
+                    }}
                     disabled={printingWalkInId === account.id}
                     className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -402,6 +409,43 @@ export function CajeroDashboard({
         invoiceSettings={invoiceSettings}
         meseros={activeMeseros}
       />
+      {printTarget && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar"
+            onClick={() => setPrintTarget(null)}
+          />
+          <div className="relative w-full max-w-md bg-staff-surface border border-staff-border rounded-2xl p-5 space-y-4">
+            <h2 className="text-lg font-semibold text-staff-fg">Imprimir y cerrar</h2>
+            <p className="text-sm text-staff-muted">¿Cómo pagó esta cuenta?</p>
+            <PaymentMethodPicker value={printMethod} onChange={setPrintMethod} />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl text-sm text-staff-muted"
+                onClick={() => setPrintTarget(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!printMethod || printingWalkInId === printTarget.id}
+                className="px-4 py-2 rounded-xl text-sm font-semibold bg-primary-600 text-white disabled:opacity-50"
+                onClick={() => {
+                  if (!printMethod) return
+                  const acc = printTarget
+                  setPrintTarget(null)
+                  void handlePrintWalkIn(acc, printMethod)
+                }}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
