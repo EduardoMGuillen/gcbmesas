@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { deactivateEventsPastGracePeriod } from '@/lib/public-events'
 import { TaquillaScanClient } from './TaquillaScanClient'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,8 @@ export default async function TaquillaPage() {
   if (!session || !['TAQUILLA', 'ADMIN', 'MESERO', 'CAJERO'].includes(session.user.role)) {
     redirect('/login')
   }
+
+  await deactivateEventsPastGracePeriod()
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)

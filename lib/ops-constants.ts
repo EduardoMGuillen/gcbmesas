@@ -17,7 +17,7 @@ export const STOCK_LOCATION_LABELS: Record<StockLocation, string> = {
   BODEGA: 'Bodega',
   BARRA: 'Barra',
   ABIERTO: 'Abierto',
-  MERMA: 'Mal estado / merma',
+  MERMA: 'Expirado/Perdida',
 }
 
 export const EXPENSE_CATEGORIES = [

@@ -56,6 +56,67 @@ export async function consumeStockForSale(
   return usedId
 }
 
+export async function consumeStockItemForSale(
+  tx: Prisma.TransactionClient,
+  opts: { stockItemId: string; quantity: number; userId: string }
+) {
+  const item = await tx.stockItem.findUnique({ where: { id: opts.stockItemId } })
+  if (!item) throw new Error('No hay de este producto en esta zona')
+  if (!item.deductOnSale) return item
+  const qty = Number(item.quantity)
+  if (qty <= 0) throw new Error('No hay de este producto en esta zona')
+  if (qty < opts.quantity) throw new Error('No hay suficiente en esta zona')
+  const updated = await tx.stockItem.update({
+    where: { id: item.id },
+    data: { quantity: qty - opts.quantity },
+  })
+  await tx.stockMovement.create({
+    data: {
+      stockItemId: item.id,
+      type: StockMovementType.SALE,
+      quantityChange: -opts.quantity,
+      note: 'Venta',
+      userId: opts.userId,
+    },
+  })
+  return updated
+}
+
+export async function ensureProductForStockItem(
+  tx: Prisma.TransactionClient,
+  item: {
+    id: string
+    name: string
+    presentation?: string | null
+    category?: string | null
+    salePrice?: unknown
+    productId?: string | null
+  }
+) {
+  if (item.productId) {
+    const existing = await tx.product.findUnique({ where: { id: item.productId } })
+    if (existing) return existing
+  }
+  const byName = await tx.product.findFirst({
+    where: { name: { equals: item.name, mode: 'insensitive' } },
+  })
+  if (byName) {
+    await tx.stockItem.update({ where: { id: item.id }, data: { productId: byName.id } })
+    return byName
+  }
+  const created = await tx.product.create({
+    data: {
+      name: item.presentation ? `${item.name} (${item.presentation})` : item.name,
+      price: Number(item.salePrice || 0),
+      category: item.category || null,
+      isActive: false,
+      requiresPrep: !['Cerveza', 'Vapes', 'Mixers'].includes(item.category || ''),
+    },
+  })
+  await tx.stockItem.update({ where: { id: item.id }, data: { productId: created.id } })
+  return created
+}
+
 export async function restoreStockForSale(
   tx: Prisma.TransactionClient,
   opts: { stockItemId: string | null; quantity: number; userId: string }

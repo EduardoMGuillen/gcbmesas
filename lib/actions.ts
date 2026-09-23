@@ -15,10 +15,12 @@ import {
   refundCyberSourceCaptureForEntry,
 } from './cybersource-refund'
 import { INSUFFICIENT_BALANCE_MESSAGE } from './billing-errors'
-import { consumeStockForSale, restoreStockForSale } from './stock-sale'
+import { consumeStockForSale, consumeStockItemForSale, ensureProductForStockItem, restoreStockForSale } from './stock-sale'
 import { parseVenueZone } from './venue-zones'
 import { businessDateToDate, getBusinessDate } from './business-day'
 import { findOpenSessionIdForZone } from './ops-actions'
+import { deactivateEventsPastGracePeriod } from './public-events'
+import { isHiddenEntryCreator } from './entry-historial'
 
 // Helper to create log
 async function createLog(
@@ -1693,11 +1695,8 @@ export async function getProductsForCashierInvoice() {
   if (!['ADMIN', 'CAJERO'].includes(u.role)) {
     throw new Error('No autorizado')
   }
-  return prisma.product.findMany({
-    where: { isActive: true },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true, price: true, category: true, isTaxExempt: true },
-  })
+  const { getInvoiceSaleCatalog } = await import('./ops-actions')
+  return getInvoiceSaleCatalog()
 }
 
 export async function createAndCloseFreeInvoiceAccount(data: {
@@ -1722,20 +1721,50 @@ export async function createAndCloseFreeInvoiceAccount(data: {
   const rawLines = (data.lines || []).filter((l) => l.productId && Number.isFinite(l.quantity) && l.quantity >= 1)
   if (rawLines.length === 0) throw new Error('Agrega al menos un artículo válido')
 
-  const uniqueProductIds = Array.from(new Set(rawLines.map((l) => l.productId)))
-  const products = await prisma.product.findMany({
-    where: { id: { in: uniqueProductIds }, isActive: true },
-    select: { id: true, name: true, price: true, requiresPrep: true },
+  const uniqueIds = Array.from(new Set(rawLines.map((l) => l.productId)))
+  const stockRows = await prisma.stockItem.findMany({
+    where: { id: { in: uniqueIds }, salePrice: { not: null } },
+    select: {
+      id: true,
+      name: true,
+      presentation: true,
+      salePrice: true,
+      productId: true,
+      category: true,
+    },
   })
+  const leftoverIds = uniqueIds.filter((id) => !stockRows.some((s) => s.id === id))
+  const products = leftoverIds.length
+    ? await prisma.product.findMany({
+        where: { id: { in: leftoverIds }, isActive: true },
+        select: { id: true, name: true, price: true, requiresPrep: true },
+      })
+    : []
+  const stockById = new Map(stockRows.map((s) => [s.id, s]))
   const byId = new Map(products.map((p) => [p.id, p]))
 
   const normalized = rawLines
     .map((l) => {
+      const stock = stockById.get(l.productId)
+      if (stock) {
+        const quantity = Math.max(1, Math.floor(l.quantity))
+        const unitPrice = Number(stock.salePrice)
+        return {
+          catalogId: stock.id,
+          fromStock: true as const,
+          quantity,
+          unitPrice,
+          linePrice: unitPrice * quantity,
+          productName: stock.presentation ? `${stock.name} (${stock.presentation})` : stock.name,
+          requiresPrep: !['Cerveza', 'Vapes', 'Mixers'].includes(stock.category || ''),
+        }
+      }
       const p = byId.get(l.productId)
       if (!p) return null
       const quantity = Math.max(1, Math.floor(l.quantity))
       return {
-        productId: p.id,
+        catalogId: p.id,
+        fromStock: false as const,
         quantity,
         unitPrice: Number(p.price),
         linePrice: Number(p.price) * quantity,
@@ -1776,10 +1805,25 @@ export async function createAndCloseFreeInvoiceAccount(data: {
       select: { id: true, tableId: true },
     })
 
-    await tx.order.createMany({
-      data: normalized.map((l) => ({
+    const orderRows = []
+    for (const l of normalized) {
+      let productId = l.catalogId
+      let stockItemId: string | null = null
+      if (l.fromStock) {
+        const item = await tx.stockItem.findUnique({ where: { id: l.catalogId } })
+        if (!item) continue
+        const product = await ensureProductForStockItem(tx, item)
+        productId = product.id
+        await consumeStockItemForSale(tx, {
+          stockItemId: item.id,
+          quantity: l.quantity,
+          userId: mesero.id,
+        })
+        stockItemId = item.id
+      }
+      orderRows.push({
         accountId: created.id,
-        productId: l.productId,
+        productId,
         userId: mesero.id,
         price: l.linePrice,
         quantity: l.quantity,
@@ -1787,8 +1831,12 @@ export async function createAndCloseFreeInvoiceAccount(data: {
         rejected: false,
         prepStatus: l.requiresPrep ? OrderPrepStatus.QUEUED : OrderPrepStatus.NONE,
         servedByUserId: u.id,
-      })),
-    })
+        stockItemId,
+      })
+    }
+    if (orderRows.length) {
+      await tx.order.createMany({ data: orderRows })
+    }
 
     await tx.log.create({
       data: {
@@ -1802,7 +1850,7 @@ export async function createAndCloseFreeInvoiceAccount(data: {
           mesero: mesero.name || mesero.username,
           total,
           lines: normalized.map((l) => ({
-            productId: l.productId,
+            productId: l.catalogId,
             productName: l.productName,
             quantity: l.quantity,
             linePrice: l.linePrice,
@@ -2164,7 +2212,8 @@ export async function deleteProduct(productId: string) {
 
 export async function createOrder(data: {
   accountId: string
-  productId: string
+  productId?: string
+  stockItemId?: string
   quantity?: number
 }) {
   const currentUser = await getCurrentUser()
@@ -2187,45 +2236,70 @@ export async function createOrder(data: {
     throw new Error('La cuenta está cerrada')
   }
 
-  const product = await prisma.product.findUnique({
-    where: { id: data.productId },
-  })
-
-  if (!product) {
-    throw new Error('Producto no encontrado')
-  }
-
-  if (!product.isActive) {
-    throw new Error('Producto no disponible')
-  }
-
   const quantity = data.quantity || 1
-  const totalPrice = Number(product.price) * quantity
   const isWalkInAccount =
     account.table?.shortCode === WALK_IN_TABLE_SHORT_CODE ||
     (account.table?.zone === WALK_IN_TABLE_ZONE && account.table?.name === WALK_IN_TABLE_NAME)
 
-  if (!isWalkInAccount && Number(account.currentBalance) < totalPrice) {
-    throw new Error(INSUFFICIENT_BALANCE_MESSAGE)
-  }
-
-  // Use transaction to ensure atomicity
   const result = await prisma.$transaction(async (tx) => {
-    // Lock account row
     const lockedAccount = await tx.account.findUnique({
       where: { id: data.accountId },
     })
+    if (!lockedAccount) throw new Error('Cuenta no encontrada')
 
-    if (!lockedAccount) {
-      throw new Error('Cuenta no encontrada')
+    let productName = ''
+    let productId = data.productId || ''
+    let unitPrice = 0
+    let stockItemId: string | null = null
+
+    if (data.stockItemId) {
+      const item = await tx.stockItem.findUnique({ where: { id: data.stockItemId } })
+      if (!item) throw new Error('Producto no encontrado')
+      if (item.salePrice == null) throw new Error('Este ítem no tiene precio de venta')
+      unitPrice = Number(item.salePrice)
+      const totalPrice = unitPrice * quantity
+      if (!isWalkInAccount && Number(lockedAccount.currentBalance) < totalPrice) {
+        throw new Error(INSUFFICIENT_BALANCE_MESSAGE)
+      }
+      const product = await ensureProductForStockItem(tx, item)
+      productId = product.id
+      productName = item.presentation ? `${item.name} (${item.presentation})` : item.name
+      await consumeStockItemForSale(tx, {
+        stockItemId: item.id,
+        quantity,
+        userId: currentUser.id,
+      })
+      stockItemId = item.id
+      const order = await tx.order.create({
+        data: {
+          accountId: data.accountId,
+          productId,
+          userId: currentUser.id,
+          price: totalPrice,
+          quantity,
+          stockItemId,
+        },
+      })
+      await tx.account.update({
+        where: { id: data.accountId },
+        data: { currentBalance: Number(lockedAccount.currentBalance) - totalPrice },
+      })
+      return { order, productName, productId, totalPrice }
     }
+
+    if (!data.productId) throw new Error('Selecciona un producto')
+    const product = await tx.product.findUnique({ where: { id: data.productId } })
+    if (!product) throw new Error('Producto no encontrado')
+    if (!product.isActive) throw new Error('Producto no disponible')
+    unitPrice = Number(product.price)
+    const totalPrice = unitPrice * quantity
     if (!isWalkInAccount && Number(lockedAccount.currentBalance) < totalPrice) {
       throw new Error(INSUFFICIENT_BALANCE_MESSAGE)
     }
-
-    // Create order
+    productName = product.name
+    productId = product.id
     const zone = account.venueZone || parseVenueZone(account.table.zone)
-    const stockItemId = await consumeStockForSale(tx, {
+    stockItemId = await consumeStockForSale(tx, {
       productId: data.productId,
       zone,
       quantity,
@@ -2241,25 +2315,19 @@ export async function createOrder(data: {
         stockItemId,
       },
     })
-
-    // Update balance
-    const newBalance =
-      Number(lockedAccount.currentBalance) - totalPrice
-
     await tx.account.update({
       where: { id: data.accountId },
-      data: { currentBalance: newBalance },
+      data: { currentBalance: Number(lockedAccount.currentBalance) - totalPrice },
     })
-
-    return order
+    return { order, productName, productId, totalPrice }
   })
 
   await createLog(LogAction.ORDER_CREATED, currentUser.id, account.tableId, {
-    orderId: result.id,
+    orderId: result.order.id,
     accountId: data.accountId,
-    productId: data.productId,
-    productName: product.name,
-    price: totalPrice,
+    productId: result.productId,
+    productName: result.productName,
+    price: result.totalPrice,
     quantity,
   })
 
@@ -2269,7 +2337,7 @@ export async function createOrder(data: {
     sendPushToAccountOpener(
       account.openedByUserId,
       account.table.name,
-      product.name,
+      result.productName,
       quantity
     ).catch((e) => console.error('[Push] Error:', e))
   }
@@ -2282,7 +2350,7 @@ export async function createOrder(data: {
     sendPushToCajerosFollowingMesero(
       meseroId,
       account.table.name,
-      product.name,
+      result.productName,
       quantity,
       meseroName
     ).catch((e) => console.error('[Push Cajero] Error:', e))
@@ -2296,7 +2364,7 @@ export async function createOrder(data: {
   revalidatePath('/cajero', 'page')
   // También revalidar el layout para limpiar cache
   revalidatePath('/', 'layout')
-  return result
+  return result.order
 }
 
 export async function cancelOrder(orderId: string) {
@@ -2747,8 +2815,9 @@ export async function getEventsForTicketeraAssignment() {
   if (currentUser.role !== 'ADMIN') {
     throw new Error('Solo administradores pueden ver este listado')
   }
+  await deactivateEventsPastGracePeriod()
   return prisma.event.findMany({
-    orderBy: { date: 'desc' },
+    orderBy: [{ isActive: 'desc' }, { date: 'desc' }],
     select: { id: true, name: true, date: true, isActive: true },
   })
 }
@@ -3279,15 +3348,47 @@ export async function createEvent(data: {
 }
 
 export async function getEvents(onlyActive = false) {
+  await deactivateEventsPastGracePeriod()
   const where = onlyActive ? { isActive: true } : {}
   return prisma.event.findMany({
     where,
-    orderBy: { date: 'desc' },
+    orderBy: [{ isActive: 'desc' }, { date: 'desc' }],
     include: {
       _count: { select: { entries: true } },
       createdBy: { select: { name: true, username: true } },
     },
   })
+}
+
+export async function getEventEntriesForExport(eventId: string) {
+  const user = await getCurrentUser()
+  ensureEntradasModuleAccess(user.role)
+  await assertEntradasEventAccess(user.id, user.role, eventId)
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, name: true, date: true, venueName: true },
+  })
+  if (!event) throw new Error('Evento no encontrado')
+
+  const rows = (
+    await prisma.entry.findMany({
+      where: { eventId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        clientName: true,
+        clientEmail: true,
+        clientPhone: true,
+        numberOfEntries: true,
+        totalPrice: true,
+        status: true,
+        createdAt: true,
+        createdBy: { select: { name: true, username: true } },
+      },
+    })
+  ).filter((row) => !isHiddenEntryCreator(row.createdBy))
+
+  return { event, rows }
 }
 
 export async function updateEvent(
@@ -3678,10 +3779,12 @@ export async function getEntradasDashboardData() {
   const eventWhere = eventScope === null ? {} : { id: { in: eventScope } }
   const entryEventFilter = eventScope === null ? {} : { eventId: { in: eventScope } }
 
+  await deactivateEventsPastGracePeriod()
+
   const [events, recentEntries, todayStats, soldByEvent] = await Promise.all([
     prisma.event.findMany({
       where: eventWhere,
-      orderBy: { date: 'desc' },
+      orderBy: [{ isActive: 'desc' }, { date: 'desc' }],
       include: {
         _count: { select: { entries: true } },
         createdBy: { select: { name: true, username: true } },

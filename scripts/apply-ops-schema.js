@@ -84,6 +84,7 @@ const statements = [
   )`,
   `ALTER TABLE "stock_items" ADD COLUMN IF NOT EXISTS "venueZone" "VenueZone"`,
   `ALTER TABLE "stock_items" ADD COLUMN IF NOT EXISTS "deductOnSale" BOOLEAN NOT NULL DEFAULT true`,
+  `ALTER TABLE "stock_items" ADD COLUMN IF NOT EXISTS "salePrice" DECIMAL(10,2)`,
   `CREATE INDEX IF NOT EXISTS "stock_items_location_idx" ON "stock_items"("location")`,
   `CREATE INDEX IF NOT EXISTS "stock_items_venueZone_idx" ON "stock_items"("venueZone")`,
   `CREATE INDEX IF NOT EXISTS "stock_items_category_idx" ON "stock_items"("category")`,

@@ -122,7 +122,8 @@ export const adminNavGroups: StaffNavGroup[] = [
     id: 'analisis',
     label: 'Análisis',
     items: [
-      { href: '/admin/reportes', label: 'Reportes', icon: ICONS.reportes },
+      { href: '/admin/reportes', label: 'Reportes', icon: ICONS.reportes, exact: true },
+      { href: '/admin/reportes/caja', label: 'Reportes de Caja', icon: ICONS.caja },
       { href: '/admin/logs', label: 'Logs', icon: ICONS.logs },
     ],
   },

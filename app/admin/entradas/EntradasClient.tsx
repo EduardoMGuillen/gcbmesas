@@ -17,6 +17,7 @@ import {
   markEntryWhatsappSent,
 } from '@/lib/actions'
 import { isPublicFreeCoverOnly } from '@/lib/public-event-pricing'
+import { isHiddenEntryCreator } from '@/lib/entry-historial'
 import { StaffTabs } from '@/components/staff/ui'
 
 // ==================== TYPES ====================
@@ -80,6 +81,23 @@ interface EntradasClientProps {
 type Tab = 'vender' | 'eventos' | 'historial' | 'escanear' | 'estadisticas'
 
 // ==================== SHARED HELPERS ====================
+
+async function downloadEventEntriesExcel(eventId: string) {
+  const res = await fetch(`/api/entradas/historial?eventId=${encodeURIComponent(eventId)}`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || 'No se pudo descargar')
+  }
+  const blob = await res.blob()
+  const cd = res.headers.get('Content-Disposition')
+  const match = cd?.match(/filename="([^"]+)"/)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = match?.[1] || 'Entradas.xlsx'
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 async function generateQRDataUrl(text: string): Promise<string> {
   return QRCode.toDataURL(text, {
@@ -1084,6 +1102,7 @@ const VENUE_FILTER_NONE = '__sin_lugar__'
 function EstadisticasTab({ rows }: { rows: EventStatRow[] }) {
   const [filterVenue, setFilterVenue] = useState('')
   const [filterEventName, setFilterEventName] = useState('')
+  const [downloadingId, setDownloadingId] = useState('')
 
   const distinctVenueNames = useMemo(() => {
     const set = new Set<string>()
@@ -1124,7 +1143,8 @@ function EstadisticasTab({ rows }: { rows: EventStatRow[] }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-dark-300">
-        Ventas acumuladas por evento (entradas no canceladas). Incluye taquilla y en línea.
+        Ventas acumuladas por evento (entradas no canceladas). Incluye taquilla y en línea. Excel no incluye entradas
+        generadas por Guillen.
       </p>
       {rows.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-dark-100 border border-dark-200">
@@ -1177,6 +1197,7 @@ function EstadisticasTab({ rows }: { rows: EventStatRow[] }) {
                 <th className="px-4 py-3 font-medium">Fecha</th>
                 <th className="px-4 py-3 font-medium text-right">Entradas</th>
                 <th className="px-4 py-3 font-medium text-right">Ingreso (L)</th>
+                <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
             <tbody>
@@ -1190,6 +1211,21 @@ function EstadisticasTab({ rows }: { rows: EventStatRow[] }) {
                   <td className="px-4 py-3 text-right text-white">{r.entriesSold}</td>
                   <td className="px-4 py-3 text-right text-primary-400 font-semibold">
                     {r.revenueLps.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      disabled={downloadingId === r.eventId}
+                      onClick={() => {
+                        setDownloadingId(r.eventId)
+                        void downloadEventEntriesExcel(r.eventId)
+                          .catch((e) => alert(e instanceof Error ? e.message : 'No se pudo descargar'))
+                          .finally(() => setDownloadingId(''))
+                      }}
+                      className="text-xs px-3 py-1.5 bg-dark-50 hover:bg-dark-200 text-white/70 hover:text-white rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {downloadingId === r.eventId ? 'Bajando…' : 'Excel'}
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -1223,6 +1259,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
   const [uploading, setUploading] = useState(false)
   const [filterListVenue, setFilterListVenue] = useState('')
   const [filterListEventName, setFilterListEventName] = useState('')
+  const [downloadingId, setDownloadingId] = useState('')
 
   const distinctListVenueNames = useMemo(() => {
     const set = new Set<string>()
@@ -1244,15 +1281,20 @@ function EventosTab({ events }: { events: EventItem[] }) {
   const hasEventsWithoutVenue = useMemo(() => events.some((ev) => !ev.venueName?.trim()), [events])
 
   const filteredListEvents = useMemo(() => {
-    return events.filter((ev) => {
-      if (filterListVenue === VENUE_FILTER_NONE) {
-        if (ev.venueName?.trim()) return false
-      } else if (filterListVenue) {
-        if ((ev.venueName?.trim() || '') !== filterListVenue) return false
-      }
-      if (filterListEventName && ev.name !== filterListEventName) return false
-      return true
-    })
+    return events
+      .filter((ev) => {
+        if (filterListVenue === VENUE_FILTER_NONE) {
+          if (ev.venueName?.trim()) return false
+        } else if (filterListVenue) {
+          if ((ev.venueName?.trim() || '') !== filterListVenue) return false
+        }
+        if (filterListEventName && ev.name !== filterListEventName) return false
+        return true
+      })
+      .sort((a, b) => {
+        if (a.isActive !== b.isActive) return a.isActive ? -1 : 1
+        return new Date(b.date).getTime() - new Date(a.date).getTime()
+      })
   }, [events, filterListVenue, filterListEventName])
 
   const resetForm = () => {
@@ -1607,6 +1649,19 @@ function EventosTab({ events }: { events: EventItem[] }) {
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button onClick={() => startEdit(ev)} disabled={isPending} className="text-xs px-3 py-1.5 bg-dark-50 hover:bg-dark-200 text-white/70 hover:text-white rounded-lg transition-colors">Editar</button>
+                <button
+                  type="button"
+                  disabled={downloadingId === ev.id}
+                  onClick={() => {
+                    setDownloadingId(ev.id)
+                    void downloadEventEntriesExcel(ev.id)
+                      .catch((e) => alert(e instanceof Error ? e.message : 'No se pudo descargar'))
+                      .finally(() => setDownloadingId(''))
+                  }}
+                  className="text-xs px-3 py-1.5 bg-dark-50 hover:bg-dark-200 text-white/70 hover:text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {downloadingId === ev.id ? 'Bajando…' : 'Excel'}
+                </button>
                 <button onClick={() => handleToggleActive(ev)} disabled={isPending} className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${ev.isActive ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'}`}>{ev.isActive ? 'Desactivar' : 'Activar'}</button>
                 {ev._count.entries === 0 && <button onClick={() => handleDelete(ev)} disabled={isPending} className="text-xs px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors">Eliminar</button>}
               </div>
@@ -1637,6 +1692,7 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
   const uniqueEvents = Array.from(new Set(entries.map((e) => e.event.name))).sort()
 
   const filtered = entries.filter((e) => {
+    if (isHiddenEntryCreator(e.createdBy || null)) return false
     if (filter !== 'all' && e.status !== filter) return false
     if (eventFilter !== 'all' && e.event.name !== eventFilter) return false
     if (searchName.trim()) {

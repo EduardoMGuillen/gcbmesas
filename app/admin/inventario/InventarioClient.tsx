@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import type { StockItem, StockLocation } from '@prisma/client'
 import {
   adjustStock,
@@ -13,6 +13,7 @@ import { VENUE_ZONE_LABELS, VENUE_ZONES, type VenueZone } from '@/lib/venue-zone
 import { Badge, PageHeader, Panel, StaffButton, StaffTabs } from '@/components/staff/ui'
 import { ProductsList } from '@/components/ProductsList'
 import { useRouter } from 'next/navigation'
+import { formatCurrency } from '@/lib/utils'
 
 type StockForm = {
   id?: string
@@ -29,9 +30,8 @@ type StockForm = {
   expiresAt?: string | null
   notes?: string | null
   productId?: string | null
+  salePrice?: number | null
 }
-
-type MenuProduct = { id: string; name: string }
 
 type StockFilter = 'ALL' | 'BODEGA' | 'ASTRO' | 'STUDIO54' | 'GARDEN' | 'MERMA'
 
@@ -53,14 +53,68 @@ export function InventarioClient({
   products: unknown[]
   stock: StockItem[]
 }) {
-  const menuProducts = (products as MenuProduct[]) || []
   const [tab, setTab] = useState<'menu' | 'stock'>('stock')
   const [filter, setFilter] = useState<StockFilter>('ALL')
   const [q, setQ] = useState('')
   const [pending, start] = useTransition()
   const [error, setError] = useState('')
   const [editing, setEditing] = useState<StockForm | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+
+  const downloadExcel = async (mode: 'export' | 'template') => {
+    setError('')
+    start(async () => {
+      try {
+        const res = await fetch(`/api/inventario/excel?mode=${mode}`)
+        if (!res.ok) {
+          const body = await res.json().catch(() => null)
+          throw new Error(body?.error || 'No se pudo descargar')
+        }
+        const blob = await res.blob()
+        const cd = res.headers.get('Content-Disposition')
+        const match = cd?.match(/filename="([^"]+)"/)
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = match?.[1] || (mode === 'template' ? 'Plantilla_Inventario.xlsx' : 'Inventario.xlsx')
+        a.click()
+        URL.revokeObjectURL(url)
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'No se pudo descargar el Excel')
+      }
+    })
+  }
+
+  const importExcel = (file: File) => {
+    if (!file) return
+    if (
+      !window.confirm(
+        'Esto actualiza el inventario con el Excel: cambia ítems existentes y agrega los que no tienen ID. ¿Continuar?'
+      )
+    ) {
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
+    setError('')
+    start(async () => {
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        const res = await fetch('/api/inventario/excel', { method: 'POST', body: fd })
+        const body = await res.json().catch(() => null)
+        if (!res.ok) throw new Error(body?.error || 'No se pudo importar')
+        const extra =
+          Array.isArray(body?.errors) && body.errors.length ? `\n${body.errors.slice(0, 8).join('\n')}` : ''
+        alert(`Importado: ${body.updated || 0} actualizados, ${body.created || 0} nuevos.${extra}`)
+        router.refresh()
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'No se pudo importar')
+      } finally {
+        if (fileRef.current) fileRef.current.value = ''
+      }
+    })
+  }
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
@@ -119,6 +173,7 @@ export function InventarioClient({
           expiresAt: editing.expiresAt || null,
           notes: editing.notes,
           productId: editing.productId || null,
+          salePrice: editing.salePrice ?? null,
         })
         setEditing(null)
         router.refresh()
@@ -132,12 +187,12 @@ export function InventarioClient({
     <div>
       <PageHeader
         title="Inventario"
-        description="Bodega es el almacén. Astro, Studio54 y Garden es lo que hay en cada barra para vender."
+        description="El stock de venta es lo que cobra el mesero. Ponle precio. El menú QR queda para la mesa del cliente y la comida."
       />
       <StaffTabs
         tabs={[
-          { id: 'stock', label: 'Stock' },
-          { id: 'menu', label: 'Menú de venta' },
+          { id: 'stock', label: 'Stock de venta' },
+          { id: 'menu', label: 'Menú QR' },
         ]}
         value={tab}
         onChange={setTab}
@@ -157,6 +212,25 @@ export function InventarioClient({
                 Cargar Excel de Astro
               </StaffButton>
             )}
+            <StaffButton type="button" variant="secondary" onClick={() => void downloadExcel('export')} disabled={pending}>
+              Exportar inventario
+            </StaffButton>
+            <StaffButton type="button" variant="secondary" onClick={() => void downloadExcel('template')} disabled={pending}>
+              Descargar plantilla
+            </StaffButton>
+            <StaffButton type="button" variant="secondary" onClick={() => fileRef.current?.click()} disabled={pending}>
+              Importar Excel
+            </StaffButton>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) importExcel(file)
+              }}
+            />
             <StaffButton
               type="button"
               variant="secondary"
@@ -182,7 +256,7 @@ export function InventarioClient({
           {(merma.length > 0 || expiring.length > 0) && (
             <div className="flex flex-wrap gap-2">
               {merma.length > 0 && (
-                <Badge tone="danger">{merma.length} ítems en merma</Badge>
+                <Badge tone="danger">{merma.length} ítems en Expirado/Perdida</Badge>
               )}
               {expiring.length > 0 && (
                 <Badge tone="warning">{expiring.length} por vencer (14 días)</Badge>
@@ -198,7 +272,7 @@ export function InventarioClient({
                 ['ASTRO', 'Astro'],
                 ['STUDIO54', 'Studio54'],
                 ['GARDEN', 'Garden'],
-                ['MERMA', 'Merma'],
+                ['MERMA', 'Expirado/Perdida'],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -264,18 +338,20 @@ export function InventarioClient({
                     </option>
                   ))}
                 </select>
-                <select
-                  value={editing.productId || ''}
-                  onChange={(e) => setEditing({ ...editing, productId: e.target.value || null })}
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={editing.salePrice ?? ''}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      salePrice: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
+                  placeholder="Precio de venta"
                   className="px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
-                >
-                  <option value="">Sin amarre al menú</option>
-                  {menuProducts.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                />
                 <label className="flex items-center gap-2 text-sm text-staff-muted">
                   <input
                     type="checkbox"
@@ -336,6 +412,7 @@ export function InventarioClient({
                     <th className="p-3 font-medium">Producto</th>
                     <th className="p-3 font-medium">Ubicación</th>
                     <th className="p-3 font-medium text-right">Qty</th>
+                    <th className="p-3 font-medium text-right">Precio</th>
                     <th className="p-3 font-medium">Caduca</th>
                     <th className="p-3 font-medium">Acciones</th>
                   </tr>
@@ -357,6 +434,9 @@ export function InventarioClient({
                           </Badge>
                         </td>
                         <td className="p-3 text-right font-semibold text-staff-fg">{qty(s.quantity)}</td>
+                        <td className="p-3 text-right text-staff-fg">
+                          {s.salePrice != null ? formatCurrency(Number(s.salePrice)) : '—'}
+                        </td>
                         <td className="p-3 text-staff-muted">
                           {s.expiresAt ? (
                             <span className={expired ? 'text-red-400' : ''}>
@@ -387,6 +467,7 @@ export function InventarioClient({
                                   expiresAt: toDateInput(s.expiresAt),
                                   notes: s.notes,
                                   productId: s.productId,
+                                  salePrice: s.salePrice != null ? Number(s.salePrice) : null,
                                 })
                               }
                             >
@@ -437,7 +518,7 @@ export function InventarioClient({
                                 type="button"
                                 className="text-xs text-red-400 hover:underline"
                                 onClick={() => {
-                                  const n = Number(window.prompt('¿Cuántas van a merma?', '1'))
+                                  const n = Number(window.prompt('¿Cuántas van a Expirado/Perdida?', '1'))
                                   if (!Number.isFinite(n) || n <= 0) return
                                   start(async () => {
                                     try {
@@ -449,7 +530,7 @@ export function InventarioClient({
                                   })
                                 }}
                               >
-                                Merma
+                                Expirado/Perdida
                               </button>
                             )}
                           </div>
