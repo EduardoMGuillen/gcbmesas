@@ -40,7 +40,9 @@ export const STOCK_CATEGORIES = [
 ] as const
 
 export const CASH_REGISTERS = [
-  { slug: 'cover', name: 'Caja Cover', defaultFloat: 4000 },
-  { slug: 'astro', name: 'Caja Astro', defaultFloat: 4000 },
-  { slug: 'eventos', name: 'Caja Eventos', defaultFloat: 4000 },
+  { slug: 'cover', name: 'Caja Cover', defaultFloat: 4000, venueZone: null },
+  { slug: 'astro', name: 'Caja Astro', defaultFloat: 4000, venueZone: 'ASTRO' as const },
+  { slug: 'studio54', name: 'Caja Studio54', defaultFloat: 4000, venueZone: 'STUDIO54' as const },
+  { slug: 'garden', name: 'Caja Garden', defaultFloat: 4000, venueZone: 'GARDEN' as const },
+  { slug: 'eventos', name: 'Caja Eventos', defaultFloat: 4000, venueZone: null },
 ] as const

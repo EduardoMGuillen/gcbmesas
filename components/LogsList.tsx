@@ -38,6 +38,7 @@ const actionLabels: Record<LogAction, string> = {
   CASH_SESSION_CLOSED: 'Caja cerrada',
   EXPENSE_CREATED: 'Gasto registrado',
   STOCK_ADJUSTED: 'Ajuste de inventario',
+  WAITER_ZONE_ASSIGNED: 'Zona de mesero',
 }
 
 function getActionLabel(action: string): string {

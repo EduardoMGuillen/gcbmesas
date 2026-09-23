@@ -25,9 +25,9 @@ export async function sendMailWithInlineImages(options: {
   to: string
   subject: string
   html: string
-  attachments: InlineImageAttachment[]
+  attachments?: InlineImageAttachment[]
 }): Promise<void> {
-  const { to, subject, html, attachments } = options
+  const { to, subject, html, attachments = [] } = options
   const toTrimmed = to.trim()
 
   const apiKey = process.env.RESEND_API_KEY?.trim()

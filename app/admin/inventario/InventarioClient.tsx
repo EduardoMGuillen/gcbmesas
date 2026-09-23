@@ -9,6 +9,7 @@ import {
   upsertStockItem,
 } from '@/lib/ops-actions'
 import { STOCK_CATEGORIES, STOCK_LOCATION_LABELS } from '@/lib/ops-constants'
+import { VENUE_ZONE_LABELS, VENUE_ZONES, type VenueZone } from '@/lib/venue-zones'
 import { Badge, PageHeader, Panel, StaffButton, StaffTabs } from '@/components/staff/ui'
 import { ProductsList } from '@/components/ProductsList'
 import { useRouter } from 'next/navigation'
@@ -21,13 +22,18 @@ type StockForm = {
   supplier?: string | null
   supplierPhone?: string | null
   location: StockLocation
+  venueZone?: VenueZone | null
+  deductOnSale?: boolean
   quantity: number
   cost?: number | null
   expiresAt?: string | null
   notes?: string | null
+  productId?: string | null
 }
 
-const LOCATIONS = Object.keys(STOCK_LOCATION_LABELS) as StockLocation[]
+type MenuProduct = { id: string; name: string }
+
+type StockFilter = 'ALL' | 'BODEGA' | 'ASTRO' | 'STUDIO54' | 'GARDEN' | 'MERMA'
 
 function qty(v: unknown) {
   return Number(v || 0)
@@ -47,8 +53,9 @@ export function InventarioClient({
   products: unknown[]
   stock: StockItem[]
 }) {
+  const menuProducts = (products as MenuProduct[]) || []
   const [tab, setTab] = useState<'menu' | 'stock'>('stock')
-  const [filter, setFilter] = useState<StockLocation | 'ALL'>('ALL')
+  const [filter, setFilter] = useState<StockFilter>('ALL')
   const [q, setQ] = useState('')
   const [pending, start] = useTransition()
   const [error, setError] = useState('')
@@ -58,7 +65,11 @@ export function InventarioClient({
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
     return stock.filter((s) => {
-      if (filter !== 'ALL' && s.location !== filter) return false
+      if (filter === 'BODEGA' && s.location !== 'BODEGA') return false
+      if (filter === 'MERMA' && s.location !== 'MERMA') return false
+      if (filter === 'ASTRO' || filter === 'STUDIO54' || filter === 'GARDEN') {
+        if (s.venueZone !== filter || s.location === 'MERMA') return false
+      }
       if (!term) return true
       return [s.name, s.presentation, s.supplier, s.category, s.notes]
         .filter(Boolean)
@@ -101,10 +112,13 @@ export function InventarioClient({
           supplier: editing.supplier,
           supplierPhone: editing.supplierPhone,
           location: editing.location,
+          venueZone: editing.venueZone || null,
+          deductOnSale: editing.deductOnSale,
           quantity: Number(editing.quantity ?? 0),
           cost: editing.cost ?? null,
           expiresAt: editing.expiresAt || null,
           notes: editing.notes,
+          productId: editing.productId || null,
         })
         setEditing(null)
         router.refresh()
@@ -118,7 +132,7 @@ export function InventarioClient({
     <div>
       <PageHeader
         title="Inventario"
-        description="El menú es lo que se vende. El stock es lo que hay en bodega, barra, abierto y merma."
+        description="Bodega es el almacén. Astro, Studio54 y Garden es lo que hay en cada barra para vender."
       />
       <StaffTabs
         tabs={[
@@ -177,21 +191,23 @@ export function InventarioClient({
           )}
 
           <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              onClick={() => setFilter('ALL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${filter === 'ALL' ? 'bg-primary-600 text-white' : 'text-staff-muted hover:bg-staff-hover'}`}
-            >
-              Todas
-            </button>
-            {LOCATIONS.map((loc) => (
+            {(
+              [
+                ['ALL', 'Todas'],
+                ['BODEGA', 'Bodega'],
+                ['ASTRO', 'Astro'],
+                ['STUDIO54', 'Studio54'],
+                ['GARDEN', 'Garden'],
+                ['MERMA', 'Merma'],
+              ] as const
+            ).map(([id, label]) => (
               <button
-                key={loc}
+                key={id}
                 type="button"
-                onClick={() => setFilter(loc)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${filter === loc ? 'bg-primary-600 text-white' : 'text-staff-muted hover:bg-staff-hover'}`}
+                onClick={() => setFilter(id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${filter === id ? 'bg-primary-600 text-white' : 'text-staff-muted hover:bg-staff-hover'}`}
               >
-                {STOCK_LOCATION_LABELS[loc]}
+                {label}
               </button>
             ))}
           </div>
@@ -228,12 +244,46 @@ export function InventarioClient({
                   onChange={(e) => setEditing({ ...editing, location: e.target.value as StockLocation })}
                   className="px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
                 >
-                  {LOCATIONS.map((loc) => (
+                  {(Object.keys(STOCK_LOCATION_LABELS) as StockLocation[]).map((loc) => (
                     <option key={loc} value={loc}>
                       {STOCK_LOCATION_LABELS[loc]}
                     </option>
                   ))}
                 </select>
+                <select
+                  value={editing.venueZone || ''}
+                  onChange={(e) =>
+                    setEditing({ ...editing, venueZone: (e.target.value as VenueZone) || null })
+                  }
+                  className="px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
+                >
+                  <option value="">Sin zona (bodega)</option>
+                  {VENUE_ZONES.map((zone) => (
+                    <option key={zone} value={zone}>
+                      {VENUE_ZONE_LABELS[zone]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={editing.productId || ''}
+                  onChange={(e) => setEditing({ ...editing, productId: e.target.value || null })}
+                  className="px-3 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg"
+                >
+                  <option value="">Sin amarre al menú</option>
+                  {menuProducts.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <label className="flex items-center gap-2 text-sm text-staff-muted">
+                  <input
+                    type="checkbox"
+                    checked={editing.deductOnSale !== false}
+                    onChange={(e) => setEditing({ ...editing, deductOnSale: e.target.checked })}
+                  />
+                  Restar al vender (cerveza, vape). No marques licores por botella.
+                </label>
                 <input
                   type="number"
                   min={0}
@@ -303,7 +353,7 @@ export function InventarioClient({
                         </td>
                         <td className="p-3">
                           <Badge tone={s.location === 'MERMA' ? 'danger' : s.location === 'ABIERTO' ? 'warning' : 'neutral'}>
-                            {STOCK_LOCATION_LABELS[s.location]}
+                            {s.venueZone ? VENUE_ZONE_LABELS[s.venueZone] : STOCK_LOCATION_LABELS[s.location]}
                           </Badge>
                         </td>
                         <td className="p-3 text-right font-semibold text-staff-fg">{qty(s.quantity)}</td>
@@ -330,10 +380,13 @@ export function InventarioClient({
                                   supplier: s.supplier,
                                   supplierPhone: s.supplierPhone,
                                   location: s.location,
+                                  venueZone: s.venueZone,
+                                  deductOnSale: s.deductOnSale,
                                   quantity: qty(s.quantity),
                                   cost: s.cost != null ? Number(s.cost) : null,
                                   expiresAt: toDateInput(s.expiresAt),
                                   notes: s.notes,
+                                  productId: s.productId,
                                 })
                               }
                             >
@@ -357,26 +410,28 @@ export function InventarioClient({
                             >
                               Ajuste
                             </button>
-                            {s.location === 'BODEGA' && (
-                              <button
-                                type="button"
-                                className="text-xs text-staff-muted hover:underline"
-                                onClick={() => {
-                                  const n = Number(window.prompt('¿Cuántas pasan a barra?', '1'))
-                                  if (!Number.isFinite(n) || n <= 0) return
-                                  start(async () => {
-                                    try {
-                                      await transferStock(s.id, 'BARRA', n)
-                                      router.refresh()
-                                    } catch (err: unknown) {
-                                      alert(err instanceof Error ? err.message : 'Error')
-                                    }
-                                  })
-                                }}
-                              >
-                                A barra
-                              </button>
-                            )}
+                            {s.location === 'BODEGA' &&
+                              VENUE_ZONES.map((zone) => (
+                                <button
+                                  key={zone}
+                                  type="button"
+                                  className="text-xs text-staff-muted hover:underline"
+                                  onClick={() => {
+                                    const n = Number(window.prompt(`¿Cuántas van a ${VENUE_ZONE_LABELS[zone]}?`, '1'))
+                                    if (!Number.isFinite(n) || n <= 0) return
+                                    start(async () => {
+                                      try {
+                                        await transferStock(s.id, 'BARRA', n, zone)
+                                        router.refresh()
+                                      } catch (err: unknown) {
+                                        alert(err instanceof Error ? err.message : 'Error')
+                                      }
+                                    })
+                                  }}
+                                >
+                                  A {VENUE_ZONE_LABELS[zone]}
+                                </button>
+                              ))}
                             {s.location !== 'MERMA' && (
                               <button
                                 type="button"

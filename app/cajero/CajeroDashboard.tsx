@@ -7,7 +7,9 @@ import { CashierAccounts } from '@/components/CashierAccounts'
 import { CashierFreeInvoiceModal } from '@/components/CashierFreeInvoiceModal'
 import { closeAccount, setCajeroMeseroWatches } from '@/lib/actions'
 import { PaymentMethodPicker } from '@/components/CloseAccountDialog'
+import { ZoneFilterButtons } from '@/components/ZoneFilterButtons'
 import type { PaymentMethod } from '@prisma/client'
+import { parseVenueZone, type VenueZone } from '@/lib/venue-zones'
 import {
   buildHnInvoiceHtml,
   printHnInvoice,
@@ -26,6 +28,7 @@ type ActiveMesero = {
 type AccountItem = {
   id: string
   table: { name: string; shortCode: string; zone?: string | null }
+  venueZone?: string | null
   initialBalance: string | number | { toString(): string }
   currentBalance: string | number | { toString(): string }
   createdAt: string | Date
@@ -163,12 +166,21 @@ export function CajeroDashboard({
   const allSelected = activeMeseros.length > 0 && selectedMeseroIds.size === activeMeseros.length
   const noneSelected = selectedMeseroIds.size === 0
   const [freeInvoiceOpen, setFreeInvoiceOpen] = useState(false)
+  const [zoneFilter, setZoneFilter] = useState<VenueZone | 'ALL'>('ALL')
   const [printingWalkInId, setPrintingWalkInId] = useState<string | null>(null)
   const [walkInQuery, setWalkInQuery] = useState('')
   const [printTarget, setPrintTarget] = useState<AccountItem | null>(null)
   const [printMethod, setPrintMethod] = useState<PaymentMethod | ''>('')
-  const walkInAccounts = accounts.filter((account) => isWalkInTable(account.table))
-  const regularAccounts = accounts.filter((account) => !isWalkInTable(account.table))
+  const walkInAccounts = accounts.filter((account) => {
+    if (!isWalkInTable(account.table)) return false
+    if (zoneFilter === 'ALL') return true
+    return (account.venueZone || parseVenueZone(account.table.zone)) === zoneFilter
+  })
+  const regularAccounts = accounts.filter((account) => {
+    if (isWalkInTable(account.table)) return false
+    if (zoneFilter === 'ALL') return true
+    return (account.venueZone || parseVenueZone(account.table.zone)) === zoneFilter
+  })
   const normalizedWalkInQuery = walkInQuery.trim().toLowerCase()
   const filteredWalkInAccounts = walkInAccounts.filter((account) => {
     if (!normalizedWalkInQuery) return true
@@ -252,10 +264,14 @@ export function CajeroDashboard({
 
   return (
     <>
+      <div className="mb-6">
+        <p className="text-sm font-medium text-white mb-2">Zona</p>
+        <ZoneFilterButtons value={zoneFilter} onChange={setZoneFilter} />
+      </div>
       <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div>
-            <label className="block text-sm font-medium text-white">Filtrar por mesero</label>
+            <label className="block text-sm font-medium text-white">Meseros (opcional)</label>
             {isCajero && (
               <p className="text-xs text-white/45 mt-1">
                 Misma selección para el panel y para las notificaciones push (activa notificaciones arriba).
@@ -308,8 +324,16 @@ export function CajeroDashboard({
 
       <section>
         <CashierOrders
-          pendingOrders={pendingOrders}
-          recentServed={recentServed}
+          pendingOrders={
+            zoneFilter === 'ALL'
+              ? pendingOrders
+              : pendingOrders.filter((order) => parseVenueZone(order.account.table.zone) === zoneFilter)
+          }
+          recentServed={
+            zoneFilter === 'ALL'
+              ? recentServed
+              : recentServed.filter((order) => parseVenueZone(order.account.table.zone) === zoneFilter)
+          }
           selectedMeseroIds={selectedMeseroIds}
           allMeseroIds={allMeseroIds}
           noneSelected={noneSelected}

@@ -57,6 +57,7 @@ enum LogAction {
   CASH_SESSION_CLOSED
   EXPENSE_CREATED
   STOCK_ADJUSTED
+  WAITER_ZONE_ASSIGNED
 }
 
 enum PaymentMethod {
@@ -78,6 +79,13 @@ enum StockMovementType {
   TRANSFER
   MERMA
   ADJUSTMENT
+  SALE
+}
+
+enum VenueZone {
+  ASTRO
+  STUDIO54
+  GARDEN
 }
 
 enum CashSessionStatus {
@@ -165,8 +173,23 @@ model User {
   closedCashSessions        CashSession[]     @relation("CashClosedBy")
   expenses                  Expense[]
   stockMovements            StockMovement[]
+  waiterZoneAssignments     WaiterZoneAssignment[]
 
   @@map("users")
+}
+
+model WaiterZoneAssignment {
+  id           String    @id @default(cuid())
+  userId       String
+  zone         VenueZone
+  businessDate DateTime  @db.Date
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessDate])
+  @@index([businessDate, zone])
+  @@map("waiter_zone_assignments")
 }
 
 /// Cajeros de los que el bar quiere ver comandas (aceptación en caja)
@@ -280,6 +303,7 @@ model Account {
   clientName      String?
   paymentMethod   PaymentMethod?
   cashSessionId   String?
+  venueZone       VenueZone?
 
   table       Table        @relation(fields: [tableId], references: [id], onDelete: Cascade)
   openedBy    User?        @relation(fields: [openedByUserId], references: [id], onDelete: SetNull)
@@ -290,6 +314,7 @@ model Account {
   @@index([tableId, status])
   @@index([cashSessionId])
   @@index([paymentMethod])
+  @@index([venueZone])
   @@map("accounts")
 }
 
@@ -325,16 +350,19 @@ model Order {
   served     Boolean         @default(false)
   rejected   Boolean         @default(false)
   prepStatus OrderPrepStatus @default(NONE)
+  stockItemId String?
   createdAt  DateTime        @default(now())
 
-  account  Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  product  Product @relation(fields: [productId], references: [id])
-  user     User    @relation("OrderCreatedByUser", fields: [userId], references: [id])
-  servedBy User?   @relation("OrderServedByCashier", fields: [servedByUserId], references: [id], onDelete: SetNull)
+  account   Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  product   Product    @relation(fields: [productId], references: [id])
+  user      User       @relation("OrderCreatedByUser", fields: [userId], references: [id])
+  servedBy  User?      @relation("OrderServedByCashier", fields: [servedByUserId], references: [id], onDelete: SetNull)
+  stockItem StockItem? @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
 
   @@index([accountId])
   @@index([userId])
   @@index([servedByUserId])
+  @@index([stockItemId])
   @@index([createdAt])
   @@index([served, rejected, createdAt])
   @@index([accountId, rejected])
@@ -481,13 +509,14 @@ model AttendanceSettings {
 }
 
 model CashRegister {
-  id           String   @id @default(cuid())
-  slug         String   @unique
+  id           String     @id @default(cuid())
+  slug         String     @unique
   name         String
-  defaultFloat Decimal  @default(4000) @db.Decimal(10, 2)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  defaultFloat Decimal    @default(4000) @db.Decimal(10, 2)
+  isActive     Boolean    @default(true)
+  venueZone    VenueZone?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   sessions CashSession[]
 
@@ -549,6 +578,8 @@ model StockItem {
   supplier      String?
   supplierPhone String?
   location      StockLocation
+  venueZone     VenueZone?
+  deductOnSale  Boolean       @default(true)
   quantity      Decimal       @db.Decimal(12, 2)
   cost          Decimal?      @db.Decimal(10, 2)
   expiresAt     DateTime?
@@ -559,11 +590,14 @@ model StockItem {
 
   product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
   movements StockMovement[]
+  saleOrders Order[]
 
   @@index([location])
+  @@index([venueZone])
   @@index([category])
   @@index([name])
   @@index([expiresAt])
+  @@index([productId, venueZone])
   @@map("stock_items")
 }
 

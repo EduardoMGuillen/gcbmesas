@@ -7,6 +7,8 @@ import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { getTableLabel, isWalkInTable } from '@/lib/walk-in-table'
 import { buildHnInvoiceHtml, printHnInvoice, type InvoiceSettingsLike, type HnInvoiceLine } from '@/lib/invoice-print-hn'
 import { CloseAccountDialog } from '@/components/CloseAccountDialog'
+import { ZoneFilterButtons } from '@/components/ZoneFilterButtons'
+import { parseVenueZone, type VenueZone } from '@/lib/venue-zones'
 import { useRouter } from 'next/navigation'
 
 interface AccountsListProps {
@@ -17,7 +19,7 @@ interface AccountsListProps {
 
 export function AccountsList({ initialAccounts, userRole, invoiceSettings }: AccountsListProps) {
   const [accounts, setAccounts] = useState(initialAccounts)
-  const [selectedZone, setSelectedZone] = useState<string>('')
+  const [selectedZone, setSelectedZone] = useState<VenueZone | 'ALL'>('ALL')
   const [selectedStatus, setSelectedStatus] = useState<string>('')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
@@ -45,8 +47,9 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
   // Filtrar cuentas por zona, estado y fechas
   const filteredAccounts = accounts.filter((acc) => {
     // Filtro por zona
-    if (selectedZone && acc.table?.zone !== selectedZone) {
-      return false
+    if (selectedZone !== 'ALL') {
+      const accountZone = acc.venueZone || parseVenueZone(acc.table?.zone)
+      if (accountZone !== selectedZone) return false
     }
 
     // Filtro por estado
@@ -165,20 +168,11 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Filtro por zona */}
-          <div className="min-w-0 w-full">
+          <div className="min-w-0 w-full sm:col-span-2 lg:col-span-4">
             <label className="block text-xs sm:text-sm font-medium text-dark-300 mb-2">
               Zona
             </label>
-            <select
-              value={selectedZone}
-              onChange={(e) => setSelectedZone(e.target.value)}
-              className="w-full px-3 sm:px-4 py-2 text-sm bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">Todas las zonas</option>
-              <option value="Astronomical">Astronomical</option>
-              <option value="Studio54">Studio54</option>
-              <option value="Beer Garden">Beer Garden</option>
-            </select>
+            <ZoneFilterButtons value={selectedZone} onChange={setSelectedZone} />
           </div>
 
           {/* Filtro por estado */}
@@ -227,14 +221,14 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
         </div>
 
         {/* Botón para limpiar filtros */}
-        {(selectedZone || selectedStatus || startDate || endDate) && (
+        {(selectedZone !== 'ALL' || selectedStatus || startDate || endDate) && (
           <div className="mt-4 flex items-center justify-between">
             <span className="text-sm text-dark-400">
               {filteredAccounts.length} cuenta{filteredAccounts.length !== 1 ? 's' : ''} encontrada{filteredAccounts.length !== 1 ? 's' : ''}
             </span>
             <button
               onClick={() => {
-                setSelectedZone('')
+                setSelectedZone('ALL')
                 setSelectedStatus('')
                 setStartDate('')
                 setEndDate('')
@@ -250,8 +244,8 @@ export function AccountsList({ initialAccounts, userRole, invoiceSettings }: Acc
       {filteredAccounts.length === 0 ? (
         <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center">
           <p className="text-dark-400 text-lg">
-            {selectedZone
-              ? `No hay cuentas en la zona "${selectedZone}"`
+            {selectedZone !== 'ALL'
+              ? `No hay cuentas en esa zona`
               : 'No hay cuentas disponibles'}
           </p>
         </div>

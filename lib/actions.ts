@@ -15,6 +15,10 @@ import {
   refundCyberSourceCaptureForEntry,
 } from './cybersource-refund'
 import { INSUFFICIENT_BALANCE_MESSAGE } from './billing-errors'
+import { consumeStockForSale, restoreStockForSale } from './stock-sale'
+import { parseVenueZone } from './venue-zones'
+import { businessDateToDate, getBusinessDate } from './business-day'
+import { findOpenSessionIdForZone } from './ops-actions'
 
 // Helper to create log
 async function createLog(
@@ -683,6 +687,12 @@ export async function cancelOrderByCustomer(orderId: string) {
       data: { rejected: true },
     })
 
+    await restoreStockForSale(tx, {
+      stockItemId: order.stockItemId,
+      quantity: order.quantity,
+      userId: customerUser.id,
+    })
+
     const newBalance = Number(lockedAccount.currentBalance) + Number(order.price)
 
     await tx.account.update({
@@ -766,6 +776,12 @@ export async function cancelOrderByMesero(orderId: string) {
       data: { rejected: true },
     })
 
+    await restoreStockForSale(tx, {
+      stockItemId: order.stockItemId,
+      quantity: order.quantity,
+      userId: currentUser.id,
+    })
+
     const newBalance = Number(lockedAccount.currentBalance) + Number(order.price)
 
     await tx.account.update({
@@ -807,6 +823,21 @@ export async function createAccount(data: {
   clientName?: string | null
 }) {
   const currentUser = await getCurrentUser()
+  const table = await prisma.table.findUnique({ where: { id: data.tableId } })
+  if (!table) throw new Error('Mesa no encontrada')
+
+  let venueZone = parseVenueZone(table.zone)
+  if (!venueZone && isWalkInTable(table)) {
+    const assignment = await prisma.waiterZoneAssignment.findUnique({
+      where: {
+        userId_businessDate: {
+          userId: currentUser.id,
+          businessDate: businessDateToDate(getBusinessDate()),
+        },
+      },
+    })
+    venueZone = assignment?.zone || null
+  }
 
   const account = await prisma.account.create({
     data: {
@@ -816,6 +847,7 @@ export async function createAccount(data: {
       status: 'OPEN',
       openedByUserId: currentUser.id,
       clientName: data.clientName?.trim() || null,
+      venueZone,
     },
   })
 
@@ -920,11 +952,8 @@ export async function closeAccount(accountId: string, paymentMethod?: PaymentMet
 
   let cashSessionId: string | null = null
   if (paymentMethod) {
-    const openSession = await prisma.cashSession.findFirst({
-      where: { status: 'OPEN', openedByUserId: currentUser.id },
-      select: { id: true },
-    })
-    cashSessionId = openSession?.id ?? null
+    const zone = account.venueZone || parseVenueZone(account.table.zone)
+    cashSessionId = await findOpenSessionIdForZone(zone)
   }
 
   const closedAccount = await prisma.account.update({
@@ -2195,6 +2224,13 @@ export async function createOrder(data: {
     }
 
     // Create order
+    const zone = account.venueZone || parseVenueZone(account.table.zone)
+    const stockItemId = await consumeStockForSale(tx, {
+      productId: data.productId,
+      zone,
+      quantity,
+      userId: currentUser.id,
+    })
     const order = await tx.order.create({
       data: {
         accountId: data.accountId,
@@ -2202,6 +2238,7 @@ export async function createOrder(data: {
         userId: currentUser.id,
         price: totalPrice,
         quantity,
+        stockItemId,
       },
     })
 
@@ -2281,6 +2318,11 @@ export async function cancelOrder(orderId: string) {
 
   // Use transaction
   await prisma.$transaction(async (tx) => {
+    await restoreStockForSale(tx, {
+      stockItemId: order.stockItemId,
+      quantity: order.quantity,
+      userId: currentUser.id,
+    })
     // Restore balance
     await tx.account.update({
       where: { id: order.accountId },
@@ -2327,6 +2369,7 @@ export async function getMeseroActiveTables() {
       currentBalance: true,
       createdAt: true,
       clientName: true,
+      venueZone: true,
       table: {
         select: {
           id: true,
@@ -2342,7 +2385,22 @@ export async function getMeseroActiveTables() {
     orderBy: { createdAt: 'desc' },
   })
 
-  return accounts
+  if (currentUser.role !== 'MESERO') return accounts
+  const assignment = await prisma.waiterZoneAssignment.findUnique({
+    where: {
+      userId_businessDate: {
+        userId: currentUser.id,
+        businessDate: businessDateToDate(getBusinessDate()),
+      },
+    },
+  })
+  if (!assignment) return accounts
+  return accounts.filter(
+    (account) =>
+      isWalkInTable(account.table) ||
+      account.venueZone === assignment.zone ||
+      parseVenueZone(account.table.zone) === assignment.zone
+  )
 }
 
 export async function getWalkInTable() {
@@ -2372,7 +2430,18 @@ export async function getTables() {
   // Una sola mesa "Cliente de pie" comparte varias cuentas abiertas (una por mesero).
   // Sin filtrar, el mesero ve la cuenta más reciente de otro mesero.
   if (currentUser.role === 'MESERO') {
-    return tables.map((t) => {
+    const assignment = await prisma.waiterZoneAssignment.findUnique({
+      where: {
+        userId_businessDate: {
+          userId: currentUser.id,
+          businessDate: businessDateToDate(getBusinessDate()),
+        },
+      },
+    })
+    const zone = assignment?.zone
+    return tables
+      .filter((t) => isWalkInTable(t) || (zone ? parseVenueZone(t.zone) === zone : true))
+      .map((t) => {
       if (!isWalkInTable(t)) return t
       const accounts = t.accounts.filter((a) => a.openedByUserId === currentUser.id)
       return {
@@ -2572,6 +2641,13 @@ export async function createCustomerOrder(data: {
     }
 
     // Create order
+    const zone = account.venueZone || parseVenueZone(account.table.zone)
+    const stockItemId = await consumeStockForSale(tx, {
+      productId: data.productId,
+      zone,
+      quantity,
+      userId: customerUser.id,
+    })
     const order = await tx.order.create({
       data: {
         accountId: data.accountId,
@@ -2579,6 +2655,7 @@ export async function createCustomerOrder(data: {
         userId: customerUser.id,
         price: totalPrice,
         quantity,
+        stockItemId,
       },
     })
 

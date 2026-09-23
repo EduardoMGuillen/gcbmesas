@@ -13,11 +13,9 @@ export default async function AdminCajaPage() {
   return (
     <CashSessionPanel
       registers={data.registers}
-      myOpen={data.myOpen}
       openAll={data.openAll}
       recent={data.recent}
-      sessionPreview={data.sessionPreview}
-      isAdmin
+      sessionPreviews={data.sessionPreviews}
     />
   )
 }

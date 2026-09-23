@@ -296,9 +296,9 @@ export function TablesList({ initialTables }: TablesListProps) {
           className="px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[200px]"
         >
           <option value="">Todas las zonas</option>
-          <option value="Astronomical">Astronomical</option>
+          <option value="Astronomical">Astro</option>
           <option value="Studio54">Studio54</option>
-          <option value="Beer Garden">Beer Garden</option>
+          <option value="Beer Garden">Garden</option>
         </select>
         {selectedZone && (
           <span className="text-sm text-dark-400">
@@ -423,9 +423,9 @@ export function TablesList({ initialTables }: TablesListProps) {
                   required
                 >
                   <option value="">Selecciona una zona</option>
-                  <option value="Astronomical">Astronomical</option>
-                  <option value="Studio54">Studio54</option>
-                  <option value="Beer Garden">Beer Garden</option>
+<option value="Astronomical">Astro</option>
+          <option value="Studio54">Studio54</option>
+          <option value="Beer Garden">Garden</option>
                 </select>
               </div>
               <div className="flex space-x-3">
