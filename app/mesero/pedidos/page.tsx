@@ -2,6 +2,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getTables, getProducts, getTableById, createAccount, getWalkInTable } from '@/lib/actions'
+import { getStockAvailabilityForZone, getWaiterZoneAssignment } from '@/lib/ops-actions'
+import { parseVenueZone } from '@/lib/venue-zones'
 import { CustomerOrderView } from '@/components/CustomerOrderView'
 import { TableSelector } from '@/components/TableSelector'
 
@@ -22,7 +24,12 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
     redirect('/login')
   }
 
-  const [tables, products, walkInTable] = await Promise.all([getTables(), getProducts(true), getWalkInTable()])
+  const [tables, products, walkInTable, assignment] = await Promise.all([
+    getTables(),
+    getProducts(true),
+    getWalkInTable(),
+    getWaiterZoneAssignment(session.user.id),
+  ])
   const initialTableId = searchParams.tableId || ''
   const forceNewWalkIn = searchParams.newWalkIn === '1' && initialTableId === walkInTable.id
   const accountIdParam = (searchParams.accountId || '').trim()
@@ -76,6 +83,9 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
     }
   }
 
+  const zone = parseVenueZone(initialTable?.zone) || assignment?.zone || null
+  const stockByProduct = zone ? await getStockAvailabilityForZone(zone) : {}
+
   // Preparar productos para la vista
   const productsForView = products.map((p: any) => ({
     id: p.id,
@@ -83,6 +93,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
     price: Number(p.price),
     category: p.category || null,
     emoji: p.emoji || null,
+    outOfStock: stockByProduct[p.id] ? stockByProduct[p.id].qty <= 0 : false,
   }))
 
   // Preparar tables para la vista
@@ -101,7 +112,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
             Agregar Pedido
           </h1>
           <p className="text-dark-400">
-            Selecciona una mesa y agrega productos a su cuenta
+            Toca la mesa y agrega lo que pidió el cliente
           </p>
         </div>
         {initialTable ? (

@@ -9,20 +9,17 @@ import {
   LogAction,
   StockLocation,
   StockMovementType,
+  VenueZone,
 } from '@prisma/client'
 import { CASH_REGISTERS, EXPENSE_CATEGORIES } from './ops-constants'
 import { STOCK_SEED } from './stock-seed-data'
+import { businessDateToDate, getBusinessDate } from './business-day'
+import { sendCashArqueoClosedMail } from './cash-session-mail'
 
 async function getCurrentUser() {
   const session = await getServerSession(authOptions)
   if (!session?.user) throw new Error('No autorizado')
   return session.user
-}
-
-function requireOpsRole(role: string) {
-  if (!['ADMIN', 'CAJERO'].includes(role)) {
-    throw new Error('No autorizado')
-  }
 }
 
 function requireAdmin(role: string) {
@@ -47,8 +44,13 @@ export async function ensureCashRegisters() {
   for (const r of CASH_REGISTERS) {
     await prisma.cashRegister.upsert({
       where: { slug: r.slug },
-      create: { slug: r.slug, name: r.name, defaultFloat: r.defaultFloat },
-      update: { name: r.name, isActive: true },
+      create: {
+        slug: r.slug,
+        name: r.name,
+        defaultFloat: r.defaultFloat,
+        venueZone: r.venueZone,
+      },
+      update: { name: r.name, isActive: true, venueZone: r.venueZone },
     })
   }
 }
@@ -71,6 +73,7 @@ export async function importStockFromExcelSnapshot() {
       quantity: row.quantity,
       expiresAt: row.expiresAt ? new Date(`${row.expiresAt}T12:00:00`) : null,
       notes: row.notes || null,
+      deductOnSale: !['Licores', 'Vinos'].includes(row.category),
     })),
   })
   revalidateOps()
@@ -94,16 +97,25 @@ export async function upsertStockItem(data: {
   supplier?: string | null
   supplierPhone?: string | null
   location: StockLocation
+  venueZone?: VenueZone | null
+  deductOnSale?: boolean
   quantity: number
   cost?: number | null
   expiresAt?: string | null
   notes?: string | null
+  productId?: string | null
 }) {
   const user = await getCurrentUser()
   requireAdmin(user.role)
   if (!data.name.trim()) throw new Error('El nombre es obligatorio')
   if (!Number.isFinite(data.quantity) || data.quantity < 0) {
     throw new Error('Cantidad inválida')
+  }
+  const liquor = ['Licores', 'Vinos'].includes(data.category || '')
+  const venueZone =
+    data.location === 'BODEGA' || data.location === 'MERMA' ? data.venueZone || null : data.venueZone || null
+  if ((data.location === 'BARRA' || data.location === 'ABIERTO') && !venueZone) {
+    throw new Error('Elige la zona (Astro, Studio54 o Garden)')
   }
   const payload = {
     name: data.name.trim(),
@@ -112,10 +124,13 @@ export async function upsertStockItem(data: {
     supplier: data.supplier?.trim() || null,
     supplierPhone: data.supplierPhone?.trim() || null,
     location: data.location,
+    venueZone,
+    deductOnSale: data.deductOnSale ?? !liquor,
     quantity: data.quantity,
     cost: data.cost == null || Number.isNaN(data.cost) ? null : data.cost,
     expiresAt: data.expiresAt ? new Date(`${data.expiresAt}T12:00:00`) : null,
     notes: data.notes?.trim() || null,
+    productId: data.productId || null,
   }
   const item = data.id
     ? await prisma.stockItem.update({ where: { id: data.id }, data: payload })
@@ -167,13 +182,25 @@ export async function adjustStock(stockItemId: string, quantityChange: number, n
   return updated
 }
 
-export async function transferStock(stockItemId: string, toLocation: StockLocation, quantity: number) {
+export async function transferStock(
+  stockItemId: string,
+  toLocation: StockLocation,
+  quantity: number,
+  toVenueZone?: VenueZone | null
+) {
   const user = await getCurrentUser()
   requireAdmin(user.role)
   if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('Cantidad inválida')
   const item = await prisma.stockItem.findUnique({ where: { id: stockItemId } })
   if (!item) throw new Error('Ítem no encontrado')
-  if (item.location === toLocation) throw new Error('Ya está en esa ubicación')
+  const destZone =
+    toLocation === 'BODEGA' || toLocation === 'MERMA' ? toVenueZone || null : toVenueZone || item.venueZone
+  if ((toLocation === 'BARRA' || toLocation === 'ABIERTO') && !destZone) {
+    throw new Error('Elige a qué zona va')
+  }
+  if (item.location === toLocation && (item.venueZone || null) === (destZone || null)) {
+    throw new Error('Ya está en esa ubicación')
+  }
   if (num(item.quantity) < quantity) throw new Error('No hay suficiente cantidad')
 
   await prisma.$transaction(async (tx) => {
@@ -186,6 +213,7 @@ export async function transferStock(stockItemId: string, toLocation: StockLocati
         name: item.name,
         presentation: item.presentation,
         location: toLocation,
+        venueZone: destZone || null,
       },
     })
     const dest = sibling
@@ -201,9 +229,12 @@ export async function transferStock(stockItemId: string, toLocation: StockLocati
             supplier: item.supplier,
             supplierPhone: item.supplierPhone,
             location: toLocation,
+            venueZone: destZone,
+            deductOnSale: item.deductOnSale,
             quantity,
             cost: item.cost,
             notes: item.notes,
+            productId: item.productId,
           },
         })
     await tx.stockMovement.create({
@@ -211,7 +242,9 @@ export async function transferStock(stockItemId: string, toLocation: StockLocati
         stockItemId: dest.id,
         type: toLocation === 'MERMA' ? StockMovementType.MERMA : StockMovementType.TRANSFER,
         quantityChange: quantity,
-        note: `${item.location} → ${toLocation}`,
+        note: `${item.location}${item.venueZone ? `/${item.venueZone}` : ''} → ${toLocation}${
+          destZone ? `/${destZone}` : ''
+        }`,
         userId: user.id,
       },
     })
@@ -231,32 +264,22 @@ export async function getOpenCashSessionForUser(userId?: string) {
 
 export async function getCashOpsData() {
   const user = await getCurrentUser()
-  requireOpsRole(user.role)
+  requireAdmin(user.role)
   await ensureCashRegisters()
   const registers = await prisma.cashRegister.findMany({
     where: { isActive: true },
     orderBy: { name: 'asc' },
   })
-  const myOpen = await prisma.cashSession.findFirst({
-    where: { status: 'OPEN', openedByUserId: user.id },
-    include: { register: true },
+  const openAll = await prisma.cashSession.findMany({
+    where: { status: 'OPEN' },
+    include: {
+      register: true,
+      openedBy: { select: { id: true, name: true, username: true } },
+    },
+    orderBy: { openedAt: 'desc' },
   })
-  const openAll =
-    user.role === 'ADMIN'
-      ? await prisma.cashSession.findMany({
-          where: { status: 'OPEN' },
-          include: {
-            register: true,
-            openedBy: { select: { id: true, name: true, username: true } },
-          },
-          orderBy: { openedAt: 'desc' },
-        })
-      : myOpen
-        ? [myOpen]
-        : []
 
   const recent = await prisma.cashSession.findMany({
-    where: user.role === 'ADMIN' ? undefined : { openedByUserId: user.id },
     include: {
       register: true,
       openedBy: { select: { name: true, username: true } },
@@ -266,17 +289,50 @@ export async function getCashOpsData() {
     take: 20,
   })
 
-  let sessionPreview: {
-    systemTotal: number
-    byMethod: Record<string, number>
-    accountCount: number
-  } | null = null
-
-  if (myOpen) {
-    sessionPreview = await computeSessionSystemTotals(myOpen.id)
+  const sessionPreviews: Record<
+    string,
+    { systemTotal: number; byMethod: Record<string, number>; accountCount: number }
+  > = {}
+  for (const session of openAll) {
+    sessionPreviews[session.id] = await computeSessionSystemTotals(session.id)
   }
 
-  return { registers, myOpen, openAll, recent, sessionPreview }
+  return { registers, openAll, recent, sessionPreviews }
+}
+
+export async function getCashSessionsForExport(fromStr: string, toStr: string, registerId?: string) {
+  const user = await getCurrentUser()
+  requireAdmin(user.role)
+  const from = new Date(fromStr)
+  from.setHours(0, 0, 0, 0)
+  const to = new Date(toStr)
+  to.setHours(23, 59, 59, 999)
+
+  return prisma.cashSession.findMany({
+    where: {
+      ...(registerId ? { registerId } : {}),
+      OR: [{ openedAt: { gte: from, lte: to } }, { closedAt: { gte: from, lte: to } }],
+    },
+    include: {
+      register: true,
+      openedBy: { select: { name: true, username: true } },
+      closedBy: { select: { name: true, username: true } },
+      accounts: {
+        where: { status: 'CLOSED' },
+        select: {
+          id: true,
+          clientName: true,
+          initialBalance: true,
+          currentBalance: true,
+          paymentMethod: true,
+          closedAt: true,
+          table: { select: { name: true, zone: true, shortCode: true } },
+        },
+        orderBy: { closedAt: 'asc' },
+      },
+    },
+    orderBy: [{ openedAt: 'asc' }],
+  })
 }
 
 async function computeSessionSystemTotals(sessionId: string) {
@@ -308,7 +364,7 @@ export async function openCashSession(data: {
   receivedByName?: string
 }) {
   const user = await getCurrentUser()
-  requireOpsRole(user.role)
+  requireAdmin(user.role)
   if (!Number.isFinite(data.openingFloat) || data.openingFloat < 0) {
     throw new Error('Fondo inválido')
   }
@@ -319,11 +375,6 @@ export async function openCashSession(data: {
     where: { registerId: register.id, status: 'OPEN' },
   })
   if (alreadyOpen) throw new Error(`Ya hay una sesión abierta en ${register.name}`)
-
-  const mine = await prisma.cashSession.findFirst({
-    where: { openedByUserId: user.id, status: 'OPEN' },
-  })
-  if (mine) throw new Error('Ya tienes una caja abierta. Ciérrala antes de abrir otra.')
 
   const session = await prisma.cashSession.create({
     data: {
@@ -355,16 +406,16 @@ export async function closeCashSession(data: {
   notes?: string
 }) {
   const user = await getCurrentUser()
-  requireOpsRole(user.role)
+  requireAdmin(user.role)
   const session = await prisma.cashSession.findUnique({
     where: { id: data.sessionId },
-    include: { register: true },
+    include: {
+      register: true,
+      openedBy: { select: { name: true, username: true } },
+    },
   })
   if (!session) throw new Error('Sesión no encontrada')
   if (session.status === 'CLOSED') throw new Error('Esta caja ya está cerrada')
-  if (user.role !== 'ADMIN' && session.openedByUserId !== user.id) {
-    throw new Error('Solo quien abrió la caja (o un admin) puede cerrarla')
-  }
 
   const totals = await computeSessionSystemTotals(session.id)
   const difference = data.countedCash - num(session.openingFloat) - data.salesCash
@@ -400,6 +451,31 @@ export async function closeCashSession(data: {
       },
     },
   })
+  try {
+    await sendCashArqueoClosedMail({
+      registerName: session.register.name,
+      venueZone: session.register.venueZone,
+      openedAt: session.openedAt,
+      closedAt: closed.closedAt || new Date(),
+      openingFloat: num(session.openingFloat),
+      salesCash: data.salesCash,
+      salesPosFicohsa: data.salesPosFicohsa,
+      salesPosBac: data.salesPosBac,
+      salesTransfer: data.salesTransfer,
+      countedCash: data.countedCash,
+      systemTotal: totals.systemTotal,
+      difference,
+      accountCount: totals.accountCount,
+      byMethod: totals.byMethod,
+      deliveredByName: session.deliveredByName,
+      receivedByName: session.receivedByName,
+      openedBy: session.openedBy.name || session.openedBy.username,
+      closedBy: user.name || user.username,
+      notes: data.notes,
+    })
+  } catch (err) {
+    console.error('[caja] No se pudo enviar el correo de cierre:', err)
+  }
   revalidateOps()
   return { ...closed, systemByMethod: totals.byMethod }
 }
@@ -516,10 +592,68 @@ export async function getMonthOpsSummary() {
   }
 }
 
-export async function findOpenSessionIdForCloser(userId: string) {
+export async function findOpenSessionIdForZone(zone: VenueZone | null) {
+  if (!zone) return null
+  const register = await prisma.cashRegister.findFirst({
+    where: { venueZone: zone, isActive: true },
+    select: { id: true },
+  })
+  if (!register) return null
   const session = await prisma.cashSession.findFirst({
-    where: { status: 'OPEN', openedByUserId: userId },
+    where: { status: 'OPEN', registerId: register.id },
     select: { id: true },
   })
   return session?.id || null
+}
+
+export async function getWaiterZoneAssignment(userId?: string) {
+  const user = await getCurrentUser()
+  const id = userId || user.id
+  const businessDate = getBusinessDate()
+  return prisma.waiterZoneAssignment.findUnique({
+    where: { userId_businessDate: { userId: id, businessDate: businessDateToDate(businessDate) } },
+  })
+}
+
+export async function assignWaiterZone(zone: VenueZone) {
+  const user = await getCurrentUser()
+  if (!['MESERO', 'ADMIN'].includes(user.role)) throw new Error('No autorizado')
+  const businessDate = getBusinessDate()
+  const row = await prisma.waiterZoneAssignment.upsert({
+    where: { userId_businessDate: { userId: user.id, businessDate: businessDateToDate(businessDate) } },
+    create: { userId: user.id, zone, businessDate: businessDateToDate(businessDate) },
+    update: { zone },
+  })
+  await prisma.log.create({
+    data: {
+      userId: user.id,
+      action: LogAction.WAITER_ZONE_ASSIGNED,
+      details: { zone, businessDate },
+    },
+  })
+  revalidatePath('/mesero')
+  revalidatePath('/mesero/pedidos')
+  revalidatePath('/mesero/mesas-activas')
+  revalidatePath('/cajero')
+  return row
+}
+
+export async function getStockAvailabilityForZone(zone: VenueZone) {
+  const items = await prisma.stockItem.findMany({
+    where: {
+      venueZone: zone,
+      location: { in: ['BARRA', 'ABIERTO'] },
+      productId: { not: null },
+    },
+    select: { productId: true, quantity: true, deductOnSale: true, name: true },
+  })
+  const byProduct: Record<string, { qty: number; tracked: boolean }> = {}
+  for (const item of items) {
+    if (!item.productId) continue
+    const prev = byProduct[item.productId] || { qty: 0, tracked: true }
+    prev.qty += num(item.quantity)
+    prev.tracked = true
+    byProduct[item.productId] = prev
+  }
+  return byProduct
 }

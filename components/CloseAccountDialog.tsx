@@ -68,7 +68,7 @@ export function CloseAccountDialog({
       <button type="button" className="absolute inset-0 bg-black/50" aria-label="Cerrar" onClick={onCancel} />
       <div className="relative w-full max-w-md bg-staff-surface border border-staff-border rounded-2xl p-5 space-y-4">
         <h2 className="text-lg font-semibold text-staff-fg">Cerrar cuenta</h2>
-        <p className="text-sm text-staff-muted">Registra el método de pago. Si tienes caja abierta, entra al arqueo de esa sesión.</p>
+        <p className="text-sm text-staff-muted">¿Cómo pagó el cliente?</p>
         <PaymentMethodPicker value={method} onChange={setMethod} />
         {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2 justify-end">

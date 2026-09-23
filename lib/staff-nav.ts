@@ -157,7 +157,6 @@ export const meseroBottomLinks: StaffNavItem[] = [
 export const cajeroLinks: StaffNavItem[] = [
   { href: '/cajero', label: 'Cajero', icon: ICONS.cajero, exact: true },
   { href: '/admin/cuentas', label: 'Cuentas', icon: ICONS.cuentas },
-  { href: '/cajero/caja', label: 'Caja', icon: ICONS.caja },
   { href: '/cajero/marcajes', label: 'Marcaje', icon: ICONS.clock },
 ]
 

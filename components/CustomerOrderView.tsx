@@ -39,6 +39,7 @@ interface CustomerOrderViewProps {
     price: string | number
     category?: string | null
     emoji?: string | null
+    outOfStock?: boolean
   }>
   // Props opcionales para modo mesero
   tables?: Array<{
@@ -952,21 +953,27 @@ export function CustomerOrderView({
                     <button
                       key={product.id}
                       type="button"
+                      disabled={product.outOfStock}
                       onClick={() => {
+                        if (product.outOfStock) return
                         setSelectedProduct(product.id)
                         setQuantity('1')
                       }}
-                      className="bg-dark-50 border border-dark-200 rounded-lg p-4 cursor-pointer hover:border-primary-500 transition-colors text-left w-full"
+                      className={`bg-dark-50 border rounded-lg p-4 text-left w-full ${
+                        product.outOfStock
+                          ? 'border-dark-200 opacity-40 cursor-not-allowed'
+                          : 'border-dark-200 cursor-pointer hover:border-primary-500 transition-colors'
+                      }`}
                     >
-                      {/* Emoji */}
                       {product.emoji && (
                         <div className="text-4xl mb-3 text-center">{product.emoji}</div>
                       )}
-                      
-                      {/* Nombre del producto */}
                       <h3 className="font-semibold text-white mb-2 text-center text-sm">
                         {product.name}
                       </h3>
+                      {product.outOfStock && (
+                        <p className="text-center text-xs text-red-400 mb-2">No hay</p>
+                      )}
                       
                       {/* Categoría tag */}
                       {product.category && (
