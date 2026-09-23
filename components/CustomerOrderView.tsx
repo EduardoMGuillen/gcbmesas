@@ -40,6 +40,7 @@ interface CustomerOrderViewProps {
     category?: string | null
     emoji?: string | null
     outOfStock?: boolean
+    kind?: 'stock' | 'menu'
   }>
   // Props opcionales para modo mesero
   tables?: Array<{
@@ -356,9 +357,11 @@ export function CustomerOrderView({
       }
 
       if (isMesero) {
+        const selected = products.find((p) => p.id === selectedProduct)
         await createOrder({
           accountId: account.id,
-          productId: selectedProduct,
+          stockItemId: selected?.kind === 'stock' ? selectedProduct : undefined,
+          productId: selected?.kind === 'stock' ? undefined : selectedProduct,
           quantity: quantityNum,
         })
         finishOrderSuccessMesero()
@@ -405,9 +408,11 @@ export function CustomerOrderView({
         currentBalance: nextCurrent,
       })
 
+      const selected = products.find((p) => p.id === selectedProduct)
       await createOrder({
         accountId: account.id,
-        productId: selectedProduct,
+        stockItemId: selected?.kind === 'stock' ? selectedProduct : undefined,
+        productId: selected?.kind === 'stock' ? undefined : selectedProduct,
         quantity: quantityNum,
       })
 

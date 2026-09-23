@@ -582,6 +582,7 @@ model StockItem {
   deductOnSale  Boolean       @default(true)
   quantity      Decimal       @db.Decimal(12, 2)
   cost          Decimal?      @db.Decimal(10, 2)
+  salePrice     Decimal?      @db.Decimal(10, 2)
   expiresAt     DateTime?
   notes         String?       @db.Text
   productId     String?

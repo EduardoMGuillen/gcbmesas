@@ -15,6 +15,7 @@ import { CASH_REGISTERS, EXPENSE_CATEGORIES } from './ops-constants'
 import { STOCK_SEED } from './stock-seed-data'
 import { businessDateToDate, getBusinessDate } from './business-day'
 import { sendCashArqueoClosedMail } from './cash-session-mail'
+import { parseStockExcelBuffer } from './stock-excel'
 
 async function getCurrentUser() {
   const session = await getServerSession(authOptions)
@@ -80,6 +81,118 @@ export async function importStockFromExcelSnapshot() {
   return { imported: STOCK_SEED.length }
 }
 
+export async function importStockFromExcelBuffer(buffer: Buffer) {
+  const user = await getCurrentUser()
+  requireAdmin(user.role)
+
+  const { rows, errors } = await parseStockExcelBuffer(buffer)
+  if (rows.length === 0) {
+    throw new Error(errors[0] || 'No hay productos para importar. Revisa la plantilla.')
+  }
+
+  const existing = await prisma.stockItem.findMany()
+  const byId = new Map(existing.map((s) => [s.id, s]))
+  const keyOf = (name: string, presentation: string | null, location: string, zone: string | null) =>
+    `${name.trim().toLowerCase()}|${(presentation || '').trim().toLowerCase()}|${location}|${zone || ''}`
+  const byKey = new Map(existing.map((s) => [keyOf(s.name, s.presentation, s.location, s.venueZone), s]))
+
+  let created = 0
+  let updated = 0
+
+  await prisma.$transaction(
+    async (tx) => {
+      for (const row of rows) {
+        const found = (row.id && byId.get(row.id)) || byKey.get(keyOf(row.name, row.presentation, row.location, row.venueZone))
+        const liquor = ['Licores', 'Vinos'].includes(row.category || found?.category || '')
+        const qty = row.quantity
+        if (found) {
+          const nextQty = qty == null ? num(found.quantity) : qty
+          if (nextQty < 0) {
+            errors.push(`Fila ${row.rowNumber} (${row.name}): cantidad inválida`)
+            continue
+          }
+          const updatedRow = await tx.stockItem.update({
+            where: { id: found.id },
+            data: {
+              name: row.name.trim(),
+              presentation: row.presentation?.trim() || null,
+              category: row.category?.trim() || found.category,
+              supplier: row.supplier?.trim() || found.supplier,
+              supplierPhone: row.supplierPhone?.trim() || found.supplierPhone,
+              location: row.location,
+              venueZone: row.venueZone,
+              quantity: nextQty,
+              salePrice: row.salePrice == null ? found.salePrice : row.salePrice,
+              expiresAt: row.expiresAt ? new Date(`${row.expiresAt}T12:00:00`) : found.expiresAt,
+              notes: row.notes?.trim() || found.notes,
+            },
+          })
+          if (nextQty !== num(found.quantity)) {
+            await tx.stockMovement.create({
+              data: {
+                stockItemId: found.id,
+                type: StockMovementType.ADJUSTMENT,
+                quantityChange: nextQty - num(found.quantity),
+                note: 'Importación Excel',
+                userId: user.id,
+              },
+            })
+          }
+          byId.set(found.id, updatedRow)
+          byKey.set(keyOf(updatedRow.name, updatedRow.presentation, updatedRow.location, updatedRow.venueZone), updatedRow)
+          updated += 1
+        } else {
+          const nextQty = qty == null ? 0 : qty
+          if (nextQty < 0) {
+            errors.push(`Fila ${row.rowNumber} (${row.name}): cantidad inválida`)
+            continue
+          }
+          const createdRow = await tx.stockItem.create({
+            data: {
+              name: row.name.trim(),
+              presentation: row.presentation?.trim() || null,
+              category: row.category?.trim() || null,
+              supplier: row.supplier?.trim() || null,
+              supplierPhone: row.supplierPhone?.trim() || null,
+              location: row.location,
+              venueZone: row.venueZone,
+              deductOnSale: !liquor,
+              quantity: nextQty,
+              salePrice: row.salePrice,
+              expiresAt: row.expiresAt ? new Date(`${row.expiresAt}T12:00:00`) : null,
+              notes: row.notes?.trim() || null,
+            },
+          })
+          await tx.stockMovement.create({
+            data: {
+              stockItemId: createdRow.id,
+              type: StockMovementType.PURCHASE,
+              quantityChange: nextQty,
+              note: 'Alta por Excel',
+              userId: user.id,
+            },
+          })
+          byId.set(createdRow.id, createdRow)
+          byKey.set(keyOf(createdRow.name, createdRow.presentation, createdRow.location, createdRow.venueZone), createdRow)
+          created += 1
+        }
+      }
+
+      await tx.log.create({
+        data: {
+          userId: user.id,
+          action: LogAction.STOCK_ADJUSTED,
+          details: { source: 'excel', created, updated, errors: errors.slice(0, 30) },
+        },
+      })
+    },
+    { timeout: 60000 }
+  )
+
+  revalidateOps()
+  return { created, updated, errors }
+}
+
 export async function getStockItems(location?: StockLocation) {
   const user = await getCurrentUser()
   requireAdmin(user.role)
@@ -104,6 +217,7 @@ export async function upsertStockItem(data: {
   expiresAt?: string | null
   notes?: string | null
   productId?: string | null
+  salePrice?: number | null
 }) {
   const user = await getCurrentUser()
   requireAdmin(user.role)
@@ -131,6 +245,7 @@ export async function upsertStockItem(data: {
     expiresAt: data.expiresAt ? new Date(`${data.expiresAt}T12:00:00`) : null,
     notes: data.notes?.trim() || null,
     productId: data.productId || null,
+    salePrice: data.salePrice == null || Number.isNaN(data.salePrice) ? null : data.salePrice,
   }
   const item = data.id
     ? await prisma.stockItem.update({ where: { id: data.id }, data: payload })
@@ -219,7 +334,11 @@ export async function transferStock(
     const dest = sibling
       ? await tx.stockItem.update({
           where: { id: sibling.id },
-          data: { quantity: { increment: quantity } },
+          data: {
+            quantity: { increment: quantity },
+            salePrice: sibling.salePrice ?? item.salePrice,
+            productId: sibling.productId || item.productId,
+          },
         })
       : await tx.stockItem.create({
           data: {
@@ -233,6 +352,7 @@ export async function transferStock(
             deductOnSale: item.deductOnSale,
             quantity,
             cost: item.cost,
+            salePrice: item.salePrice,
             notes: item.notes,
             productId: item.productId,
           },
@@ -346,6 +466,43 @@ export async function getCashSessionByIdForExport(sessionId: string) {
   })
   if (!row) throw new Error('Arqueo no encontrado')
   return row
+}
+
+export async function getCashRegistersLite() {
+  const user = await getCurrentUser()
+  requireAdmin(user.role)
+  await ensureCashRegisters()
+  return prisma.cashRegister.findMany({
+    where: { isActive: true },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true },
+  })
+}
+
+export async function getCashReportPreview(fromStr: string, toStr: string, registerId?: string) {
+  const sessions = await getCashSessionsForExport(fromStr, toStr, registerId)
+  return sessions.map((s) => {
+    const cash = num(s.salesCash)
+    const ficohsa = num(s.salesPosFicohsa)
+    const bac = num(s.salesPosBac)
+    const transfer = num(s.salesTransfer)
+    return {
+      id: s.id,
+      registerName: s.register.name,
+      status: s.status,
+      openedAt: s.openedAt.toISOString(),
+      closedAt: s.closedAt ? s.closedAt.toISOString() : null,
+      openingFloat: num(s.openingFloat),
+      declaredTotal: cash + ficohsa + bac + transfer,
+      salesCash: cash,
+      countedCash: s.countedCash == null ? null : num(s.countedCash),
+      systemTotal: s.systemTotal == null ? null : num(s.systemTotal),
+      difference: s.difference == null ? null : num(s.difference),
+      accounts: s.accounts.length,
+      openedBy: s.openedBy?.name || s.openedBy?.username || '—',
+      closedBy: s.closedBy?.name || s.closedBy?.username || '—',
+    }
+  })
 }
 
 async function computeSessionSystemTotals(sessionId: string) {
@@ -649,6 +806,99 @@ export async function assignWaiterZone(zone: VenueZone) {
   revalidatePath('/mesero/mesas-activas')
   revalidatePath('/cajero')
   return row
+}
+
+export async function getStaffSaleCatalog(zone: VenueZone | null) {
+  const { stockMatchesProduct } = await import('./sale-catalog')
+  const stock = zone
+    ? await prisma.stockItem.findMany({
+        where: {
+          venueZone: zone,
+          location: { in: ['BARRA', 'ABIERTO'] },
+          salePrice: { not: null },
+        },
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      })
+    : []
+
+  const allStockNames = await prisma.stockItem.findMany({
+    select: { name: true },
+  })
+  const products = await prisma.product.findMany({
+    where: { isActive: true },
+    orderBy: { name: 'asc' },
+  })
+  const menuOnly = products.filter((p) => !allStockNames.some((s) => stockMatchesProduct(s.name, p.name)))
+
+  return {
+    stock: stock.map((s) => ({
+      id: s.id,
+      kind: 'stock' as const,
+      name: s.presentation ? `${s.name} (${s.presentation})` : s.name,
+      price: num(s.salePrice),
+      category: s.category,
+      emoji: null as string | null,
+      outOfStock: s.deductOnSale && num(s.quantity) <= 0,
+    })),
+    menu: menuOnly.map((p) => ({
+      id: p.id,
+      kind: 'menu' as const,
+      name: p.name,
+      price: num(p.price),
+      category: p.category,
+      emoji: p.emoji,
+      outOfStock: false,
+    })),
+  }
+}
+
+export async function getInvoiceSaleCatalog() {
+  const { stockMatchesProduct } = await import('./sale-catalog')
+  const stock = await prisma.stockItem.findMany({
+    where: { salePrice: { not: null }, location: { not: 'MERMA' } },
+    orderBy: [{ name: 'asc' }, { quantity: 'desc' }],
+    select: {
+      id: true,
+      name: true,
+      presentation: true,
+      category: true,
+      salePrice: true,
+      quantity: true,
+    },
+  })
+  const seen = new Set<string>()
+  const uniqueStock = []
+  for (const s of stock) {
+    const key = `${s.name}|${s.presentation || ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    uniqueStock.push(s)
+  }
+  const allStockNames = await prisma.stockItem.findMany({ select: { name: true } })
+  const products = await prisma.product.findMany({
+    where: { isActive: true },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, price: true, category: true, isTaxExempt: true },
+  })
+  const menuOnly = products.filter((p) => !allStockNames.some((s) => stockMatchesProduct(s.name, p.name)))
+  return [
+    ...uniqueStock.map((s) => ({
+      id: s.id,
+      kind: 'stock' as const,
+      name: s.presentation ? `${s.name} (${s.presentation})` : s.name,
+      price: num(s.salePrice),
+      category: s.category,
+      isTaxExempt: false,
+    })),
+    ...menuOnly.map((p) => ({
+      id: p.id,
+      kind: 'menu' as const,
+      name: p.name,
+      price: num(p.price),
+      category: p.category,
+      isTaxExempt: p.isTaxExempt,
+    })),
+  ]
 }
 
 export async function getStockAvailabilityForZone(zone: VenueZone) {

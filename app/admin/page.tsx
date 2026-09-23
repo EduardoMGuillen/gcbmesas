@@ -42,7 +42,7 @@ export default async function AdminDashboard() {
             <StatCard label="Ventas (piso + entradas)" value={formatCurrency(month.sales)} accent />
             <StatCard label="Gastos" value={formatCurrency(month.expenses)} />
             <StatCard label="Margen operativo" value={formatCurrency(month.margin)} />
-            <StatCard label="Unidades en merma" value={month.mermaUnits} />
+            <StatCard label="Unidades en Expirado/Perdida" value={month.mermaUnits} />
           </div>
           {(month.openSessions.length > 0 || month.expiring.length > 0) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

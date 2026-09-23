@@ -1,10 +1,11 @@
 import type { MetadataRoute } from 'next'
 import { prisma } from '@/lib/prisma'
-import { isEventWithinPublicSalesWindow } from '@/lib/public-events'
+import { deactivateEventsPastGracePeriod, isEventWithinPublicSalesWindow } from '@/lib/public-events'
 
 const CBTICKETS_BASE_URL = 'https://gcbtickets.com'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  await deactivateEventsPastGracePeriod()
   const listingMinDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
   const candidates = await prisma.event.findMany({
     where: {

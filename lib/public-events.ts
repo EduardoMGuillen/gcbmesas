@@ -44,6 +44,33 @@ function hondurasWallClockToUtc(y: number, m: number, d: number, hour: number, m
   return new Date(Date.UTC(y, m - 1, d, hour + 6, minute, 0, 0))
 }
 
+const EVENT_INACTIVE_AFTER_DAYS = 3
+
+export function eventDaysPastInHonduras(eventDate: Date, now: Date = new Date()) {
+  const ev = getVenueCalendarYMD(eventDate, VENUE_TIMEZONE)
+  const today = getVenueCalendarYMD(now, VENUE_TIMEZONE)
+  const evUtc = Date.UTC(ev.y, ev.m - 1, ev.d)
+  const todayUtc = Date.UTC(today.y, today.m - 1, today.d)
+  return Math.round((todayUtc - evUtc) / 86_400_000)
+}
+
+/** Pasa a inactivo lo que ya lleva más de 3 días después de su fecha (zona Honduras). */
+export async function deactivateEventsPastGracePeriod() {
+  const active = await prisma.event.findMany({
+    where: { isActive: true },
+    select: { id: true, date: true },
+  })
+  const ids = active
+    .filter((e) => eventDaysPastInHonduras(e.date) > EVENT_INACTIVE_AFTER_DAYS)
+    .map((e) => e.id)
+  if (ids.length === 0) return 0
+  const res = await prisma.event.updateMany({
+    where: { id: { in: ids } },
+    data: { isActive: false },
+  })
+  return res.count
+}
+
 /** Límite inferior en BD: no cargar eventos muy viejos; el filtro fino es isEventWithinPublicSalesWindow. */
 const LISTING_DB_LOOKBACK_MS = 45 * 24 * 60 * 60 * 1000
 
@@ -61,6 +88,7 @@ function channelWhere(channel: PublicEventChannel) {
 }
 
 export async function getPublicEvents(channel: PublicEventChannel = 'lcb') {
+  await deactivateEventsPastGracePeriod()
   const listingMinDate = new Date(Date.now() - LISTING_DB_LOOKBACK_MS)
   const eventsRaw = await prisma.event.findMany({
     where: {
@@ -119,6 +147,7 @@ export async function getPublicEvents(channel: PublicEventChannel = 'lcb') {
 }
 
 export async function getPublicEventById(id: string, opts?: { channel?: PublicEventChannel }) {
+  await deactivateEventsPastGracePeriod()
   const channel: PublicEventChannel = opts?.channel ?? 'lcb'
   const event = await prisma.event.findFirst({
     where: {

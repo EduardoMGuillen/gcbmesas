@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { ReportesClient } from './ReportesClient'
+import { getCashRegistersLite } from '@/lib/ops-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,5 +13,6 @@ export default async function ReportesPage() {
     redirect('/login')
   }
 
-  return <ReportesClient />
+  const registers = await getCashRegistersLite()
+  return <ReportesClient registers={registers} initialTab="ventas" />
 }

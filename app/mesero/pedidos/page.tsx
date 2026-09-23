@@ -1,8 +1,8 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { getTables, getProducts, getTableById, createAccount, getWalkInTable } from '@/lib/actions'
-import { getStockAvailabilityForZone, getWaiterZoneAssignment } from '@/lib/ops-actions'
+import { getTables, getTableById, createAccount, getWalkInTable } from '@/lib/actions'
+import { getStaffSaleCatalog, getWaiterZoneAssignment } from '@/lib/ops-actions'
 import { parseVenueZone } from '@/lib/venue-zones'
 import { CustomerOrderView } from '@/components/CustomerOrderView'
 import { TableSelector } from '@/components/TableSelector'
@@ -24,9 +24,8 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
     redirect('/login')
   }
 
-  const [tables, products, walkInTable, assignment] = await Promise.all([
+  const [tables, walkInTable, assignment] = await Promise.all([
     getTables(),
-    getProducts(true),
     getWalkInTable(),
     getWaiterZoneAssignment(session.user.id),
   ])
@@ -84,17 +83,8 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
   }
 
   const zone = parseVenueZone(initialTable?.zone) || assignment?.zone || null
-  const stockByProduct = zone ? await getStockAvailabilityForZone(zone) : {}
-
-  // Preparar productos para la vista
-  const productsForView = products.map((p: any) => ({
-    id: p.id,
-    name: p.name,
-    price: Number(p.price),
-    category: p.category || null,
-    emoji: p.emoji || null,
-    outOfStock: stockByProduct[p.id] ? stockByProduct[p.id].qty <= 0 : false,
-  }))
+  const catalog = await getStaffSaleCatalog(zone)
+  const productsForView = [...catalog.stock, ...catalog.menu]
 
   // Preparar tables para la vista
   const tablesForView = tables.map((t: any) => ({
