@@ -7,11 +7,10 @@ import { authOptions } from './auth'
 import {
   CashSessionStatus,
   LogAction,
-  PaymentMethod,
   StockLocation,
   StockMovementType,
 } from '@prisma/client'
-import { CASH_REGISTERS, EXPENSE_CATEGORIES, PAYMENT_METHODS } from './ops-constants'
+import { CASH_REGISTERS, EXPENSE_CATEGORIES } from './ops-constants'
 import { STOCK_SEED } from './stock-seed-data'
 
 async function getCurrentUser() {
@@ -515,10 +514,6 @@ export async function getMonthOpsSummary() {
     expiring,
     monthLabel: from.toLocaleDateString('es-HN', { month: 'long', year: 'numeric' }),
   }
-}
-
-export function isPaymentMethod(v: unknown): v is PaymentMethod {
-  return typeof v === 'string' && (PAYMENT_METHODS as string[]).includes(v)
 }
 
 export async function findOpenSessionIdForCloser(userId: string) {
