@@ -142,6 +142,28 @@ function toDateValue(value: Date | string | null) {
   return d
 }
 
+function addListValidation(
+  sheet: ExcelJS.Worksheet,
+  range: string,
+  list: string,
+  error?: { title: string; message: string }
+) {
+  const dv = (
+    sheet as ExcelJS.Worksheet & {
+      dataValidations?: { add: (r: string, spec: Record<string, unknown>) => void }
+    }
+  ).dataValidations
+  if (!dv?.add) return
+  dv.add(range, {
+    type: 'list',
+    allowBlank: true,
+    formulae: [`"${list}"`],
+    ...(error
+      ? { showErrorMessage: true, errorTitle: error.title, error: error.message }
+      : {}),
+  })
+}
+
 function applyRowStyle(row: ExcelJS.Row, zebra: boolean, blank: boolean) {
   row.height = 20
   row.eachCell({ includeEmpty: true }, (cell) => {
@@ -287,24 +309,12 @@ export async function buildStockExcelBuffer(items: StockExcelItem[], mode: Build
 
   const lastData = rowIdx - 1
   if (lastData >= 5) {
-    sheet.dataValidations.add(`G5:G${lastData}`, {
-      type: 'list',
-      allowBlank: true,
-      formulae: ['"Bodega,Barra,Abierto,Expirado/Perdida"'],
-      showErrorMessage: true,
-      errorTitle: 'Ubicación',
-      error: 'Usa Bodega, Barra, Abierto o Expirado/Perdida.',
+    addListValidation(sheet, `G5:G${lastData}`, 'Bodega,Barra,Abierto,Expirado/Perdida', {
+      title: 'Ubicación',
+      message: 'Usa Bodega, Barra, Abierto o Expirado/Perdida.',
     })
-    sheet.dataValidations.add(`H5:H${lastData}`, {
-      type: 'list',
-      allowBlank: true,
-      formulae: ['"Astro,Studio54,Garden"'],
-    })
-    sheet.dataValidations.add(`I5:I${lastData}`, {
-      type: 'list',
-      allowBlank: true,
-      formulae: [`"${STOCK_CATEGORIES.join(',')}"`],
-    })
+    addListValidation(sheet, `H5:H${lastData}`, 'Astro,Studio54,Garden')
+    addListValidation(sheet, `I5:I${lastData}`, STOCK_CATEGORIES.join(','))
   }
 
   const leyenda = wb.addWorksheet('Leyenda')
