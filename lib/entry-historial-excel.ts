@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs'
-import { entryOriginLabel } from './entry-historial'
+import { entryOriginLabel, isNonSaleEntryCreator } from './entry-historial'
 
 const GOLD = 'FFC9A84C'
 const NAVY = 'FF0F172A'
@@ -124,7 +124,10 @@ export async function buildEntryHistorialExcelBuffer(
 
   const counted = rows.filter((r) => r.status !== 'CANCELLED')
   const tickets = counted.reduce((s, r) => s + r.numberOfEntries, 0)
-  const revenue = counted.reduce((s, r) => s + money(r.totalPrice), 0)
+  // Las cortesías (usuarios no-venta) aparecen en la lista pero no suman al dinero
+  const revenue = counted
+    .filter((r) => !isNonSaleEntryCreator(r.createdBy))
+    .reduce((s, r) => s + money(r.totalPrice), 0)
   const online = counted.filter((r) => !r.createdBy).length
   const door = counted.filter((r) => r.createdBy).length
 

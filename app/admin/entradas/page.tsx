@@ -50,6 +50,7 @@ export default async function EntradasPage() {
         recentEntries={recentEntries}
         eventStats={eventStats}
         isTicketeraClient={isTicketeraClient}
+        viewerUsername={session.user.username}
         entrySaleNotificationsEnabled={entrySaleNotificationsEnabled}
         canManageEntrySaleNotifications={canManageEntrySaleNotifications}
       />

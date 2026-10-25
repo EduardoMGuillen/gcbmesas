@@ -1,10 +1,5 @@
 import { prisma } from './prisma'
-
-/**
- * Usuarios cuyas entradas son cortesías generadas (no ventas): siguen siendo válidas
- * y cuentan para el cupo, pero su dinero no suma a los balances de ventas.
- */
-export const NON_SALE_ENTRY_CREATORS = ['eguillen']
+import { NON_SALE_ENTRY_CREATORS } from './entry-historial'
 
 export async function getNonSaleEntryCreatorIds(): Promise<string[]> {
   const users = await prisma.user.findMany({

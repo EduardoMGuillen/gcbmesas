@@ -3387,7 +3387,7 @@ export async function getEventEntriesForExport(eventId: string) {
         createdBy: { select: { name: true, username: true } },
       },
     })
-  ).filter((row) => !isHiddenEntryCreator(row.createdBy))
+  ).filter((row) => !isHiddenEntryCreator(row.createdBy, user.username))
 
   return { event, rows }
 }

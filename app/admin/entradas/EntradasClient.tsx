@@ -17,7 +17,7 @@ import {
   markEntryWhatsappSent,
 } from '@/lib/actions'
 import { isPublicFreeCoverOnly } from '@/lib/public-event-pricing'
-import { isHiddenEntryCreator } from '@/lib/entry-historial'
+import { isHiddenEntryCreator, isNonSaleEntryCreator } from '@/lib/entry-historial'
 import { StaffTabs } from '@/components/staff/ui'
 
 // ==================== TYPES ====================
@@ -76,6 +76,8 @@ interface EntradasClientProps {
   /** Preferencia del usuario actual (solo ADMIN gestiona el interruptor) */
   entrySaleNotificationsEnabled?: boolean
   canManageEntrySaleNotifications?: boolean
+  /** Usuario actual: ve en el historial sus propias entradas aunque estén ocultas para el resto */
+  viewerUsername?: string
 }
 
 type Tab = 'vender' | 'eventos' | 'historial' | 'escanear' | 'estadisticas'
@@ -331,6 +333,7 @@ export function EntradasClient({
   isTicketeraClient = false,
   entrySaleNotificationsEnabled = false,
   canManageEntrySaleNotifications = false,
+  viewerUsername,
 }: EntradasClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('vender')
   const router = useRouter()
@@ -404,7 +407,7 @@ export function EntradasClient({
       {activeTab === 'escanear' && <EscanearTab />}
       {activeTab === 'eventos' && <EventosTab events={events} />}
       {activeTab === 'estadisticas' && <EstadisticasTab rows={eventStats} />}
-      {activeTab === 'historial' && <HistorialTab entries={recentEntries} />}
+      {activeTab === 'historial' && <HistorialTab entries={recentEntries} viewerUsername={viewerUsername} />}
     </div>
   )
 }
@@ -1677,7 +1680,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
 
 // ==================== HISTORIAL TAB ====================
 
-function HistorialTab({ entries }: { entries: EntryItem[] }) {
+function HistorialTab({ entries, viewerUsername }: { entries: EntryItem[]; viewerUsername?: string }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [filter, setFilter] = useState<'all' | 'ACTIVE' | 'USED' | 'CANCELLED'>('all')
@@ -1692,7 +1695,7 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
   const uniqueEvents = Array.from(new Set(entries.map((e) => e.event.name))).sort()
 
   const filtered = entries.filter((e) => {
-    if (isHiddenEntryCreator(e.createdBy || null)) return false
+    if (isHiddenEntryCreator(e.createdBy || null, viewerUsername)) return false
     if (filter !== 'all' && e.status !== filter) return false
     if (eventFilter !== 'all' && e.event.name !== eventFilter) return false
     if (searchName.trim()) {
@@ -1841,6 +1844,11 @@ function HistorialTab({ entries }: { entries: EntryItem[] }) {
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-semibold text-white truncate">{entry.clientName}</h4>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sc.bg} ${sc.text}`}>{sc.label}</span>
+                      {isNonSaleEntryCreator(entry.createdBy) && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-400" title="Generada como cortesía: no suma a las ventas">
+                          Cortesía
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1 text-xs sm:text-sm text-dark-300">
                       <span className="truncate max-w-[180px] sm:max-w-none">{entry.clientEmail}</span>
