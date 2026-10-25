@@ -617,3 +617,17 @@ model StockMovement {
   @@index([stockItemId, createdAt])
   @@map("stock_movements")
 }
+
+/// Concurso de disfraces "Resident Evil" Halloween 2026 (registro público desde la landing).
+model HalloweenContestant {
+  id           String   @id @default(cuid())
+  fullName     String
+  nationalId   String   @unique
+  phone        String
+  email        String
+  instagramUrl String   @unique
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("halloween_contestants")
+}

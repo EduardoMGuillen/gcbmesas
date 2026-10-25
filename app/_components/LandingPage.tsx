@@ -7,6 +7,7 @@ import Image from 'next/image'
 import Script from 'next/script'
 import { isStandalonePWA } from '@/lib/pwa-detect'
 import { isPublicFreeCoverOnly } from '@/lib/public-event-pricing'
+import HalloweenContest from './HalloweenContest'
 
 type PublicEvent = {
   id: string
@@ -75,8 +76,8 @@ export default function LandingPage({ events }: LandingPageProps) {
           minWidth: 200,
           scale: 1.0,
           scaleMobile: 1.0,
-          color: 0xffffff,
-          backgroundColor: 0x0a0015,
+          color: 0xff5a1f,
+          backgroundColor: 0x0d0208,
           points: 7.0,
           maxDistance: 18.0,
           spacing: 28.0,
@@ -100,6 +101,7 @@ export default function LandingPage({ events }: LandingPageProps) {
 
   const navLinks = [
     { label: 'Inicio',    id: 'hero' },
+    { label: 'Halloween 🎃', id: 'halloween' },
     { label: 'Eventos',   id: 'eventos' },
     { label: 'Ubicación', id: 'ubicacion' },
     { label: 'Horarios',  id: 'horarios' },
@@ -121,7 +123,7 @@ export default function LandingPage({ events }: LandingPageProps) {
 
       {/* Google Fonts */}
       <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&family=Creepster&family=Oswald:wght@500;700&display=swap"
         rel="stylesheet"
       />
 
@@ -315,6 +317,39 @@ export default function LandingPage({ events }: LandingPageProps) {
           text-align: center;
           transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
         }
+        /* Halloween */
+        .hw-badge {
+          display: inline-flex; align-items: center; gap: 0.5rem;
+          padding: 0.5rem 1.1rem; margin-bottom: 1.5rem; border-radius: 999px;
+          background: rgba(211,18,26,0.14); border: 1px solid rgba(211,18,26,0.55);
+          color: #fff; font-family: 'Oswald', sans-serif; letter-spacing: 0.08em; text-transform: uppercase;
+          font-size: clamp(0.78rem, 2.2vw, 0.95rem); cursor: pointer;
+          box-shadow: 0 0 22px rgba(211,18,26,0.35);
+          animation: hwFlicker 4s infinite;
+        }
+        .hw-badge:hover { background: rgba(211,18,26,0.28); }
+        @keyframes hwFlicker {
+          0%, 92%, 100% { opacity: 1; }
+          93% { opacity: 0.55; } 95% { opacity: 1; } 97% { opacity: 0.7; }
+        }
+        .hw-bat {
+          position: fixed; z-index: 0; pointer-events: none; color: #120206;
+          filter: drop-shadow(0 0 4px rgba(255,90,31,0.75)) drop-shadow(0 0 12px rgba(211,18,26,0.4));
+          animation: hwFly linear infinite;
+        }
+        @keyframes hwFly {
+          0%   { transform: translate(-10vw, 0) scale(0.9); }
+          25%  { transform: translate(25vw, -4vh) scale(1); }
+          50%  { transform: translate(55vw, 3vh) scale(0.85); }
+          75%  { transform: translate(85vw, -3vh) scale(1); }
+          100% { transform: translate(115vw, 0) scale(0.9); }
+        }
+        .hw-bat svg { animation: hwFlap 0.35s ease-in-out infinite alternate; transform-origin: center; }
+        @keyframes hwFlap { from { transform: scaleY(1); } to { transform: scaleY(0.55); } }
+        @media (prefers-reduced-motion: reduce) {
+          .hw-bat { display: none; }
+          .hw-badge { animation: none; }
+        }
         .hours-card:hover {
           transform: translateY(-6px);
           border-color: rgba(0,255,255,0.5);
@@ -329,6 +364,19 @@ export default function LandingPage({ events }: LandingPageProps) {
           ref={vantaRef}
           style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}
         />
+
+        {/* Halloween bats */}
+        {[
+          { top: '18%', size: 34, dur: 22, delay: 0 },
+          { top: '42%', size: 22, dur: 30, delay: -9 },
+          { top: '70%', size: 28, dur: 26, delay: -17 },
+        ].map((b, i) => (
+          <div key={i} className="hw-bat" aria-hidden style={{ top: b.top, left: 0, animationDuration: `${b.dur}s`, animationDelay: `${b.delay}s` }}>
+            <svg width={b.size} height={b.size * 0.5} viewBox="0 0 64 32" fill="currentColor">
+              <path d="M32 10c-1.6-3-3.4-4-3.4-4l.9 4.6C26 9 22 9.5 19 12c-1.2-4-5-7-10-7 2 2.4 2.6 5 2 7.5C8 11 4 11.8 0 15c5 0 8.5 2 10 5 1.8-2.2 5-3 7.5-2 .6 3 2.6 5.6 5.5 7 .5-2.3 2-4 4-4.6L32 28l5-7.6c2 .6 3.5 2.3 4 4.6 2.9-1.4 4.9-4 5.5-7 2.5-1 5.7-.2 7.5 2 1.5-3 5-5 10-5-4-3.2-8-4-11-2.5-.6-2.5 0-5.1 2-7.5-5 0-8.8 3-10 7-3-2.5-7-3-10.5-1.4l.9-4.6s-1.8 1-3.4 4z"/>
+            </svg>
+          </div>
+        ))}
 
         {/* ─── NAVBAR ─────────────────────────────────── */}
         <nav
@@ -395,6 +443,10 @@ export default function LandingPage({ events }: LandingPageProps) {
             }}
           >
             <div style={{ maxWidth: 900 }} className="fade-up">
+              <button type="button" className="hw-badge" onClick={() => scrollTo('halloween')}>
+                🎃 Resident Evil Halloween Party · 31 Oct
+              </button>
+
               {/* Logos */}
               <div className="hero-logos">
                 <Image src="/LogoAstronomical.png" alt="Astronomical" width={400} height={120} className="logo-astronomical" />
@@ -430,6 +482,9 @@ export default function LandingPage({ events }: LandingPageProps) {
               </div>
             </div>
           </section>
+
+          {/* ─── HALLOWEEN CONTEST ─────────────────────── */}
+          <HalloweenContest />
 
           {/* ─── EVENTS ────────────────────────────────── */}
           <section id="eventos" style={{ padding: '5rem 2rem', maxWidth: 1200, margin: '0 auto' }}>
