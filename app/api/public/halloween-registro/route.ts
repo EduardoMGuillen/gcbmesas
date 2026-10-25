@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { contestRegistrationCode } from '@/lib/contest-code'
+import { sendHalloweenContestConfirmation } from '@/lib/halloween-contest-mail'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 // Publicaciones o reels de Instagram: instagram.com/p/<code>, /reel/<code>, /<usuario>/p/<code>
@@ -46,9 +48,18 @@ export async function POST(request: Request) {
   try {
     const contestant = await prisma.halloweenContestant.create({
       data: { fullName, nationalId, phone, email, instagramUrl },
-      select: { id: true },
     })
-    return NextResponse.json({ ok: true, id: contestant.id })
+
+    // El registro ya quedó guardado: si el correo falla, solo se registra el error
+    let emailSent = true
+    try {
+      await sendHalloweenContestConfirmation(contestant)
+    } catch (mailError) {
+      emailSent = false
+      console.error('[halloween-registro] correo de confirmación', mailError)
+    }
+
+    return NextResponse.json({ ok: true, code: contestRegistrationCode(contestant.id), emailSent })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       const target = String((error.meta as any)?.target ?? '')

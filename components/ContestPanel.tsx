@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { deleteHalloweenContestant } from '@/lib/contest-actions'
+import { contestRegistrationCode } from '@/lib/contest-code'
 import { formatDate } from '@/lib/utils'
 import { EmptyState, PageHeader, Panel, StaffButton, StatCard } from '@/components/staff/ui'
 
@@ -40,7 +41,7 @@ export function ContestPanel({ contestants }: { contestants: Contestant[] }) {
     const q = query.trim().toLowerCase()
     if (!q) return contestants
     return contestants.filter(c =>
-      [c.fullName, c.nationalId, c.phone, c.email, c.instagramUrl].some(v => v.toLowerCase().includes(q))
+      [c.fullName, c.nationalId, c.phone, c.email, c.instagramUrl, contestRegistrationCode(c.id)].some(v => v.toLowerCase().includes(q))
     )
   }, [contestants, query])
 
@@ -83,7 +84,7 @@ export function ContestPanel({ contestants }: { contestants: Contestant[] }) {
             type="search"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Buscar por nombre, ID, teléfono o correo…"
+            placeholder="Buscar por nombre, ID, teléfono, correo o número CB-…"
             className="flex-1 min-w-0 px-4 py-2 rounded-xl bg-staff-raised border border-staff-border text-staff-fg placeholder:text-staff-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
           <label className="flex items-center gap-2 text-sm text-staff-muted select-none cursor-pointer">
@@ -120,7 +121,10 @@ export function ContestPanel({ contestants }: { contestants: Contestant[] }) {
                 )}
                 <div className="p-4 space-y-3 flex-1 flex flex-col">
                   <div>
-                    <p className="font-semibold text-staff-fg leading-tight">{c.fullName}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-staff-fg leading-tight">{c.fullName}</p>
+                      <span className="shrink-0 font-mono text-xs px-2 py-0.5 rounded-md border border-staff-border text-staff-muted">{contestRegistrationCode(c.id)}</span>
+                    </div>
                     <p className="text-xs text-staff-muted mt-0.5">{formatDate(c.createdAt)}</p>
                   </div>
                   <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-sm">

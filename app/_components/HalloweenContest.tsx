@@ -25,6 +25,7 @@ const FIELDS: { name: keyof FormState; label: string; type: string; placeholder:
 export default function HalloweenContest() {
   const [form, setForm] = useState<FormState>(EMPTY)
   const [status, setStatus] = useState<'idle' | 'sending' | 'done'>('idle')
+  const [result, setResult] = useState<{ code: string; email: string; emailSent: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [posterOpen, setPosterOpen] = useState(false)
@@ -53,6 +54,7 @@ export default function HalloweenContest() {
         setStatus('idle')
         return
       }
+      setResult({ code: data.code, email: form.email.trim(), emailSent: !!data.emailSent })
       setStatus('done')
       setForm(EMPTY)
     } catch {
@@ -158,6 +160,13 @@ export default function HalloweenContest() {
         .hw-done-icon { font-size: 3rem; margin-bottom: 0.5rem; }
         .hw-done h3 { margin-bottom: 0.75rem; }
         .hw-done p { color: rgba(255,255,255,0.75); line-height: 1.6; margin: 0 0 1.25rem; }
+        .hw-code {
+          display: inline-flex; flex-direction: column; gap: 0.2rem; margin: 0 auto 1.1rem;
+          padding: 0.8rem 1.6rem; border: 1px dashed #c9a15a; border-radius: 14px;
+        }
+        .hw-code span { font-size: 0.8rem; color: #c9a15a; }
+        .hw-code strong { font-family: 'Oswald', sans-serif; font-size: 1.7rem; letter-spacing: 0.12em; color: #fff; }
+        .hw-done strong { color: #fff; }
         .hw-link-btn { background: none; border: 1px solid rgba(255,255,255,0.25); color: #fff; border-radius: 999px; padding: 0.6rem 1.4rem; cursor: pointer; font-family: inherit; }
         .hw-info { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.5rem; }
         .hw-chip {
@@ -213,7 +222,18 @@ export default function HalloweenContest() {
                 <div className="hw-done" role="status">
                   <div className="hw-done-icon" aria-hidden>🧟</div>
                   <h3>¡Estás registrado!</h3>
-                  <p>Te esperamos el 31 de octubre en La Gran Casa Blanca. Lleva tu identidad para confirmar tu inscripción.</p>
+                  {result?.code && (
+                    <div className="hw-code">
+                      <span>Tu número de inscripción</span>
+                      <strong>{result.code}</strong>
+                    </div>
+                  )}
+                  <p>
+                    {result?.emailSent
+                      ? <>Te enviamos la confirmación a <strong>{result.email}</strong>. </>
+                      : <>Guarda tu número: lo pedirán en la mesa de inscripción. </>}
+                    Te esperamos el 31 de octubre en La Gran Casa Blanca con tu identidad.
+                  </p>
                   <button type="button" className="hw-link-btn" onClick={() => setStatus('idle')}>Registrar a otra persona</button>
                 </div>
               ) : (

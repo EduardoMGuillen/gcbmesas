@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { contestRegistrationCode } from '@/lib/contest-code'
 
 export async function GET() {
   try {
@@ -14,9 +15,10 @@ export async function GET() {
     const XLSX = await import('xlsx')
 
     const data = [
-      ['#', 'Nombre', 'ID', 'Teléfono', 'Correo', 'Post de Instagram', 'Fecha de registro'],
+      ['#', 'Inscripción', 'Nombre', 'ID', 'Teléfono', 'Correo', 'Post de Instagram', 'Fecha de registro'],
       ...rows.map((r, i) => [
         i + 1,
+        contestRegistrationCode(r.id),
         r.fullName,
         r.nationalId,
         r.phone,
@@ -26,7 +28,7 @@ export async function GET() {
       ]),
     ]
     const ws = XLSX.utils.aoa_to_sheet(data)
-    ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 18 }, { wch: 14 }, { wch: 30 }, { wch: 50 }, { wch: 22 }]
+    ws['!cols'] = [{ wch: 5 }, { wch: 12 }, { wch: 30 }, { wch: 18 }, { wch: 14 }, { wch: 30 }, { wch: 50 }, { wch: 22 }]
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, ws, 'Participantes')
 
