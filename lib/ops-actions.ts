@@ -1,6 +1,7 @@
 'use server'
 
 import { prisma } from './prisma'
+import { getNonSaleEntryCreatorIds, saleEntriesWhere } from './entry-sales'
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
@@ -716,13 +717,15 @@ export async function getMonthOpsSummary() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  const saleOnly = saleEntriesWhere(await getNonSaleEntryCreatorIds())
+
   const [orderSum, entrySum, expenses, openSessions, mermaQty, expiring] = await Promise.all([
     prisma.order.aggregate({
       where: { createdAt: { gte: from, lt: to }, rejected: false },
       _sum: { price: true },
     }),
     prisma.entry.aggregate({
-      where: { createdAt: { gte: from, lt: to }, status: { not: 'CANCELLED' } },
+      where: { createdAt: { gte: from, lt: to }, status: { not: 'CANCELLED' }, ...saleOnly },
       _sum: { totalPrice: true },
     }),
     prisma.expense.aggregate({

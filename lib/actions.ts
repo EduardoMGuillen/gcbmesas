@@ -1,6 +1,7 @@
 'use server'
 
 import { prisma } from './prisma'
+import { getNonSaleEntryCreatorIds, saleEntriesWhere } from './entry-sales'
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
@@ -3781,7 +3782,10 @@ export async function getEntradasDashboardData() {
 
   await deactivateEventsPastGracePeriod()
 
-  const [events, recentEntries, todayStats, soldByEvent] = await Promise.all([
+  const todayStart = new Date(new Date().setHours(0, 0, 0, 0))
+  const saleOnly = saleEntriesWhere(await getNonSaleEntryCreatorIds())
+
+  const [events, recentEntries, todayStats, soldByEvent, todaySales, revenueByEvent] = await Promise.all([
     prisma.event.findMany({
       where: eventWhere,
       orderBy: [{ isActive: 'desc' }, { date: 'desc' }],
@@ -3815,12 +3819,24 @@ export async function getEntradasDashboardData() {
       where: { status: { not: 'CANCELLED' }, ...entryEventFilter },
       _sum: { numberOfEntries: true, totalPrice: true },
     }),
+    // Dinero: sin las entradas generadas por usuarios de cortesía (no son venta)
+    prisma.entry.aggregate({
+      where: { ...entryEventFilter, createdAt: { gte: todayStart }, ...saleOnly },
+      _sum: { totalPrice: true },
+    }),
+    prisma.entry.groupBy({
+      by: ['eventId'],
+      where: { status: { not: 'CANCELLED' }, ...entryEventFilter, ...saleOnly },
+      _sum: { totalPrice: true },
+    }),
   ])
 
   const soldMap = new Map<string, number>()
   const revenueByEventMap = new Map<string, number>()
   for (const r of soldByEvent) {
     soldMap.set(r.eventId, Number(r._sum.numberOfEntries ?? 0))
+  }
+  for (const r of revenueByEvent) {
     revenueByEventMap.set(r.eventId, Number(r._sum.totalPrice ?? 0))
   }
 
@@ -3878,7 +3894,7 @@ export async function getEntradasDashboardData() {
       createdBy: e.createdBy,
     })),
     todayStats: {
-      totalSales: Number(todayStats._sum.totalPrice ?? 0),
+      totalSales: Number(todaySales._sum.totalPrice ?? 0),
       totalEntries: Number(todayStats._sum.numberOfEntries ?? 0),
       totalTransactions: todayStats._count,
     },
