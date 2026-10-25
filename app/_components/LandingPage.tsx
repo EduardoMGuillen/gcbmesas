@@ -77,7 +77,7 @@ export default function LandingPage({ events }: LandingPageProps) {
           scale: 1.0,
           scaleMobile: 1.0,
           color: 0xff5a1f,
-          backgroundColor: 0x0d0208,
+          backgroundColor: 0x07040a,
           points: 7.0,
           maxDistance: 18.0,
           spacing: 28.0,
@@ -101,7 +101,7 @@ export default function LandingPage({ events }: LandingPageProps) {
 
   const navLinks = [
     { label: 'Inicio',    id: 'hero' },
-    { label: 'Halloween 🎃', id: 'halloween' },
+    ...(Date.now() < Date.UTC(2026, 10, 1, 12) ? [{ label: 'Concurso', id: 'halloween' }] : []),
     { label: 'Eventos',   id: 'eventos' },
     { label: 'Ubicación', id: 'ubicacion' },
     { label: 'Horarios',  id: 'horarios' },
@@ -109,6 +109,10 @@ export default function LandingPage({ events }: LandingPageProps) {
   ]
 
   const latestEvents = events.slice(0, 3)
+
+  // La temática del evento se muestra hasta la mañana del 1 de noviembre (hora de Honduras)
+  const halloweenActive = Date.now() < Date.UTC(2026, 10, 1, 12)
+  const halloweenEvent = events.find(e => /halloween/i.test(e.name))
 
   return (
     <>
@@ -123,164 +127,159 @@ export default function LandingPage({ events }: LandingPageProps) {
 
       {/* Google Fonts */}
       <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&family=Creepster&family=Oswald:wght@500;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Creepster&family=Oswald:wght@400;500;600;700&display=swap"
         rel="stylesheet"
       />
 
-      <style>{`
-        .landing * { box-sizing: border-box; }
-        .landing { font-family: 'Exo 2', sans-serif; color: #fff; overflow-x: hidden; }
-        .orbitron { font-family: 'Orbitron', monospace; }
-        .gradient-text {
-          background: linear-gradient(45deg, #00ffff, #ff00ff);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+      <style dangerouslySetInnerHTML={{ __html: `
+        .landing {
+          --void: #07040a;
+          --void-2: #120609;
+          --blood: #c8141c;
+          --blood-deep: #6e0409;
+          --ember: #ff6a1a;
+          --bone: #ede3cf;
+          --gold: #c9a15a;
+          --fog: #8e8597;
+          --line: rgba(237,227,207,0.12);
         }
+        .landing * { box-sizing: border-box; }
+        .landing { font-family: 'Barlow', sans-serif; color: var(--bone); overflow-x: hidden; }
+        .landing :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+        .orbitron { font-family: 'Oswald', sans-serif; }
         .section-title {
-          font-family: 'Orbitron', monospace;
-          font-size: clamp(2rem, 5vw, 3rem);
+          font-family: 'Oswald', sans-serif;
+          font-size: clamp(2.1rem, 5.5vw, 3.4rem);
           font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
           text-align: center;
-          margin-bottom: 3rem;
-          background: linear-gradient(45deg, #00ffff, #ff00ff);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+          color: var(--bone);
+          margin: 0 0 3rem;
+          text-shadow: 0 0 24px rgba(200,20,28,0.45);
+        }
+        .section-title::after {
+          content: '';
+          display: block;
+          width: 64px; height: 3px; margin: 0.9rem auto 0;
+          background: var(--blood);
+          box-shadow: 0 0 14px rgba(200,20,28,0.8);
         }
         /* Nav */
         .nav-link {
-          color: #fff;
+          color: var(--bone);
           text-decoration: none;
-          font-weight: 600;
+          font-family: 'Oswald', sans-serif;
+          font-weight: 500;
+          font-size: 0.98rem;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
           position: relative;
-          transition: color 0.3s;
+          transition: color 0.25s;
           cursor: pointer;
           background: none;
           border: none;
-          font-family: 'Exo 2', sans-serif;
-          font-size: 1rem;
           white-space: nowrap;
         }
         .nav-link::after {
           content: '';
           position: absolute;
-          bottom: -4px;
-          left: 0;
-          width: 0;
-          height: 2px;
-          background: linear-gradient(45deg, #00ffff, #ff00ff);
-          transition: width 0.3s;
+          bottom: -5px; left: 0;
+          width: 0; height: 2px;
+          background: var(--blood);
+          transition: width 0.25s;
         }
+        .nav-link:hover { color: #fff; }
         .nav-link:hover::after { width: 100%; }
         .nav-desktop { display: flex; gap: 2rem; align-items: center; }
         .nav-hamburger { display: none; }
         .nav-mobile-menu {
           display: none;
           flex-direction: column;
-          gap: 0;
           padding: 0.5rem 0 1rem;
-          border-top: 1px solid rgba(0,255,255,0.08);
+          border-top: 1px solid var(--line);
         }
         .nav-mobile-menu.open { display: flex; }
         .nav-mobile-link {
-          color: #fff; background: none; border: none;
-          font-family: 'Exo 2', sans-serif; font-size: 1rem; font-weight: 600;
+          color: var(--bone); background: none; border: none;
+          font-family: 'Oswald', sans-serif; font-size: 1.05rem; font-weight: 500;
+          letter-spacing: 0.06em; text-transform: uppercase;
           padding: 0.85rem 1.5rem; text-align: left; cursor: pointer; width: 100%;
           transition: background 0.2s, color 0.2s;
         }
-        .nav-mobile-link:hover { background: rgba(0,255,255,0.06); color: #00ffff; }
-        @media (max-width: 680px) {
+        .nav-mobile-link:hover { background: rgba(200,20,28,0.12); color: #fff; }
+        @media (max-width: 760px) {
           .nav-desktop { display: none; }
           .nav-hamburger { display: flex; align-items: center; justify-content: center; }
         }
         /* Buttons */
+        .btn-primary, .btn-secondary {
+          padding: 0.85rem 1.9rem;
+          border-radius: 999px;
+          font-family: 'Oswald', sans-serif;
+          font-weight: 600;
+          font-size: 1rem;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          text-decoration: none;
+          display: inline-block;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s, background 0.2s, border-color 0.2s;
+        }
         .btn-primary {
-          padding: 0.85rem 2rem;
-          border-radius: 50px;
-          font-weight: 700;
-          font-family: 'Exo 2', sans-serif;
-          font-size: 1rem;
-          text-decoration: none;
-          display: inline-block;
-          background: linear-gradient(45deg, #00ffff, #ff00ff);
-          color: #000;
-          border: none;
-          cursor: pointer;
-          transition: transform 0.3s, box-shadow 0.3s;
-        }
-        .btn-primary:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 30px rgba(0,255,255,0.35);
-        }
-        .btn-secondary {
-          padding: 0.85rem 2rem;
-          border-radius: 50px;
-          font-weight: 700;
-          font-family: 'Exo 2', sans-serif;
-          font-size: 1rem;
-          text-decoration: none;
-          display: inline-block;
-          background: transparent;
+          background: linear-gradient(180deg, #e3161f, #8a0006);
           color: #fff;
-          border: 2px solid #00ffff;
-          cursor: pointer;
-          transition: transform 0.3s, box-shadow 0.3s;
+          border: none;
+          box-shadow: 0 8px 26px rgba(200,20,28,0.35);
         }
-        .btn-secondary:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 30px rgba(0,255,255,0.2);
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 34px rgba(200,20,28,0.55); }
+        .btn-secondary {
+          background: rgba(7,4,10,0.55);
+          color: var(--bone);
+          border: 1px solid rgba(201,161,90,0.6);
         }
-        .glow-btn {
-          animation: pulseGlow 2s infinite;
-        }
-        @keyframes pulseGlow {
-          0%   { box-shadow: 0 0 15px rgba(0,255,255,0.6); border-color: #00ffff; }
-          50%  { box-shadow: 0 0 30px rgba(255,0,255,0.8); border-color: #ff00ff; }
-          100% { box-shadow: 0 0 15px rgba(0,255,255,0.6); border-color: #00ffff; }
-        }
+        .btn-secondary:hover { transform: translateY(-2px); border-color: var(--gold); background: rgba(201,161,90,0.1); }
+        .glow-btn { animation: none; }
         /* Cards */
         .glass-card {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 20px;
-          transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+          background: linear-gradient(180deg, rgba(30,8,12,0.85), rgba(12,4,7,0.92));
+          border: 1px solid var(--line);
+          border-radius: 18px;
           position: relative;
           overflow: hidden;
+          transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
         }
-        .glass-card::before {
-          content: '';
-          position: absolute;
-          top: 0; left: -100%;
-          width: 100%; height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
-          transition: left 0.5s;
-        }
-        .glass-card:hover::before { left: 100%; }
         .glass-card:hover {
-          transform: translateY(-10px);
-          border-color: rgba(0,255,255,0.45);
-          box-shadow: 0 20px 40px rgba(0,255,255,0.15);
+          transform: translateY(-6px);
+          border-color: rgba(200,20,28,0.55);
+          box-shadow: 0 20px 44px rgba(110,4,9,0.45);
         }
         /* Social */
         .social-btn {
-          width: 48px; height: 48px;
+          width: 46px; height: 46px;
           border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
           text-decoration: none; color: #fff;
-          transition: transform 0.3s;
+          transition: transform 0.25s, box-shadow 0.25s;
           position: relative; overflow: hidden;
         }
-        .social-btn::before {
-          content: '';
-          position: absolute; inset: 0;
-          background: linear-gradient(45deg, #00ffff, #ff00ff);
-          opacity: 0; transition: opacity 0.3s; border-radius: 50%;
-        }
-        .social-btn:hover::before { opacity: 1; }
-        .social-btn:hover { transform: translateY(-5px) scale(1.1); }
+        .social-btn:hover { transform: translateY(-4px); box-shadow: 0 0 0 2px var(--void), 0 0 0 4px var(--blood); }
         .social-btn svg { position: relative; z-index: 2; }
-        /* Hero logos */
+        /* Hero */
+        .hero-wrap { position: relative; isolation: isolate; }
+        .hero-wrap::before {
+          content: '';
+          position: absolute; left: 50%; top: 42%;
+          width: min(900px, 120vw); height: 520px;
+          transform: translate(-50%, -50%);
+          background: radial-gradient(ellipse at center, rgba(200,20,28,0.32), rgba(110,4,9,0.12) 45%, transparent 70%);
+          z-index: -1; pointer-events: none;
+        }
+        .hero-fog {
+          position: absolute; left: 0; right: 0; bottom: 0; height: 38vh;
+          background: linear-gradient(180deg, transparent, rgba(7,4,10,0.85) 70%, var(--void));
+          pointer-events: none;
+        }
         .hero-logos {
           display: flex;
           flex-direction: row;
@@ -289,52 +288,64 @@ export default function LandingPage({ events }: LandingPageProps) {
           gap: clamp(32px, 6vw, 80px);
           margin-bottom: 2.5rem;
         }
-        /* Desktop order via CSS order property */
         .logo-astronomical { order: 1; height: clamp(60px, 9vw, 100px);  width: auto; object-fit: contain; }
-        .logo-casablanca   { order: 2; height: clamp(90px, 14vw, 160px); width: auto; object-fit: contain; }
+        .logo-casablanca   { order: 2; height: clamp(90px, 14vw, 160px); width: auto; object-fit: contain; filter: drop-shadow(0 0 18px rgba(201,161,90,0.35)); }
         .logo-studio       { order: 3; height: clamp(60px, 9vw, 100px);  width: auto; object-fit: contain; }
         @media (max-width: 600px) {
-          .hero-logos {
-            flex-direction: column;
-            gap: 20px;
-          }
-          /* Mobile order: Astronomical, Studio, Casa Blanca */
-          .logo-astronomical { order: 1; height: 68px; }
-          .logo-studio       { order: 2; height: 68px; }
-          .logo-casablanca   { order: 3; height: 88px; }
+          .hero-logos { flex-direction: column; gap: 18px; margin-bottom: 2rem; }
+          .logo-astronomical { order: 1; height: 60px; }
+          .logo-studio       { order: 2; height: 60px; }
+          .logo-casablanca   { order: 3; height: 84px; }
         }
+        .hero-title {
+          font-family: 'Oswald', sans-serif;
+          font-weight: 700;
+          font-size: clamp(2.2rem, 7vw, 4.6rem);
+          line-height: 1.02;
+          letter-spacing: 0.01em;
+          text-transform: uppercase;
+          color: var(--bone);
+          margin: 0 0 0.9rem;
+          text-shadow: 0 2px 0 #2a0204, 0 0 30px rgba(200,20,28,0.5);
+        }
+        .hero-title span { display: block; color: var(--blood); font-size: 0.55em; letter-spacing: 0.32em; margin-top: 0.35rem; text-shadow: 0 0 22px rgba(200,20,28,0.6); }
+        .hero-when {
+          font-size: clamp(1rem, 2.4vw, 1.2rem);
+          color: var(--gold);
+          font-weight: 500;
+          margin: 0 0 2.2rem;
+        }
+        .hero-tagline { font-size: clamp(1rem, 2.5vw, 1.25rem); margin-bottom: 2.4rem; color: rgba(237,227,207,0.78); font-weight: 300; }
         @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(30px); }
+          from { opacity: 0; transform: translateY(24px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .fade-up { animation: fadeUp 0.7s ease both; }
-        /* Hours card */
+        .fade-up { animation: fadeUp 0.9s ease both; }
+        /* Hours */
         .hours-card {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 15px;
-          padding: 1.5rem;
+          background: rgba(18,6,9,0.8);
+          border: 1px solid var(--line);
+          border-radius: 14px;
+          padding: 1.5rem 1rem;
           text-align: center;
-          transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+          transition: border-color 0.25s;
         }
+        .hours-card:hover { border-color: rgba(200,20,28,0.55); }
+        .hours-card.closed { opacity: 0.55; }
+        .hours-special {
+          margin: 2rem auto 0; max-width: 620px; text-align: center;
+          padding: 1rem 1.25rem; border-radius: 14px;
+          border: 1px dashed rgba(201,161,90,0.55); color: var(--bone);
+          background: rgba(201,161,90,0.06);
+        }
+        .hours-special strong { color: var(--gold); }
+        /* Map */
+        .map-frame { border-radius: 18px; overflow: hidden; border: 1px solid rgba(200,20,28,0.35); box-shadow: 0 0 40px rgba(110,4,9,0.4); }
+        .map-frame iframe { filter: invert(0.92) hue-rotate(180deg) saturate(0.55) brightness(0.9); }
         /* Halloween */
-        .hw-badge {
-          display: inline-flex; align-items: center; gap: 0.5rem;
-          padding: 0.5rem 1.1rem; margin-bottom: 1.5rem; border-radius: 999px;
-          background: rgba(211,18,26,0.14); border: 1px solid rgba(211,18,26,0.55);
-          color: #fff; font-family: 'Oswald', sans-serif; letter-spacing: 0.08em; text-transform: uppercase;
-          font-size: clamp(0.78rem, 2.2vw, 0.95rem); cursor: pointer;
-          box-shadow: 0 0 22px rgba(211,18,26,0.35);
-          animation: hwFlicker 4s infinite;
-        }
-        .hw-badge:hover { background: rgba(211,18,26,0.28); }
-        @keyframes hwFlicker {
-          0%, 92%, 100% { opacity: 1; }
-          93% { opacity: 0.55; } 95% { opacity: 1; } 97% { opacity: 0.7; }
-        }
         .hw-bat {
           position: fixed; z-index: 0; pointer-events: none; color: #120206;
-          filter: drop-shadow(0 0 4px rgba(255,90,31,0.75)) drop-shadow(0 0 12px rgba(211,18,26,0.4));
+          filter: drop-shadow(0 0 4px rgba(255,106,26,0.75)) drop-shadow(0 0 12px rgba(200,20,28,0.4));
           animation: hwFly linear infinite;
         }
         @keyframes hwFly {
@@ -348,16 +359,11 @@ export default function LandingPage({ events }: LandingPageProps) {
         @keyframes hwFlap { from { transform: scaleY(1); } to { transform: scaleY(0.55); } }
         @media (prefers-reduced-motion: reduce) {
           .hw-bat { display: none; }
-          .hw-badge { animation: none; }
+          .fade-up { animation: none; }
         }
-        .hours-card:hover {
-          transform: translateY(-6px);
-          border-color: rgba(0,255,255,0.5);
-          box-shadow: 0 15px 30px rgba(0,255,255,0.1);
-        }
-      `}</style>
+      ` }} />
 
-      <div className="landing" style={{ background: '#0a0015', minHeight: '100vh' }}>
+      <div className="landing" style={{ background: 'var(--void)', minHeight: '100vh' }}>
 
         {/* Vanta animated background */}
         <div
@@ -382,9 +388,9 @@ export default function LandingPage({ events }: LandingPageProps) {
         <nav
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
-            background: scrolled ? 'rgba(10,0,21,0.97)' : 'rgba(10,0,21,0.75)',
+            background: scrolled ? 'rgba(7,4,10,0.96)' : 'rgba(7,4,10,0.7)',
             backdropFilter: 'blur(12px)',
-            borderBottom: '1px solid rgba(0,255,255,0.08)',
+            borderBottom: '1px solid rgba(200,20,28,0.22)',
             transition: 'background 0.3s',
             paddingTop: 'env(safe-area-inset-top)',
           }}
@@ -408,7 +414,7 @@ export default function LandingPage({ events }: LandingPageProps) {
               <button
                 className="nav-hamburger"
                 onClick={() => setMenuOpen(v => !v)}
-                style={{ background: 'none', border: '1px solid rgba(0,255,255,0.3)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: '#00ffff' }}
+                style={{ background: 'none', border: '1px solid rgba(201,161,90,0.5)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'var(--bone)' }}
                 aria-label="Menú"
               >
                 {menuOpen ? (
@@ -436,17 +442,15 @@ export default function LandingPage({ events }: LandingPageProps) {
           {/* ─── HERO ──────────────────────────────────── */}
           <section
             id="hero"
+            className="hero-wrap"
             style={{
-              minHeight: '100vh',
+              minHeight: '100svh',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              textAlign: 'center', padding: '0 2rem', paddingTop: 'calc(80px + env(safe-area-inset-top))',
+              textAlign: 'center', padding: '0 1.25rem 3rem', paddingTop: 'calc(96px + env(safe-area-inset-top))',
             }}
           >
-            <div style={{ maxWidth: 900 }} className="fade-up">
-              <button type="button" className="hw-badge" onClick={() => scrollTo('halloween')}>
-                🎃 Resident Evil Halloween Party · 31 Oct
-              </button>
-
+            <div className="hero-fog" />
+            <div style={{ maxWidth: 900, position: 'relative' }} className="fade-up">
               {/* Logos */}
               <div className="hero-logos">
                 <Image src="/LogoAstronomical.png" alt="Astronomical" width={400} height={120} className="logo-astronomical" />
@@ -454,18 +458,41 @@ export default function LandingPage({ events }: LandingPageProps) {
                 <Image src="/LogoStudio54.png"      alt="Studio 54"   width={400} height={120} className="logo-studio" />
               </div>
 
-              <p style={{ fontSize: 'clamp(1rem, 2.5vw, 1.3rem)', marginBottom: '2.5rem', color: 'rgba(255,255,255,0.75)', fontWeight: 300 }}>
-                La mejor experiencia nocturna de San Pedro Sula
-              </p>
+              {halloweenActive ? (
+                <>
+                  <h1 className="hero-title">
+                    Resident Evil
+                    <span>Halloween Party</span>
+                  </h1>
+                  <p className="hero-when">Sábado 31 de octubre, 8 PM. Concurso de disfraces con iPhone 18 Pro Max para el primer lugar.</p>
+                </>
+              ) : (
+                <p className="hero-tagline">La mejor experiencia nocturna de San Pedro Sula</p>
+              )}
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
-                <button className="btn-primary" onClick={() => scrollTo('eventos')}>Ver Eventos</button>
-                <a href="https://wa.me/50498240217" target="_blank" rel="noopener noreferrer" className="btn-secondary glow-btn">
-                  Contactar
-                </a>
-                <a href="https://wa.me/50494902444" target="_blank" rel="noopener noreferrer" className="btn-secondary glow-btn" aria-label="AstroBot WhatsApp">
-                  AstroBot
-                </a>
+                {halloweenActive ? (
+                  <>
+                    {halloweenEvent ? (
+                      <Link href={`/eventos/${halloweenEvent.id}`} className="btn-primary">Comprar entrada</Link>
+                    ) : (
+                      <button className="btn-primary" onClick={() => scrollTo('eventos')}>Comprar entrada</button>
+                    )}
+                    <button className="btn-secondary" onClick={() => scrollTo('halloween')}>Inscribirme al concurso</button>
+                  </>
+                ) : (
+                  <button className="btn-primary" onClick={() => scrollTo('eventos')}>Ver Eventos</button>
+                )}
+                {!halloweenActive && (
+                  <>
+                    <a href="https://wa.me/50498240217" target="_blank" rel="noopener noreferrer" className="btn-secondary glow-btn">
+                      Contactar
+                    </a>
+                    <a href="https://wa.me/50494902444" target="_blank" rel="noopener noreferrer" className="btn-secondary glow-btn" aria-label="AstroBot WhatsApp">
+                      AstroBot
+                    </a>
+                  </>
+                )}
               </div>
 
               {/* Social icons */}
@@ -484,7 +511,7 @@ export default function LandingPage({ events }: LandingPageProps) {
           </section>
 
           {/* ─── HALLOWEEN CONTEST ─────────────────────── */}
-          <HalloweenContest />
+          {halloweenActive && <HalloweenContest />}
 
           {/* ─── EVENTS ────────────────────────────────── */}
           <section id="eventos" style={{ padding: '5rem 2rem', maxWidth: 1200, margin: '0 auto' }}>
@@ -512,17 +539,17 @@ export default function LandingPage({ events }: LandingPageProps) {
                       />
                     )}
                     <div style={{ padding: '1.8rem' }}>
-                      <p style={{ color: '#00ffff', fontWeight: 600, marginBottom: '0.6rem', fontSize: '1.05rem' }}>
+                      <p style={{ color: 'var(--gold)', fontWeight: 600, marginBottom: '0.6rem', fontSize: '1.05rem' }}>
                         {weekday.charAt(0).toUpperCase() + weekday.slice(1)} {dayNum} de {monthStr.charAt(0).toUpperCase() + monthStr.slice(1)} · 9:00 PM
                       </p>
                       <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.8rem' }}>{event.name}</h3>
                       {event.description && (
-                        <p style={{ color: 'rgba(255,255,255,0.65)', marginBottom: '1.2rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
+                        <p style={{ color: 'rgba(237,227,207,0.65)', marginBottom: '1.2rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
                           {event.description}
                         </p>
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                        <span style={{ color: '#00ffff', fontWeight: 700, fontSize: '1.1rem' }}>
+                        <span style={{ color: 'var(--bone)', fontFamily: "'Oswald', sans-serif", fontWeight: 600, fontSize: '1.25rem' }}>
                           {freeOnly ? 'Cover gratuito' : `L ${price.toFixed(2)}`}
                         </span>
                         {soldOut ? (
@@ -545,7 +572,7 @@ export default function LandingPage({ events }: LandingPageProps) {
 
               {/* Próximamente card */}
               <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '3rem 2rem', minHeight: 280 }}>
-                <p className="orbitron" style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(45deg,#00ffff,#ff00ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: '1.5rem', textAlign: 'center' }}>
+                <p className="orbitron" style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--bone)', textShadow: '0 0 20px rgba(200,20,28,0.5)', marginBottom: '1.5rem', textAlign: 'center' }}>
                   PRÓXIMAMENTE
                 </p>
                 <a href="https://www.instagram.com/casablanca_sps/" target="_blank" rel="noopener noreferrer" className="btn-secondary">
@@ -567,10 +594,10 @@ export default function LandingPage({ events }: LandingPageProps) {
             <h2 className="section-title">UBICACIÓN</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '3rem', alignItems: 'center' }}>
               <div>
-                <h3 style={{ fontSize: '1.8rem', color: '#00ffff', marginBottom: '1rem', fontFamily: "'Exo 2', sans-serif" }}>
+                <h3 style={{ fontSize: '1.8rem', color: 'var(--gold)', marginBottom: '1rem', fontFamily: "'Oswald', sans-serif", fontWeight: 600 }}>
                   Encuéntranos en San Pedro Sula
                 </h3>
-                <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '1.05rem', marginBottom: '1.5rem', lineHeight: 1.7 }}>
+                <p style={{ color: 'rgba(237,227,207,0.75)', fontSize: '1.05rem', marginBottom: '1.5rem', lineHeight: 1.7 }}>
                   Astronomical, Studio 54 y Casa Blanca, los tres ambientes más emocionantes de San Pedro Sula, te esperan en un mismo lugar.
                 </p>
                 <ul style={{ listStyle: 'none', padding: 0 }}>
@@ -580,14 +607,14 @@ export default function LandingPage({ events }: LandingPageProps) {
                     { icon: '🅿️', text: 'Estacionamiento disponible' },
                     { icon: '🚕', text: 'Zona de taxis cerca' },
                   ].map((item, i) => (
-                    <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '0.5rem 0', color: 'rgba(255,255,255,0.7)', fontSize: '1rem' }}>
+                    <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '0.5rem 0', color: 'rgba(237,227,207,0.7)', fontSize: '1rem' }}>
                       <span style={{ fontSize: '1.1rem', minWidth: 24 }}>{item.icon}</span>
                       <span>{item.text}</span>
                     </li>
                   ))}
                 </ul>
               </div>
-              <div style={{ borderRadius: 20, overflow: 'hidden', boxShadow: '0 0 40px rgba(0,255,255,0.15)' }}>
+              <div className="map-frame">
                 <iframe
                   title="Ubicación"
                   src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3774.3!2d-88.0337!3d15.5056!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTXCsDMwJzIwLjIiTiA4OMKwMDInMDEuMyJX!5e0!3m2!1ses!2shn!4v1"
@@ -613,17 +640,22 @@ export default function LandingPage({ events }: LandingPageProps) {
                 { day: 'Domingo',          time: 'Cerrado'            },
                 { day: 'Lunes – Miércoles', time: 'Cerrado'           },
               ].map(({ day, time }) => (
-                <div key={day} className="hours-card">
-                  <p style={{ fontSize: '1.15rem', fontWeight: 700, color: '#00ffff', marginBottom: '0.5rem', fontFamily: "'Orbitron', monospace" }}>
+                <div key={day} className={`hours-card ${time === 'Cerrado' ? 'closed' : ''}`}>
+                  <p style={{ fontSize: '1.2rem', fontWeight: 600, letterSpacing: '0.04em', color: 'var(--gold)', marginBottom: '0.5rem', fontFamily: "'Oswald', sans-serif", textTransform: 'uppercase' }}>
                     {day}
                   </p>
-                  <p style={{ color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-line', fontSize: '0.95rem', lineHeight: 1.6 }}>
+                  <p style={{ color: 'rgba(237,227,207,0.75)', whiteSpace: 'pre-line', fontSize: '0.95rem', lineHeight: 1.6 }}>
                     {time}
                   </p>
                 </div>
               ))}
             </div>
-            <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', marginTop: '2rem', fontSize: '0.85rem' }}>
+            {halloweenActive && (
+              <p className="hours-special">
+                <strong>Sábado 31 de octubre:</strong> abrimos a las 8 PM por la Resident Evil Halloween Party. Inscripciones al concurso de 7 a 11 PM.
+              </p>
+            )}
+            <p style={{ textAlign: 'center', color: 'var(--fog)', marginTop: '1.5rem', fontSize: '0.85rem' }}>
               Los horarios pueden variar según eventos especiales
             </p>
           </section>
@@ -631,13 +663,13 @@ export default function LandingPage({ events }: LandingPageProps) {
           {/* ─── CONTACT / SOCIAL ──────────────────────── */}
           <section id="contacto" style={{ padding: '5rem 2rem', maxWidth: 1200, margin: '0 auto', textAlign: 'center' }}>
             <h2 className="section-title">CONTACTO</h2>
-            <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '2rem', fontSize: '1.05rem' }}>
+            <p style={{ color: 'rgba(237,227,207,0.6)', marginBottom: '2rem', fontSize: '1.05rem' }}>
               Reservaciones y consultas
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1.2rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
               <a href="https://wa.me/50494902444" target="_blank" rel="noopener noreferrer"
                 className="btn-primary"
-                style={{ background: 'linear-gradient(45deg,#1e3a5f,#2563eb)', color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
                 aria-label="AstroBot WhatsApp">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.344 0-4.507-.81-6.214-2.163l-.436-.345-2.648.888.888-2.648-.345-.436A9.956 9.956 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
                 AstroBot
@@ -660,7 +692,7 @@ export default function LandingPage({ events }: LandingPageProps) {
           </section>
 
           {/* ─── FOOTER ────────────────────────────────── */}
-          <footer style={{ background: 'rgba(0,0,0,0.85)', borderTop: '1px solid rgba(255,255,255,0.08)', padding: '2.5rem 2rem', textAlign: 'center' }}>
+          <footer style={{ background: 'rgba(0,0,0,0.85)', borderTop: '1px solid rgba(237,227,207,0.08)', padding: '2.5rem 2rem', textAlign: 'center' }}>
             <div style={{ maxWidth: 1200, margin: '0 auto' }}>
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'clamp(16px, 4vw, 48px)', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                 <Image src="/LogoStudio54.png" alt="Studio 54" width={100} height={32} style={{ height: 28, width: 'auto', objectFit: 'contain', opacity: 0.5 }} />
@@ -683,13 +715,13 @@ export default function LandingPage({ events }: LandingPageProps) {
                   </a>
                 ))}
               </div>
-              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+              <p style={{ color: 'rgba(237,227,207,0.3)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                 © {new Date().getFullYear()} La Gran Casa Blanca · San Pedro Sula, Honduras · Todos los derechos reservados
               </p>
-              <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8rem' }}>
+              <p style={{ color: 'rgba(237,227,207,0.25)', fontSize: '0.8rem' }}>
                 Powered by{' '}
                 <a href="https://www.nexusglobalsuministros.com/" target="_blank" rel="noopener noreferrer"
-                  style={{ color: 'rgba(0,255,255,0.5)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                  style={{ color: 'var(--gold)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
                   Nexus Global
                 </a>
               </p>

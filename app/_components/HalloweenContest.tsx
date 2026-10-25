@@ -63,7 +63,7 @@ export default function HalloweenContest() {
 
   return (
     <section id="halloween" className="hw-section">
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .hw-section {
           position: relative;
           padding: 5rem 1.25rem 5.5rem;
@@ -73,11 +73,6 @@ export default function HalloweenContest() {
           overflow: hidden;
         }
         .hw-inner { max-width: 1150px; margin: 0 auto; position: relative; z-index: 1; }
-        .hw-kicker {
-          font-family: 'Oswald', sans-serif; letter-spacing: 0.35em; text-transform: uppercase;
-          color: #e8c58a; font-size: 0.85rem; text-align: center; margin-bottom: 0.75rem;
-        }
-        @media (max-width: 520px) { .hw-kicker { letter-spacing: 0.18em; font-size: 0.75rem; } }
         .hw-title {
           font-family: 'Creepster', 'Oswald', cursive; font-weight: 400;
           font-size: clamp(2.6rem, 8vw, 5rem); line-height: 1; text-align: center;
@@ -139,7 +134,7 @@ export default function HalloweenContest() {
         .hw-field input {
           width: 100%; padding: 0.8rem 0.95rem; border-radius: 12px;
           background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.12);
-          color: #fff; font-family: 'Exo 2', sans-serif; font-size: 1rem; outline: none;
+          color: #fff; font-family: 'Barlow', sans-serif; font-size: 1rem; outline: none;
           transition: border-color 0.2s, box-shadow 0.2s;
         }
         .hw-field input::placeholder { color: rgba(255,255,255,0.28); }
@@ -174,10 +169,9 @@ export default function HalloweenContest() {
           display: flex; align-items: center; justify-content: center; padding: 1rem; cursor: zoom-out;
         }
         .hw-lightbox img { max-width: 100%; max-height: 92vh; border-radius: 12px; box-shadow: 0 0 60px rgba(211,18,26,0.4); }
-      `}</style>
+      ` }} />
 
       <div className="hw-inner">
-        <p className="hw-kicker">Astronomical · 31 de octubre · 8 PM</p>
         <h2 className="hw-title">Concurso de Disfraces</h2>
         <p className="hw-sub">
           <strong>Resident Evil Halloween Party.</strong> Gana un <strong>iPhone 18 Pro Max</strong>, efectivo
