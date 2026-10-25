@@ -56,6 +56,8 @@ export const ICONS = {
   warning:
     'M12 9v2m0 4v.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
   caja: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
+  trofeo:
+    'M8 21h8m-4-4v4m-5-17h10v5a5 5 0 01-10 0V4zm10 2h2a2 2 0 010 4h-2M7 6H5a2 2 0 000 4h2',
   gastos:
     'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
 }
@@ -107,6 +109,7 @@ export const adminNavGroups: StaffNavGroup[] = [
     items: [
       { href: '/admin/entradas', label: 'Entradas', icon: ICONS.ticket },
       { href: '/admin/entradas/rechazos-pago', label: 'Rechazos pago', icon: ICONS.warning },
+      { href: '/admin/concursos', label: 'Concursos', icon: ICONS.trofeo },
     ],
   },
   {
