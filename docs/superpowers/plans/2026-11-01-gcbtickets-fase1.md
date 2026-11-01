@@ -24,7 +24,7 @@
 - Tipografías: Cormorant Garamond (títulos) y Exo 2 (cuerpo). Ya se cargan en `app/cbtickets/layout.tsx`.
 - Logos: `/gcbtickets/logo.svg` (header/footer), `/gcbtickets/icon.png` (favicon), `/gcbtickets/logo.png` (imagen OpenGraph).
 - WhatsApp:
-  - Soporte GCBTickets: `https://wa.me/50498240217`.
+  - Soporte GCBTickets: `https://wa.me/50498823627` (Nexus Global, +504 9882-3627).
   - Organizadores: el mismo número con `?text=` = `Quiero vender entradas de mi evento con GCBTickets`.
 - Instagram: `https://www.instagram.com/casablanca_sps/`.
 - Copy hero: "Tus entradas en Honduras, en minutos".
