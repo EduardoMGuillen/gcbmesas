@@ -41,57 +41,62 @@ export type EventPurchaseVariant = 'lcb' | 'cbtickets'
 
 export type PurchasePalette = ReturnType<typeof getPurchasePalette>
 
+/**
+ * Paleta visual por sitio. SOLO colores: no altera el flujo de compra ni CyberSource.
+ * - `lcb`: índigo nocturno con amarillo (La Gran Casa Blanca).
+ * - `cbtickets`: blanco, negro y dorado (GCBTickets).
+ */
 function getPurchasePalette(variant: EventPurchaseVariant) {
   const isLight = variant === 'cbtickets'
   return {
     isLight,
-    goldGradient: 'linear-gradient(135deg, #c9a84c, #a88a3d)',
-    cardBg: isLight ? 'rgba(255, 252, 248, 0.97)' : 'rgba(15, 15, 30, 0.8)',
-    cardBorder: isLight ? 'rgba(176, 145, 80, 0.32)' : 'rgba(255,255,255,0.06)',
-    inputBg: isLight ? '#ffffff' : 'rgba(10,10,25,0.9)',
-    inputBorder: isLight ? 'rgba(176, 145, 80, 0.45)' : 'rgba(255,255,255,0.1)',
-    mutedText: isLight ? 'rgba(41, 37, 36, 0.62)' : 'rgba(255,255,255,0.55)',
-    innerPanelBg: isLight ? 'rgba(254, 252, 249, 0.96)' : 'rgba(10,10,25,0.6)',
+    goldGradient: isLight ? 'linear-gradient(180deg, #C9A24A, #B8913A)' : 'linear-gradient(180deg, #F0D04A, #E8C531)',
+    cardBg: isLight ? '#FFFFFF' : 'rgba(28, 22, 64, 0.92)',
+    cardBorder: isLight ? '#E7E5E4' : 'rgba(255,255,255,0.14)',
+    inputBg: isLight ? '#ffffff' : '#140F2E',
+    inputBorder: isLight ? '#D6D3D1' : 'rgba(255,255,255,0.16)',
+    mutedText: isLight ? 'rgba(10, 10, 10, 0.55)' : 'rgba(246,241,231,0.6)',
+    innerPanelBg: isLight ? '#F6F6F5' : 'rgba(20, 15, 46, 0.75)',
     chipPaso: isLight
-      ? { background: 'rgba(201,168,76,0.14)', color: '#5c4a1c', border: '1px solid rgba(201,168,76,0.42)' }
-      : { background: 'rgba(201,168,76,0.18)', color: '#e8d18d', border: '1px solid rgba(201,168,76,0.35)' },
+      ? { background: '#F4ECD8', color: '#7A5F22', border: '1px solid rgba(184,145,58,0.35)' }
+      : { background: 'rgba(232,197,49,0.14)', color: '#F0D04A', border: '1px solid rgba(232,197,49,0.4)' },
     linkCta: isLight
-      ? { background: 'linear-gradient(135deg, #d4af37, #8b6914)', color: '#1a1510', boxShadow: '0 4px 20px rgba(180,140,60,0.22)' }
-      : { background: 'linear-gradient(45deg, #00ffff, #a855f7)', color: '#0a0a15', boxShadow: '0 4px 20px rgba(0,255,255,0.2)' },
-    fieldRim: isLight ? 'rgba(252, 249, 244, 0.98)' : 'rgba(255,255,255,0.03)',
+      ? { background: '#0A0A0A', color: '#ffffff', boxShadow: '0 8px 24px -10px rgba(10,10,10,0.5)' }
+      : { background: '#E8C531', color: '#140F2E', boxShadow: '0 12px 34px -12px rgba(232,197,49,0.8)' },
+    fieldRim: isLight ? '#F6F6F5' : 'rgba(255,255,255,0.04)',
     inputFieldClass: isLight
-      ? 'text-stone-900 placeholder:text-stone-400 focus:ring-amber-400/35'
-      : 'text-white placeholder:text-white/20 focus:ring-cyan-500/25',
-    qtyBtnClass: isLight ? 'text-stone-800' : 'text-white',
+      ? 'text-neutral-900 placeholder:text-neutral-400 focus:ring-[#B8913A]/35'
+      : 'text-white placeholder:text-white/30 focus:ring-[#E8C531]/35',
+    qtyBtnClass: isLight ? 'text-neutral-900' : 'text-white',
     unifiedPanel: isLight
       ? {
-          background: 'rgba(255,252,248,0.97)',
-          border: '1px solid rgba(176,145,80,0.38)',
-          boxShadow: '0 0 0 1px rgba(176,145,80,0.12) inset',
+          background: '#FFFFFF',
+          border: '1px solid #E7E5E4',
+          boxShadow: '0 20px 50px -30px rgba(10,10,10,0.25)',
         }
       : {
-          background: 'rgba(16, 27, 48, 0.8)',
-          border: '1px solid rgba(59,130,246,0.35)',
-          boxShadow: '0 0 0 1px rgba(59,130,246,0.1) inset',
+          background: 'rgba(28, 22, 64, 0.92)',
+          border: '1px solid rgba(232,197,49,0.35)',
+          boxShadow: '0 0 0 1px rgba(232,197,49,0.08) inset',
         },
     tx: {
-      h2: isLight ? 'text-stone-900' : 'text-white',
-      h3: isLight ? 'text-stone-900' : 'text-white',
-      body: isLight ? 'text-stone-600' : 'text-white/40',
-      label: isLight ? 'text-stone-600' : 'text-white/50',
-      faint: isLight ? 'text-stone-500' : 'text-white/20',
-      vfaint: isLight ? 'text-stone-400' : 'text-white/25',
-      hint: isLight ? 'text-stone-500' : 'text-white/30',
-      row: isLight ? 'text-stone-500' : 'text-white/40',
-      entryRow: isLight ? 'text-stone-500' : 'text-white/45',
-      successSub: isLight ? 'text-stone-600' : 'text-white/50',
-      moreEvents: isLight ? 'text-stone-600 hover:text-stone-900' : 'text-white/50 hover:text-white',
-      ref: isLight ? 'text-stone-400' : 'text-white/15',
-      directTitle: isLight ? 'text-stone-800' : 'text-white/80',
-      directBadge: isLight ? 'text-stone-500' : 'text-white/40',
-      unifiedLead: isLight ? 'text-sm font-medium text-amber-900' : 'text-sm font-medium text-blue-200',
-      unifiedLbl: isLight ? 'text-xs text-amber-900/80' : 'text-xs text-blue-100/80',
-      unifiedFoot: isLight ? 'text-xs text-amber-900/75' : 'text-xs text-blue-100/70',
+      h2: isLight ? 'text-neutral-950' : 'text-white',
+      h3: isLight ? 'text-neutral-950' : 'text-white',
+      body: isLight ? 'text-neutral-600' : 'text-white/60',
+      label: isLight ? 'text-neutral-600' : 'text-white/65',
+      faint: isLight ? 'text-neutral-500' : 'text-white/35',
+      vfaint: isLight ? 'text-neutral-400' : 'text-white/35',
+      hint: isLight ? 'text-neutral-500' : 'text-white/45',
+      row: isLight ? 'text-neutral-500' : 'text-white/55',
+      entryRow: isLight ? 'text-neutral-500' : 'text-white/60',
+      successSub: isLight ? 'text-neutral-600' : 'text-white/65',
+      moreEvents: isLight ? 'text-neutral-600 hover:text-neutral-950' : 'text-white/65 hover:text-white',
+      ref: isLight ? 'text-neutral-400' : 'text-white/30',
+      directTitle: isLight ? 'text-neutral-900' : 'text-white/85',
+      directBadge: isLight ? 'text-neutral-500' : 'text-white/55',
+      unifiedLead: isLight ? 'text-sm font-medium text-neutral-900' : 'text-sm font-medium text-[#F0D04A]',
+      unifiedLbl: isLight ? 'text-xs text-neutral-600' : 'text-xs text-white/70',
+      unifiedFoot: isLight ? 'text-xs text-neutral-500' : 'text-xs text-white/60',
     },
   }
 }

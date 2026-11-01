@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { EventPurchaseClient } from './EventPurchaseClient'
-import { PublicSiteVantaBackground } from '@/components/PublicSiteVantaBackground'
+import { LcbFooter, LcbHead, LcbHeader } from '@/app/_components/lcb/LcbShared'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -80,119 +80,44 @@ export default async function EventoPage({
 
   return (
     <>
-      <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Exo+2:wght@400;600;700&display=swap"
-        rel="stylesheet"
-      />
-      <PublicSiteVantaBackground>
-        <div className="flex flex-col flex-1 min-h-screen font-[family-name:var(--font-exo)]" style={{ fontFamily: "'Exo 2', sans-serif" }}>
-          <nav
-            className="border-b border-white/10 backdrop-blur-md shrink-0"
-            style={{
-              paddingTop: 'env(safe-area-inset-top)',
-              background: 'rgba(10,0,21,0.72)',
-            }}
-          >
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-4 sm:gap-6">
-                <Link
-                  href="/"
-                  className="text-xs sm:text-sm font-medium text-white/55 hover:text-white transition-colors flex items-center gap-1.5"
-                >
-                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Inicio
-                </Link>
-                <Link href="/eventos" className="flex items-center gap-2 group">
-                  <Image
-                    src="/LogoCasaBlanca.png"
-                    alt="Casa Blanca"
-                    width={36}
-                    height={36}
-                    className="h-8 w-auto object-contain"
-                  />
-                  <span className="text-sm font-medium text-white/70 group-hover:text-white transition-colors">Eventos</span>
-                </Link>
-              </div>
-              <Link
-                href="/eventos"
-                className="text-xs sm:text-sm text-white/45 hover:text-cyan-300 transition-colors flex items-center gap-1.5"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Todos los eventos
+      <LcbHead />
+      <div className="lcb flex min-h-screen flex-col overflow-x-hidden antialiased">
+        <LcbHeader buyHref={`/eventos/${event.id}`} onHome={false} />
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-[520px] opacity-60"
+          style={{ background: 'radial-gradient(60% 80% at 50% 0%, rgba(226,69,123,.25), transparent 70%), radial-gradient(40% 60% at 85% 10%, rgba(31,181,168,.2), transparent 70%)' }}
+          aria-hidden
+        />
+        <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 px-4 pb-20 pt-28 sm:px-6 sm:pt-32">
+          <Link href="/eventos" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-white/60 transition-colors hover:text-white">
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Todos los eventos
+          </Link>
+          {venueLine ? <p className="mb-6 text-center text-sm text-white/55">{venueLine}</p> : null}
+          {eventHasPassed ? (
+            <div className="rounded-[28px] bg-[#1C1640] px-6 py-16 text-center ring-1 ring-white/15">
+              <h3 className="lcb-display text-5xl uppercase">Este evento ya pasó</h3>
+              <p className="mb-8 mt-3 text-white/65">La venta de entradas en línea ya no está disponible.</p>
+              <Link href="/eventos" className="lcb-btn lcb-btn-yellow px-7 py-3.5">
+                Ver otros eventos
               </Link>
             </div>
-          </nav>
-
-          <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex-1 w-full">
-            {venueLine ? (
-              <p className="text-center text-white/45 text-sm mb-6">{venueLine}</p>
-            ) : null}
-            {eventHasPassed ? (
-              <div className="text-center py-20">
-                <div
-                  className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center"
-                  style={{ border: '1px solid rgba(0,255,255,0.25)' }}
-                >
-                  <svg className="w-10 h-10 text-cyan-400/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-white/40 mb-2">Este evento ya pasó</h3>
-                <p className="text-white/25 mb-6 text-sm">La venta de entradas en línea ya no está disponible.</p>
-                <Link
-                  href="/eventos"
-                  className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full transition-all hover:scale-105"
-                  style={{
-                    background: 'linear-gradient(45deg, #00ffff, #a855f7)',
-                    color: '#0a0a15',
-                    boxShadow: '0 4px 20px rgba(0,255,255,0.2)',
-                  }}
-                >
-                  Ver otros eventos
-                </Link>
-              </div>
-            ) : freeOnly ? (
-              <FreeCoverEventView
-                name={event.name}
-                eventDateLabel={eventDateLabel}
-                description={event.description}
-                coverImage={event.coverImage}
-                listHref="/eventos"
-              />
-            ) : (
-              <EventPurchaseClient event={eventData} />
-            )}
-          </main>
-
-          <footer className="py-8 mt-auto border-t border-white/10 shrink-0" style={{ background: 'rgba(0,0,0,0.35)' }}>
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-3">
-              <div className="flex items-center justify-center gap-6 sm:gap-10 mb-3 flex-wrap">
-                <Image src="/LogoAstronomical.png" alt="Astronomical" width={90} height={30} className="h-6 sm:h-7 w-auto object-contain opacity-35" />
-                <Image src="/LogoCasaBlanca.png" alt="Casa Blanca" width={40} height={40} className="h-8 w-auto object-contain opacity-35" />
-                <Image src="/LogoStudio54.png" alt="Studio 54" width={90} height={30} className="h-6 sm:h-7 w-auto object-contain opacity-35" />
-              </div>
-              <p className="text-xs text-white/25">
-                &copy; {new Date().getFullYear()} Casa Blanca &middot; San Pedro Sula, Honduras
-              </p>
-              <p className="text-xs text-white/25">
-                Powered by{' '}
-                <a
-                  href="https://www.nexusglobalsuministros.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-cyan-400/60 hover:text-cyan-300 underline underline-offset-2"
-                >
-                  Nexus Global
-                </a>
-              </p>
-            </div>
-          </footer>
-        </div>
-      </PublicSiteVantaBackground>
+          ) : freeOnly ? (
+            <FreeCoverEventView
+              name={event.name}
+              eventDateLabel={eventDateLabel}
+              description={event.description}
+              coverImage={event.coverImage}
+              listHref="/eventos"
+            />
+          ) : (
+            <EventPurchaseClient event={eventData} />
+          )}
+        </main>
+        <LcbFooter />
+      </div>
     </>
   )
 }

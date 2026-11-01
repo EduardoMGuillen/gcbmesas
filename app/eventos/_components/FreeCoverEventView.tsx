@@ -6,7 +6,7 @@ type Props = {
   description: string | null
   coverImage: string | null
   listHref: '/eventos' | '/cbtickets'
-  /** Canal CBTickets: paleta blanco / dorado acorde al sitio. */
+  /** Canal GCBTickets: blanco, negro y dorado; LCB: índigo y amarillo. */
   theme?: 'lcb' | 'cbtickets'
 }
 
@@ -17,7 +17,7 @@ export function FreeCoverEventView({ name, eventDateLabel, description, coverIma
       {coverImage ? (
         <div
           className={`mb-8 flex justify-center rounded-2xl p-2 sm:p-3 ${
-            isCb ? 'border border-amber-200/70 bg-white/80 shadow-sm' : 'border border-white/10 bg-black/20'
+            isCb ? 'border border-[#E7E5E4] bg-white' : 'bg-[#1C1640] ring-1 ring-white/15'
           }`}
         >
           <img
@@ -31,35 +31,35 @@ export function FreeCoverEventView({ name, eventDateLabel, description, coverIma
       ) : null}
       <p
         className={`text-sm uppercase tracking-widest mb-2 ${
-          isCb ? 'text-amber-800/90' : 'text-cyan-300/90'
+          isCb ? 'text-[#B8913A]' : 'text-[#E8C531]'
         }`}
       >
         {eventDateLabel}
       </p>
-      <h1 className={`text-2xl sm:text-3xl font-bold mb-4 ${isCb ? 'text-stone-900' : 'text-white'}`}>{name}</h1>
+      <h1 className={`text-2xl sm:text-3xl font-bold mb-4 ${isCb ? 'text-neutral-950' : 'lcb-display uppercase text-white'}`}>{name}</h1>
       <div
         className="inline-block px-5 py-2.5 rounded-full text-sm font-bold mb-6"
         style={
           isCb
             ? {
-                background: 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(255,250,240,0.95))',
-                border: '1px solid rgba(180, 140, 70, 0.45)',
-                color: '#6b5420',
+                background: '#F4ECD8',
+                border: '1px solid rgba(184,145,58,0.35)',
+                color: '#7A5F22',
               }
             : {
-                background: 'linear-gradient(45deg, rgba(34,197,94,0.25), rgba(16,185,129,0.15))',
-                border: '1px solid rgba(52,211,153,0.45)',
-                color: '#6ee7b7',
+                background: 'rgba(232,197,49,0.14)',
+                border: '1px solid rgba(232,197,49,0.45)',
+                color: '#F0D04A',
               }
         }
       >
         Cover gratuito
       </div>
-      <p className={`text-sm mb-6 ${isCb ? 'text-stone-600' : 'text-white/45'}`}>
+      <p className={`text-sm mb-6 ${isCb ? 'text-neutral-500' : 'text-white/60'}`}>
         Sin venta de entradas en línea para este evento.
       </p>
       {description ? (
-        <p className={`text-sm text-left leading-relaxed mb-8 whitespace-pre-wrap ${isCb ? 'text-stone-700' : 'text-white/65'}`}>
+        <p className={`text-sm text-left leading-relaxed mb-8 whitespace-pre-wrap ${isCb ? 'text-neutral-700' : 'text-white/75'}`}>
           {description}
         </p>
       ) : null}
@@ -69,14 +69,14 @@ export function FreeCoverEventView({ name, eventDateLabel, description, coverIma
         style={
           isCb
             ? {
-                background: 'linear-gradient(135deg, #d4af37, #9a7328)',
-                color: '#1a1510',
-                boxShadow: '0 4px 20px rgba(180, 140, 60, 0.28)',
+                background: '#0A0A0A',
+                color: '#ffffff',
+                boxShadow: '0 8px 24px -10px rgba(10,10,10,0.5)',
               }
             : {
-                background: 'linear-gradient(45deg, #00ffff, #a855f7)',
-                color: '#0a0a15',
-                boxShadow: '0 4px 20px rgba(0,255,255,0.2)',
+                background: '#E8C531',
+                color: '#140F2E',
+                boxShadow: '0 12px 34px -12px rgba(232,197,49,0.8)',
               }
         }
       >
