@@ -1,5 +1,6 @@
 'use client'
 
+import { HN_DEPARTMENTS, departmentDefaults } from '@/lib/hn-departments'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import QRCode from 'qrcode'
@@ -159,6 +160,15 @@ export function EventPurchaseClient({
   const [billingState, setBillingState] = useState('')
   const [billingPostalCode, setBillingPostalCode] = useState('')
   const [billingCountry, setBillingCountry] = useState('HN')
+  /** Al elegir departamento se precargan ciudad cabecera y código postal (editables). */
+  const onBillingStateChange = (name: string) => {
+    setBillingState(name)
+    const d = departmentDefaults(name)
+    if (d) {
+      setBillingCity(d.city)
+      setBillingPostalCode(d.postalCode)
+    }
+  }
   const microformRef = useRef<any>(null)
   /** Flex Field instances — must call .unload() before React removes #cybs-card-* hosts (avoids removeChild crashes). */
   const microformFieldRefs = useRef<{ number: any; cvv: any } | null>(null)
@@ -1072,19 +1082,25 @@ export function EventPurchaseClient({
                   className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 sm:col-span-2 ${p.inputFieldClass}`}
                   style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
+                <select
+                  value={billingState}
+                  onChange={(e) => onBillingStateChange(e.target.value)}
+                  aria-label="Departamento"
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass} ${billingState ? '' : 'opacity-70'}`}
+                  style={{ background: p.inputBg, border: `1px solid ${p.inputBorder}` }}
+                >
+                  <option value="">Departamento *</option>
+                  {HN_DEPARTMENTS.map((d) => (
+                    <option key={d.name} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="text"
                   value={billingCity}
                   onChange={(e) => setBillingCity(e.target.value)}
                   placeholder="Ciudad *"
-                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
-                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
-                />
-                <input
-                  type="text"
-                  value={billingState}
-                  onChange={(e) => setBillingState(e.target.value)}
-                  placeholder="Departamento/Estado *"
                   className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
                   style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
@@ -1192,19 +1208,25 @@ export function EventPurchaseClient({
                   className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 sm:col-span-2 ${p.inputFieldClass}`}
                   style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
+                <select
+                  value={billingState}
+                  onChange={(e) => onBillingStateChange(e.target.value)}
+                  aria-label="Departamento"
+                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass} ${billingState ? '' : 'opacity-70'}`}
+                  style={{ background: p.inputBg, border: `1px solid ${p.inputBorder}` }}
+                >
+                  <option value="">Departamento *</option>
+                  {HN_DEPARTMENTS.map((d) => (
+                    <option key={d.name} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="text"
                   value={billingCity}
                   onChange={(e) => setBillingCity(e.target.value)}
                   placeholder="Ciudad *"
-                  className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
-                  style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
-                />
-                <input
-                  type="text"
-                  value={billingState}
-                  onChange={(e) => setBillingState(e.target.value)}
-                  placeholder="Departamento/Estado *"
                   className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${p.inputFieldClass}`}
                   style={{ background: p.fieldRim, border: `1px solid ${p.inputBorder}` }}
                 />
