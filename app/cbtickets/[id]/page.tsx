@@ -1,4 +1,5 @@
 import { CBT_EVENTS } from '@/lib/cbtickets-paths'
+import { buildCbtEventMetadata } from '@/lib/cbtickets-metadata'
 import { getPublicEventById, hasOnlineTicketSale, isPublicFreeCoverOnly } from '@/lib/public-events'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -28,10 +29,7 @@ export async function generateMetadata({
     timeZone: 'UTC',
   })
 
-  return {
-    title: event.name,
-    description: `${event.name} - ${eventDate}. Compra tus entradas en línea en GCBTickets.`,
-  }
+  return buildCbtEventMetadata({ id: event.id, name: event.name, dateLabel: eventDate, coverImage: event.coverImage })
 }
 
 export default async function CbTicketsEventoPage({

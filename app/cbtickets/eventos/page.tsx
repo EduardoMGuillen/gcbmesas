@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 export const metadata = {
   title: 'Eventos',
   alternates: { canonical: '/eventos' },
+  openGraph: { url: '/eventos', title: 'Eventos | GCBTickets', images: ['/gcbtickets/logo.png'] },
   description: 'Todos los eventos con entradas a la venta en GCBTickets. Compra en línea y recibe tu QR al instante.',
 }
 
