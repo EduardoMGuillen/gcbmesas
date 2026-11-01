@@ -18,6 +18,7 @@ import { persistCyberSourcePaymentAudit } from '@/lib/cybersource-payment-audit'
 import { assertEventEntryCapacity } from '@/lib/actions'
 import { escapeHtml } from '@/lib/html-escape'
 import { sendMailWithInlineImages } from '@/lib/send-mail'
+import { buildTicketEmailHtml } from '@/lib/ticket-email'
 import { notifyAdminsNewEntrySale } from '@/lib/push'
 import { formatPurchaseErrorForUser } from '@/lib/purchase-user-friendly-error'
 import { scheduleOnlinePaymentRejectionLog } from '@/lib/online-payment-rejection'
@@ -742,7 +743,7 @@ export async function POST(req: NextRequest) {
         })
       )
 
-      const logoPath = path.join(process.cwd(), 'public', 'LogoCasaBlanca.png')
+      const logoPath = path.join(process.cwd(), 'public', 'gcbtickets', 'logo-email.png')
       const logoBuffer = fs.readFileSync(logoPath)
 
       const eventDateStr = new Date(eventDate).toLocaleDateString('es-HN', {
@@ -773,42 +774,20 @@ export async function POST(req: NextRequest) {
       await sendMailWithInlineImages({
         to: String(pendingDetails?.clientEmail || clientEmail).trim(),
         subject: `${isBulk ? `Tus ${entries.length} entradas` : 'Tu entrada'} para ${eventName} - Casa Blanca`,
-        html: `
-          <!DOCTYPE html><html><head><meta charset="utf-8"></head>
-          <body style="margin:0;padding:0;background-color:#1a1a2e;font-family:Arial,sans-serif;">
-            <div style="max-width:600px;margin:0 auto;padding:20px;">
-              <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:16px;overflow:hidden;border:1px solid #334155;">
-                ${eventCoverImage ? `<div style="text-align:center;"><img src="${eventCoverImage}" alt="${eventName}" style="width:100%;max-height:250px;object-fit:cover;display:block;" /></div>` : ''}
-                <div style="padding:30px 20px;text-align:center;">
-                  <img src="cid:logo" alt="Casa Blanca" style="width:100px;height:100px;display:inline-block;" />
-                  <p style="color:#c9a84c;margin:8px 0 0;font-size:14px;letter-spacing:1px;">Confirmacion de Compra Online</p>
-                </div>
-                <div style="padding:30px 20px;">
-                  <h2 style="color:#fff;margin:0 0 20px;font-size:20px;text-align:center;">Hola ${names[0]}!</h2>
-                  <p style="color:#94a3b8;text-align:center;margin:0 0 24px;font-size:15px;">
-                    ${isBulk ? `Tus <strong style="color:#fff;">${entries.length} entradas</strong>` : 'Tu entrada'} para <strong style="color:#fff;">${eventName}</strong> ${isBulk ? 'han sido confirmadas' : 'ha sido confirmada'}.
-                  </p>
-                  <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;margin:0 0 24px;">
-                    <table style="width:100%;border-collapse:collapse;">
-                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Evento</td><td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${eventName}</td></tr>
-                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Fecha</td><td style="padding:8px 0;color:#c9a84c;font-size:14px;text-align:right;font-weight:bold;text-transform:capitalize;">${eventDateStr}</td></tr>
-                      ${venueRowsHtml}
-                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Entradas</td><td style="padding:8px 0;color:#fff;font-size:14px;text-align:right;font-weight:bold;">${entries.length}</td></tr>
-                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Total Pagado</td><td style="padding:8px 0;color:#3b82f6;font-size:18px;text-align:right;font-weight:bold;">L ${totalPriceLps.toFixed(2)} HNL</td></tr>
-                      <tr><td style="padding:8px 0;color:#94a3b8;font-size:14px;">Referencia</td><td style="padding:8px 0;color:#64748b;font-size:12px;text-align:right;">${paymentReference}</td></tr>
-                    </table>
-                  </div>
-                  ${qrSectionsHtml}
-                  <p style="color:#64748b;text-align:center;font-size:12px;margin:0;">Presenta tu QR en la entrada.</p>
-                </div>
-                <div style="border-top:1px solid #334155;padding:20px;text-align:center;">
-                  <p style="color:#64748b;font-size:12px;margin:0;">Casa Blanca &copy; ${new Date().getFullYear()}</p>
-                </div>
-              </div>
-            </div>
-          </body></html>`,
+        html: buildTicketEmailHtml({
+          firstName: String(names[0] ?? '').split(/\s+/)[0] || String(names[0] ?? ''),
+          eventName,
+          eventDateLabel: eventDateStr,
+          coverImageUrl: eventCoverImage || null,
+          venueName: event.venueName ?? null,
+          venueAddress: event.venueAddress ?? null,
+          totalLps: totalPriceLps,
+          paymentReference: String(paymentReference),
+          tickets: qrData.map((qr: any) => ({ holderName: String(qr.clientName), qrCid: qr.cid })),
+          logoUrl: 'cid:logo',
+        }),
         attachments: [
-          { filename: 'LogoCasaBlanca.png', content: logoBuffer, cid: 'logo' },
+          { filename: 'GCBTickets.png', content: logoBuffer, cid: 'logo' },
           ...qrData.map((qr: any) => ({
             filename: `entrada-qr-${qr.clientName.replace(/\s+/g, '-').toLowerCase()}.png`,
             content: Buffer.from(qr.qrBase64, 'base64'),
