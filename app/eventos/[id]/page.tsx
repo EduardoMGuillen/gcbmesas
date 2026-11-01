@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { EventPurchaseClient } from './EventPurchaseClient'
 import { LcbFooter, LcbHead, LcbHeader } from '@/app/_components/lcb/LcbShared'
+import { daysUntil } from '@/lib/ticket-availability'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -78,16 +79,28 @@ export default async function EventoPage({
     timeZone: 'UTC',
   })
 
+  const days = daysUntil(new Date(event.date).toISOString(), now)
+  const chips = [
+    eventDateLabel.charAt(0).toUpperCase() + eventDateLabel.slice(1),
+    venueLine,
+    eventHasPassed ? '' : days === 0 ? 'Es hoy' : days === 1 ? 'Mañana' : `Faltan ${days} días`,
+  ].filter(Boolean)
+
   return (
     <>
       <LcbHead />
       <div className="lcb flex min-h-screen flex-col overflow-x-hidden antialiased">
         <LcbHeader buyHref={`/eventos/${event.id}`} onHome={false} />
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-[520px] opacity-60"
-          style={{ background: 'radial-gradient(60% 80% at 50% 0%, rgba(226,69,123,.25), transparent 70%), radial-gradient(40% 60% at 85% 10%, rgba(31,181,168,.2), transparent 70%)' }}
-          aria-hidden
-        />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden" aria-hidden>
+          {event.coverImage && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={event.coverImage} alt="" className="h-full w-full scale-110 object-cover opacity-45 blur-3xl" />
+          )}
+          <div
+            className="absolute inset-0"
+            style={{ background: 'radial-gradient(60% 80% at 50% 0%, rgba(226,69,123,.22), transparent 70%), linear-gradient(180deg, rgba(20,15,46,.35), #140F2E 92%)' }}
+          />
+        </div>
         <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 px-4 pb-20 pt-28 sm:px-6 sm:pt-32">
           <Link href="/eventos" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-white/60 transition-colors hover:text-white">
             <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -95,7 +108,13 @@ export default async function EventoPage({
             </svg>
             Todos los eventos
           </Link>
-          {venueLine ? <p className="mb-6 text-center text-sm text-white/55">{venueLine}</p> : null}
+          <ul className="mb-8 flex flex-wrap justify-center gap-2" aria-label="Datos del evento">
+            {chips.map((c) => (
+              <li key={c} className="rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-white ring-1 ring-white/15 backdrop-blur-md">
+                {c}
+              </li>
+            ))}
+          </ul>
           {eventHasPassed ? (
             <div className="rounded-[28px] bg-[#1C1640] px-6 py-16 text-center ring-1 ring-white/15">
               <h3 className="lcb-display text-5xl uppercase">Este evento ya pasó</h3>

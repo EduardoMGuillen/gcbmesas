@@ -1,6 +1,7 @@
 import { CBT_EVENTS } from '@/lib/cbtickets-paths'
 import { buildCbtEventMetadata } from '@/lib/cbtickets-metadata'
 import { eventJsonLd } from '@/lib/cbtickets-seo'
+import { daysUntil } from '@/lib/ticket-availability'
 import { toCbtEvent } from '../_components/CbtEventCard'
 import { getPublicEventById, hasOnlineTicketSale, isPublicFreeCoverOnly } from '@/lib/public-events'
 import { notFound } from 'next/navigation'
@@ -79,8 +80,23 @@ export default async function CbTicketsEventoPage({
 
   const jsonLd = eventJsonLd({ ...toCbtEvent(event), description: event.description })
 
+  const days = daysUntil(new Date(event.date).toISOString(), now)
+  const chips = [
+    eventDateLabel.charAt(0).toUpperCase() + eventDateLabel.slice(1),
+    venueLine,
+    eventHasPassed ? '' : days === 0 ? 'Es hoy' : days === 1 ? 'Mañana' : `Faltan ${days} días`,
+  ].filter(Boolean)
+
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+    <div className="relative flex-1">
+      {event.coverImage && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[460px] overflow-hidden" aria-hidden>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={event.coverImage} alt="" className="h-full w-full scale-110 object-cover opacity-35 blur-3xl" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-white/70 to-white" />
+        </div>
+      )}
+    <main className="relative mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="mb-5">
         <Link
@@ -93,7 +109,13 @@ export default async function CbTicketsEventoPage({
           Todos los eventos
         </Link>
       </div>
-      {venueLine ? <p className="mb-6 text-center text-sm text-neutral-500">{venueLine}</p> : null}
+      <ul className="mb-8 flex flex-wrap justify-center gap-2" aria-label="Datos del evento">
+        {chips.map((c) => (
+          <li key={c} className="gcb-glass rounded-full px-4 py-1.5 text-sm font-medium text-neutral-800">
+            {c}
+          </li>
+        ))}
+      </ul>
       {eventHasPassed ? (
         <div className="rounded-[28px] bg-gcb-mist px-4 py-16 text-center">
           <h3 className="mb-2 text-2xl font-extrabold tracking-tight">Este evento ya pasó</h3>
@@ -115,5 +137,6 @@ export default async function CbTicketsEventoPage({
         <EventPurchaseClient event={eventData} eventsListPath={CBT_EVENTS} variant="cbtickets" />
       )}
     </main>
+    </div>
   )
 }
