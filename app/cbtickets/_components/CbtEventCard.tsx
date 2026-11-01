@@ -70,56 +70,57 @@ export function CbtEventCard({ event }: { event: CbtEvent }) {
 
   const body = (
     <>
-      <div className="relative aspect-[4/5] overflow-hidden bg-cbt-forest">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-gcb-mist">
         {event.coverImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={event.coverImage}
             alt={`Afiche de ${event.name}`}
             loading="lazy"
-            className={`h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03] ${soldOut ? 'grayscale' : ''}`}
+            className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] ${soldOut ? 'grayscale' : ''}`}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-cbt-moss to-cbt-forest">
+          <div className="flex h-full w-full items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/gcbtickets/icon.svg" alt="" className="h-24 w-24 opacity-40" />
+            <img src="/gcbtickets/icon.svg" alt="" className="h-20 w-20 opacity-50" />
           </div>
         )}
+        <div className="gcb-glass-dark absolute left-3 top-3 rounded-xl px-3 py-1.5 text-center text-white">
+          <p className="text-lg font-bold leading-none">{date.day}</p>
+          <p className="mt-0.5 text-[10px] font-semibold tracking-wide">{date.month}</p>
+        </div>
         {availability === 'last' && (
-          <span className="absolute right-3 top-3 rounded-full bg-cbt-ivory px-3 py-1 text-xs font-semibold text-cbt-ink shadow">
-            Últimas entradas
-          </span>
+          <span className="gcb-glass absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-semibold">Últimas entradas</span>
         )}
         {soldOut && (
-          <span className="absolute right-3 top-3 rounded-full bg-cbt-ink/85 px-3 py-1 text-xs font-semibold text-cbt-ivory">
-            Agotado
-          </span>
+          <span className="absolute right-3 top-3 rounded-full bg-black px-3 py-1 text-xs font-semibold text-white">Agotado</span>
         )}
       </div>
-      <div className="cbt-ticket-h cbt-paper relative grid grid-cols-[auto_1fr] gap-x-4 border-t-2 border-dashed border-cbt-ink/25 px-5 pb-5 pt-4 text-cbt-ink [--cut:0%]">
-        <div className="row-span-2 flex flex-col items-center justify-center border-r border-cbt-ink/15 pr-4 text-center">
-          <span className="cbt-display text-4xl font-semibold leading-none">{date.day}</span>
-          <span className="mt-1 text-xs font-semibold text-cbt-gold-lo">{date.month.toLowerCase()}</span>
-        </div>
-        <div className="min-w-0">
-          <h3 className="cbt-display truncate text-xl font-semibold leading-tight">{event.name}</h3>
-          <p className="mt-0.5 truncate text-sm text-cbt-ink/60">{event.venueName || date.long}</p>
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <span className="text-base font-semibold">{formatCbtPrice(event)}</span>
-          <span className={soldOut ? 'text-sm font-semibold text-cbt-ink/45' : 'cbt-btn-ink px-4 py-1.5 text-sm'}>
-            {soldOut ? 'Agotado' : availability === 'free' ? 'Ver evento' : 'Comprar'}
-          </span>
-        </div>
+      <div className="px-1 pt-4">
+        <h3 className="line-clamp-2 text-lg font-bold leading-snug">{event.name}</h3>
+        <p className="mt-1 truncate text-sm text-neutral-500">
+          {date.long}
+          {event.venueName ? `, ${event.venueName}` : ''}
+        </p>
+        <p className="mt-2 text-sm font-semibold">
+          {soldOut ? (
+            <span className="text-neutral-400">Agotado</span>
+          ) : availability === 'free' ? (
+            'Entrada libre'
+          ) : (
+            <>
+              <span className="font-normal text-neutral-500">Desde </span>
+              <span className="text-gcb-gold">{formatCbtPrice(event)}</span>
+            </>
+          )}
+        </p>
       </div>
     </>
   )
 
-  const cls = 'group flex flex-col overflow-hidden rounded-[20px] shadow-[0_24px_50px_-28px_rgba(0,0,0,.9)] transition-transform duration-300'
-
-  if (soldOut) return <div className={`${cls} opacity-75`}>{body}</div>
+  if (soldOut) return <div className="opacity-70">{body}</div>
   return (
-    <Link href={cbtEventPath(event.id)} className={`${cls} hover:-translate-y-1.5`} aria-label={`${event.name}, ${date.long}`}>
+    <Link href={cbtEventPath(event.id)} className="group block" aria-label={`${event.name}, ${date.long}`}>
       {body}
     </Link>
   )

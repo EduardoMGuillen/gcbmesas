@@ -9,16 +9,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // GCBTickets: verde botella + oro + marfil
-        cbt: {
-          night: '#10241D',
-          forest: '#173329',
-          moss: '#22463A',
-          gold: '#C8A257',
-          'gold-hi': '#E6CB86',
-          'gold-lo': '#A9843A',
-          ivory: '#F3ECDD',
-          ink: '#1D1B16',
+        // GCBTickets: blanco, negro y dorado
+        gcb: {
+          ink: '#0A0A0A',
+          gold: '#B8913A',
+          'gold-hi': '#D4B26A',
+          'gold-soft': '#F4ECD8',
+          mist: '#F6F6F5',
+          line: '#E7E5E4',
         },
         primary: {
           50: '#f0f9ff',

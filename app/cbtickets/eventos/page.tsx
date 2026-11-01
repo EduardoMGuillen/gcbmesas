@@ -1,8 +1,6 @@
 import { getPublicEvents } from '@/lib/public-events'
-import { pickFeaturedEvent } from '@/lib/featured-event'
 import { toCbtEvent } from '../_components/CbtEventCard'
 import { CbtEventRow } from '../_components/CbtEventRow'
-import { CbtTicket } from '../_components/CbtTicket'
 import { CBT_INSTAGRAM, CBT_ORGANIZERS_WHATSAPP, CBT_SELL_CTA } from '../_components/contact'
 
 export const dynamic = 'force-dynamic'
@@ -16,54 +14,46 @@ export const metadata = {
 
 export default async function CbTicketsEventosPage() {
   const events = (await getPublicEvents('cbtickets')).map(toCbtEvent)
-  const featured = pickFeaturedEvent(events)
 
   return (
-    <main className="flex-1">
-      <section className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{ background: 'radial-gradient(55% 80% at 80% 50%, rgba(200,162,87,.16), transparent 70%)' }}
-          aria-hidden
-        />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-14 sm:px-6 lg:grid-cols-[1fr_1fr] lg:pt-20">
-          <div>
-            <h1 className="cbt-display text-5xl font-medium leading-[1.02] sm:text-6xl">Eventos en Honduras</h1>
-            <p className="mt-5 max-w-md text-lg text-cbt-ivory/70">
-              {events.length > 0
-                ? `${events.length === 1 ? 'Hay 1 evento' : `Hay ${events.length} eventos`} con entradas a la venta. Paga con tarjeta y recibe tu QR al instante.`
-                : 'Los próximos eventos salen pronto a la venta. Síguenos en Instagram para enterarte primero.'}
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              {events.length === 0 && (
-                <a href={CBT_INSTAGRAM} target="_blank" rel="noopener noreferrer" className="cbt-btn-gold px-7 py-3 text-[15px]">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-24 pt-10 sm:px-6 sm:pt-14">
+      <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl">Eventos en Honduras</h1>
+      <p className="mt-3 text-neutral-500 sm:text-lg">
+        {events.length > 0
+          ? `${events.length === 1 ? '1 evento' : `${events.length} eventos`} con entradas a la venta.`
+          : 'Pronto publicaremos nuevos eventos.'}
+      </p>
+
+      {events.length === 0 ? (
+        <div className="relative mt-10 overflow-hidden rounded-[28px] bg-black">
+          <div className="absolute inset-0 grid grid-cols-2 sm:grid-cols-4" aria-hidden>
+            {['/Eventos/3.png', '/Eventos/2.png', '/Eventos/4.png', '/Eventos/5.png'].map((src) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={src} src={src} alt="" className="h-full w-full object-cover" />
+            ))}
+          </div>
+          <div className="absolute inset-0 bg-black/45" aria-hidden />
+          <div className="relative p-5 sm:p-10">
+            <div className="gcb-glass-dark max-w-lg rounded-3xl p-6 text-white sm:p-8">
+              <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">No hay eventos a la venta en este momento</h2>
+              <p className="mt-3 text-white/80">Síguenos en Instagram para enterarte primero cuando salgan.</p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <a href={CBT_INSTAGRAM} target="_blank" rel="noopener noreferrer" className="gcb-btn gcb-btn-gold px-6 py-3">
                   Seguir en Instagram
                 </a>
-              )}
-              <a href={CBT_ORGANIZERS_WHATSAPP} target="_blank" rel="noopener noreferrer" className="cbt-btn-line px-7 py-3 text-[15px]">
-                {CBT_SELL_CTA}
-              </a>
+                <a href={CBT_ORGANIZERS_WHATSAPP} target="_blank" rel="noopener noreferrer" className="gcb-btn bg-white/15 px-6 py-3 text-white ring-1 ring-white/30 hover:bg-white/25">
+                  {CBT_SELL_CTA}
+                </a>
+              </div>
             </div>
-          </div>
-          <div className="px-2 sm:px-6 lg:px-0">
-            <CbtTicket event={featured} />
           </div>
         </div>
-      </section>
-
-      {events.length > 0 && (
-        <section className="cbt-paper border-t border-cbt-gold/20" aria-labelledby="cartelera">
-          <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6">
-            <h2 id="cartelera" className="cbt-display text-center text-4xl font-medium text-cbt-ink sm:text-5xl">
-              Cartelera
-            </h2>
-            <div className="mt-12 flex flex-col gap-6">
-              {events.map((event) => (
-                <CbtEventRow key={event.id} event={event} />
-              ))}
-            </div>
-          </div>
-        </section>
+      ) : (
+        <div className="mt-10 flex flex-col gap-5">
+          {events.map((event) => (
+            <CbtEventRow key={event.id} event={event} />
+          ))}
+        </div>
       )}
     </main>
   )

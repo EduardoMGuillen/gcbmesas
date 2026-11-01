@@ -4,37 +4,40 @@ import { CBT_INSTAGRAM, CBT_ORGANIZERS_WHATSAPP, CBT_SELL_CTA, CBT_SUPPORT_PHONE
 
 export function CbtFooter() {
   return (
-    <footer className="relative z-[1] mt-auto border-t border-cbt-gold/15 bg-[#0C1C17]">
-      <div className="mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr]">
+    <footer className="mt-auto border-t border-gcb-line bg-white">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr]">
         <div>
           <Link href={CBT_HOME} aria-label="GCBTickets, inicio">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/gcbtickets/logo.svg" alt="GCBTickets" width={171} height={48} className="h-12 w-auto" />
+            <img src="/gcbtickets/logo-dark.png" alt="GCBTickets" width={157} height={44} className="h-10 w-auto" />
           </Link>
-          <p className="mt-5 max-w-sm leading-relaxed text-cbt-ivory/55">
-            GCBTickets es la ticketera en línea de Honduras para comprar entradas de fiestas, conciertos y eventos, con pago seguro y entrada QR al instante.
+          <p className="mt-4 max-w-sm text-sm leading-relaxed text-neutral-500">
+            Ticketera en línea de Honduras. Entradas para fiestas, conciertos y eventos con pago seguro y QR al instante.
           </p>
         </div>
-        <nav aria-label="Enlaces" className="flex flex-col gap-3 text-[15px]">
-          <p className="font-semibold text-cbt-gold-hi">Explora</p>
-          <Link href={CBT_EVENTS} className="text-cbt-ivory/65 hover:text-cbt-ivory">Eventos en Honduras</Link>
-          <Link href={`${CBT_HOME}#faq`} className="text-cbt-ivory/65 hover:text-cbt-ivory">Preguntas frecuentes</Link>
-          <Link href={`${CBT_HOME}#reembolsos`} className="text-cbt-ivory/65 hover:text-cbt-ivory">Política de reembolso</Link>
-          <a href={CBT_ORGANIZERS_WHATSAPP} target="_blank" rel="noopener noreferrer" className="text-cbt-ivory/65 hover:text-cbt-ivory">{CBT_SELL_CTA}</a>
+        <nav aria-label="Enlaces" className="flex flex-col gap-2.5 text-sm">
+          <p className="mb-1 font-semibold">Explora</p>
+          <Link href={CBT_EVENTS} className="text-neutral-500 hover:text-black">Eventos en Honduras</Link>
+          <Link href={`${CBT_HOME}#faq`} className="text-neutral-500 hover:text-black">Preguntas frecuentes</Link>
+          <Link href={`${CBT_HOME}#reembolsos`} className="text-neutral-500 hover:text-black">Política de reembolso</Link>
+          <a href={CBT_ORGANIZERS_WHATSAPP} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-black">{CBT_SELL_CTA}</a>
         </nav>
-        <div className="flex flex-col gap-3 text-[15px]">
-          <p className="font-semibold text-cbt-gold-hi">Ayuda</p>
-          <a href={CBT_SUPPORT_WHATSAPP} target="_blank" rel="noopener noreferrer" className="text-cbt-ivory/65 hover:text-cbt-ivory">
-            WhatsApp {CBT_SUPPORT_PHONE_LABEL}
-          </a>
-          <a href={CBT_INSTAGRAM} target="_blank" rel="noopener noreferrer" className="text-cbt-ivory/65 hover:text-cbt-ivory">Instagram</a>
+        <div className="flex flex-col gap-2.5 text-sm">
+          <p className="mb-1 font-semibold">Ayuda</p>
+          <a href={CBT_SUPPORT_WHATSAPP} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-black">WhatsApp {CBT_SUPPORT_PHONE_LABEL}</a>
+          <a href={CBT_INSTAGRAM} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-black">Instagram</a>
         </div>
       </div>
-      <div className="border-t border-cbt-gold/10 py-6 text-center text-sm text-cbt-ivory/40">
-        © {new Date().getFullYear()} GCBTickets. Powered by{' '}
-        <a href="https://www.nexusglobalsuministros.com/" target="_blank" rel="noopener noreferrer" className="text-cbt-gold underline underline-offset-4">
-          Nexus Global
-        </a>
+      <div className="border-t border-gcb-line">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-5 text-xs text-neutral-400 sm:px-6">
+          <p>© {new Date().getFullYear()} GCBTickets</p>
+          <p>
+            Powered by{' '}
+            <a href="https://www.nexusglobalsuministros.com/" target="_blank" rel="noopener noreferrer" className="font-medium text-gcb-gold hover:underline">
+              Nexus Global
+            </a>
+          </p>
+        </div>
       </div>
     </footer>
   )
