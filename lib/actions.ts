@@ -3994,10 +3994,11 @@ export async function markEntryUsed(entryId: string) {
   if (entry.status === 'USED') throw new Error('Esta entrada ya fue utilizada')
   if (entry.status === 'CANCELLED') throw new Error('Esta entrada fue cancelada')
 
-  await prisma.entry.update({
-    where: { id: entryId },
+  const updated = await prisma.entry.updateMany({
+    where: { id: entryId, status: 'ACTIVE' },
     data: { status: 'USED' },
   })
+  if (updated.count === 0) throw new Error('Esta entrada ya fue utilizada')
 
   await createLog('ENTRY_USED', user.id, undefined, {
     entryId,

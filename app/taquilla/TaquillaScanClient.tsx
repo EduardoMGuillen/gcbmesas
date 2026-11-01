@@ -34,6 +34,32 @@ type ScannedEntry = {
   }
 }
 
+type ScanPopup = {
+  kind: 'valid' | 'used' | 'cancelled' | 'error'
+  title: string
+  message?: string
+  entry?: ScannedEntry
+}
+
+function toScannedEntry(entry: NonNullable<Awaited<ReturnType<typeof validateEntryByToken>>>): ScannedEntry {
+  return {
+    id: entry.id,
+    clientName: entry.clientName,
+    clientEmail: entry.clientEmail,
+    numberOfEntries: entry.numberOfEntries,
+    status: entry.status,
+    event: {
+      id: entry.event.id,
+      name: entry.event.name,
+      date: entry.event.date,
+      description: entry.event.description ?? null,
+      coverImage: entry.event.coverImage ?? null,
+      venueName: entry.event.venueName ?? null,
+      venueAddress: entry.event.venueAddress ?? null,
+    },
+  }
+}
+
 export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
   const router = useRouter()
   const [selectedEventId, setSelectedEventId] = useState(events[0]?.id ?? '')
@@ -43,6 +69,7 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
   const [successMsg, setSuccessMsg] = useState('')
   const [scannerError, setScannerError] = useState('')
   const [isScanning, setIsScanning] = useState(false)
+  const [scanPopup, setScanPopup] = useState<ScanPopup | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const [histStatus, setHistStatus] = useState<'all' | 'ACTIVE' | 'USED' | 'CANCELLED'>('all')
@@ -158,39 +185,66 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
     setError('')
     setSuccessMsg('')
     setScannedEntry(null)
+    setScanPopup(null)
 
     startTransition(async () => {
       try {
         const entry = await validateEntryByToken(token)
         if (!entry) {
-          setError('Entrada no encontrada. Verifica el código.')
+          setScanPopup({ kind: 'error', title: 'ENTRADA NO ENCONTRADA', message: 'Verifica el código QR.' })
           return
         }
 
         if (entry.event.id !== selectedEventId) {
-          setError(`Esta entrada pertenece a "${entry.event.name}", no al evento seleccionado.`)
+          setScanPopup({
+            kind: 'error',
+            title: 'EVENTO INCORRECTO',
+            message: `Esta entrada pertenece a "${entry.event.name}", no al evento seleccionado.`,
+          })
           return
         }
 
         setManualToken(token)
-        setScannedEntry({
-          id: entry.id,
-          clientName: entry.clientName,
-          clientEmail: entry.clientEmail,
-          numberOfEntries: entry.numberOfEntries,
-          status: entry.status,
-          event: {
-            id: entry.event.id,
-            name: entry.event.name,
-            date: entry.event.date,
-            description: entry.event.description ?? null,
-            coverImage: entry.event.coverImage ?? null,
-            venueName: entry.event.venueName ?? null,
-            venueAddress: entry.event.venueAddress ?? null,
-          },
-        })
+        const scanned = toScannedEntry(entry)
+
+        if (entry.status === 'USED') {
+          setScannedEntry(scanned)
+          setScanPopup({ kind: 'used', title: 'ENTRADA USADA', message: 'Esta entrada ya fue utilizada.', entry: scanned })
+          return
+        }
+
+        if (entry.status === 'CANCELLED') {
+          setScannedEntry(scanned)
+          setScanPopup({ kind: 'cancelled', title: 'ENTRADA CANCELADA', message: 'Esta entrada fue cancelada. No permitir ingreso.', entry: scanned })
+          return
+        }
+
+        try {
+          await markEntryUsed(entry.id)
+        } catch (markErr: any) {
+          const fresh = await validateEntryByToken(token).catch(() => null)
+          if (fresh?.status === 'USED') {
+            const freshScanned = toScannedEntry(fresh)
+            setScannedEntry(freshScanned)
+            setScanPopup({ kind: 'used', title: 'ENTRADA USADA', message: 'Esta entrada ya fue utilizada.', entry: freshScanned })
+            return
+          }
+          setScannedEntry(scanned)
+          setScanPopup({
+            kind: 'error',
+            title: 'NO SE PUDO MARCAR',
+            message: markErr?.message || 'Intenta de nuevo.',
+            entry: scanned,
+          })
+          return
+        }
+
+        const usedNow: ScannedEntry = { ...scanned, status: 'USED' }
+        setScannedEntry(usedNow)
+        setScanPopup({ kind: 'valid', title: 'ENTRADA VÁLIDA', message: 'Marcada como usada. Permitir ingreso.', entry: usedNow })
+        void refreshHistorial()
       } catch (err: any) {
-        setError(err.message || 'Error al validar entrada')
+        setScanPopup({ kind: 'error', title: 'ERROR AL VALIDAR', message: err?.message || 'Intenta de nuevo.' })
       }
     })
   }
@@ -626,6 +680,58 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
             </ul>
           )}
         </section>
+
+        {scanPopup && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              className={`w-full max-w-md rounded-2xl border-4 p-6 text-center shadow-2xl ${
+                scanPopup.kind === 'valid' ? 'bg-green-600 border-green-300' : 'bg-red-600 border-red-300'
+              }`}
+            >
+              <div className="text-6xl font-black text-white leading-none mb-3">
+                {scanPopup.kind === 'valid' ? '✓' : '✕'}
+              </div>
+              <h2 className="text-3xl font-black text-white tracking-wide">{scanPopup.title}</h2>
+              {scanPopup.message && <p className="mt-2 text-lg font-semibold text-white/95">{scanPopup.message}</p>}
+
+              {scanPopup.entry && (
+                <div className="mt-4 rounded-xl bg-black/25 p-4 text-left text-white space-y-1">
+                  <p className="text-xl font-bold break-words">{scanPopup.entry.clientName}</p>
+                  <p className="text-sm text-white/85 break-all">{scanPopup.entry.clientEmail}</p>
+                  <p className="text-sm text-white/85">
+                    {scanPopup.entry.numberOfEntries} entrada{scanPopup.entry.numberOfEntries !== 1 ? 's' : ''} ·{' '}
+                    {scanPopup.entry.event.name}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScanPopup(null)
+                    setManualToken('')
+                    void startScanner()
+                  }}
+                  className="w-full rounded-xl bg-white py-4 text-lg font-bold text-black hover:bg-white/90"
+                >
+                  Escanear siguiente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScanPopup(null)}
+                  className="w-full rounded-xl border-2 border-white/70 py-3 font-semibold text-white hover:bg-white/10"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   )
 }
