@@ -42,13 +42,17 @@ export function toCbtEvent(e: {
   }
 }
 
+function capitalizeFirst(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 export function formatCbtDate(iso: string) {
   const d = new Date(iso)
   const opts = { timeZone: 'UTC' } as const
   return {
     day: d.toLocaleDateString('es-HN', { ...opts, day: 'numeric' }),
     month: d.toLocaleDateString('es-HN', { ...opts, month: 'short' }).replace('.', '').toUpperCase(),
-    long: d.toLocaleDateString('es-HN', { ...opts, weekday: 'long', day: 'numeric', month: 'long' }),
+    long: capitalizeFirst(d.toLocaleDateString('es-HN', { ...opts, weekday: 'long', day: 'numeric', month: 'long' })),
   }
 }
 
@@ -97,7 +101,7 @@ export function CbtEventCard({ event }: { event: CbtEvent }) {
       </div>
       <div className="flex flex-1 flex-col gap-1 p-5">
         <h3 className="cbt-serif text-2xl font-semibold leading-tight text-[#EDE6D6]">{event.name}</h3>
-        <p className="text-sm capitalize text-[#EDE6D6]/60">{date.long}</p>
+        <p className="text-sm text-[#EDE6D6]/60">{date.long}</p>
         {venueLine && <p className="text-sm text-[#EDE6D6]/60">{venueLine}</p>}
         <div className="mt-auto flex items-center justify-between gap-3 pt-4">
           <span className="text-lg font-semibold text-[#EDE6D6]">{formatCbtPrice(event)}</span>

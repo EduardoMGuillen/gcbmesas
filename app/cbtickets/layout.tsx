@@ -64,7 +64,9 @@ export default function CbTicketsLayout({ children }: { children: React.ReactNod
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap"
         rel="stylesheet"
       />
-      <style>{`
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         .cbtickets-shell { --cbt-bg: #0B0B0B; --cbt-surface: #141210; --cbt-gold: #B08F42; --cbt-gold-2: #A3832F; --cbt-ivory: #EDE6D6; }
         .cbt-serif { font-family: 'Cormorant Garamond', Georgia, serif; }
         .cbt-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: var(--cbt-gold); }
@@ -83,7 +85,9 @@ export default function CbTicketsLayout({ children }: { children: React.ReactNod
         }
         .cbt-btn-ghost:hover { background: rgba(176,143,66,0.12); border-color: var(--cbt-gold); }
         .cbtickets-shell :focus-visible { outline: 2px solid var(--cbt-gold); outline-offset: 3px; }
-      `}</style>
+      `,
+        }}
+      />
       <div
         className="cbtickets-shell min-h-screen flex flex-col bg-[#0B0B0B] text-[#EDE6D6]"
         style={{ fontFamily: "'Exo 2', sans-serif" }}

@@ -26,3 +26,22 @@ describe('getTicketAvailability', () => {
     expect(getTicketAvailability({ ...base, maxEntries: 0, entriesSoldSum: 5 })).toBe('available')
   })
 })
+
+import { daysUntil } from '@/lib/ticket-availability'
+
+describe('daysUntil (hora Honduras)', () => {
+  const ev = '2026-11-07T12:00:00Z'
+  it('cuenta días calendario', () => {
+    expect(daysUntil(ev, new Date('2026-11-01T16:00:00Z'))).toBe(6)
+  })
+  it('mismo día es 0', () => {
+    expect(daysUntil(ev, new Date('2026-11-07T20:00:00Z'))).toBe(0)
+  })
+  it('evento pasado es 0', () => {
+    expect(daysUntil(ev, new Date('2026-11-09T12:00:00Z'))).toBe(0)
+  })
+  it('usa la fecha de Honduras, no la UTC', () => {
+    // 2026-11-01T05:30Z = 31 oct 23:30 en Honduras
+    expect(daysUntil('2026-11-01T12:00:00Z', new Date('2026-11-01T05:30:00Z'))).toBe(1)
+  })
+})
