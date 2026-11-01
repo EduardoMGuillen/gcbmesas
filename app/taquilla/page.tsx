@@ -17,7 +17,6 @@ export default async function TaquillaPage() {
   await deactivateEventsPastGracePeriod()
 
   const now = new Date()
-  const hondurasHour = new Date(now.getTime() - 6 * 60 * 60 * 1000).getUTCHours()
 
   const candidateEvents = await prisma.event.findMany({
     where: {
@@ -34,11 +33,8 @@ export default async function TaquillaPage() {
     },
   })
 
-  // Día calendario de Honduras (UTC−6); el evento de anoche sigue visible hasta las 08:00 HN.
-  const activeEvents = candidateEvents.filter((event) => {
-    const daysPast = eventDaysPastInHonduras(event.date, now)
-    return daysPast <= 0 || (daysPast === 1 && hondurasHour < 8)
-  })
+  // Día calendario de Honduras (UTC−6); el evento sigue visible todo el día siguiente.
+  const activeEvents = candidateEvents.filter((event) => eventDaysPastInHonduras(event.date, now) <= 1)
 
   return <TaquillaScanClient events={activeEvents} />
 }
