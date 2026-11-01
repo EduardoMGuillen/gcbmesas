@@ -42,7 +42,14 @@ export type EventPurchaseVariant = 'lcb' | 'cbtickets'
 export type PurchasePalette = ReturnType<typeof getPurchasePalette>
 
 function getPurchasePalette(variant: EventPurchaseVariant) {
-  const isLight = variant === 'cbtickets'
+  const base = getBasePalette()
+  if (variant !== 'cbtickets') return base
+  return applyCbticketsPalette(base)
+}
+
+/** Paleta LCB (oscura neón). `isLight` se conserva en la forma del objeto para los consumidores. */
+function getBasePalette() {
+  const isLight = false as boolean
   return {
     isLight,
     goldGradient: 'linear-gradient(135deg, #c9a84c, #a88a3d)',
@@ -96,6 +103,46 @@ function getPurchasePalette(variant: EventPurchaseVariant) {
   }
 }
 
+/** GCBTickets: negro / dorado del logo. Solo colores; no altera el flujo de pago. */
+function applyCbticketsPalette(base: ReturnType<typeof getBasePalette>): ReturnType<typeof getBasePalette> {
+  return {
+    ...base,
+    goldGradient: 'linear-gradient(180deg, #C4A256, #A3832F)',
+    cardBg: 'rgba(20, 18, 16, 0.95)',
+    cardBorder: 'rgba(176, 143, 66, 0.28)',
+    inputBg: '#0B0B0B',
+    inputBorder: 'rgba(176, 143, 66, 0.35)',
+    mutedText: 'rgba(237, 230, 214, 0.6)',
+    innerPanelBg: 'rgba(11, 11, 11, 0.7)',
+    chipPaso: { background: 'rgba(176,143,66,0.14)', color: '#D9BE7A', border: '1px solid rgba(176,143,66,0.4)' },
+    linkCta: { background: 'linear-gradient(180deg, #C4A256, #A3832F)', color: '#0B0B0B', boxShadow: '0 6px 22px rgba(176,143,66,0.28)' },
+    fieldRim: 'rgba(237, 230, 214, 0.03)',
+    inputFieldClass: 'text-[#EDE6D6] placeholder:text-[#EDE6D6]/30 focus:ring-[#B08F42]/35',
+    unifiedPanel: {
+      background: 'rgba(20, 18, 16, 0.95)',
+      border: '1px solid rgba(176,143,66,0.4)',
+      boxShadow: '0 0 0 1px rgba(176,143,66,0.1) inset',
+    },
+    tx: {
+      ...base.tx,
+      h2: 'text-[#EDE6D6]',
+      h3: 'text-[#EDE6D6]',
+      body: 'text-[#EDE6D6]/60',
+      label: 'text-[#EDE6D6]/60',
+      hint: 'text-[#EDE6D6]/45',
+      row: 'text-[#EDE6D6]/55',
+      entryRow: 'text-[#EDE6D6]/55',
+      successSub: 'text-[#EDE6D6]/60',
+      moreEvents: 'text-[#EDE6D6]/60 hover:text-[#EDE6D6]',
+      directTitle: 'text-[#EDE6D6]/85',
+      directBadge: 'text-[#EDE6D6]/50',
+      unifiedLead: 'text-sm font-medium text-[#D9BE7A]',
+      unifiedLbl: 'text-xs text-[#EDE6D6]/70',
+      unifiedFoot: 'text-xs text-[#EDE6D6]/60',
+    },
+  }
+}
+
 function formatLps(value: number) {
   return `L ${value.toFixed(2)}`
 }
@@ -126,7 +173,7 @@ export function EventPurchaseClient({
   event: EventData
   /** Listado público del canal (ej. `/eventos` o `/cbtickets`). No altera el POST a CyberSource. */
   eventsListPath?: string
-  /** `cbtickets`: UI clara blanco/dorado. No altera CyberSource. */
+  /** `cbtickets`: UI negro/dorado de GCBTickets. No altera CyberSource. */
   variant?: EventPurchaseVariant
 }) {
   const p = getPurchasePalette(variant)

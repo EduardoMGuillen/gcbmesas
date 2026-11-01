@@ -16,8 +16,8 @@ export async function generateMetadata({
   const event = await getPublicEventById(params.id, { channel: 'cbtickets' })
   if (!event) {
     return {
-      title: 'Evento | GCBTickets',
-      description: 'Entradas en linea para eventos de La Gran Casa Blanca.',
+      title: 'Evento',
+      description: 'Entradas en línea para eventos en Honduras.',
     }
   }
 
@@ -29,8 +29,8 @@ export async function generateMetadata({
   })
 
   return {
-    title: `${event.name} | GCBTickets`,
-    description: `${event.name} - ${eventDate}. Compra entradas en linea en GCBTickets, la ticketera oficial de La Gran Casa Blanca.`,
+    title: event.name,
+    description: `${event.name} - ${eventDate}. Compra tus entradas en línea en GCBTickets.`,
   }
 }
 
@@ -78,76 +78,39 @@ export default async function CbTicketsEventoPage({
   })
 
   return (
-    <>
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10 flex-1 w-full">
-        <div className="mb-5">
-          <Link
-            href={CBT_EVENTS}
-            className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-stone-600 hover:text-amber-800 transition-colors"
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Inicio GCBTickets
+    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mb-5">
+        <Link
+          href={CBT_EVENTS}
+          className="inline-flex items-center gap-2 text-sm font-medium text-[#EDE6D6]/60 transition-colors hover:text-[#B08F42]"
+        >
+          <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Todos los eventos
+        </Link>
+      </div>
+      {venueLine ? <p className="mb-6 text-center text-sm text-[#EDE6D6]/60">{venueLine}</p> : null}
+      {eventHasPassed ? (
+        <div className="rounded-2xl border border-white/10 bg-[#141210] px-4 py-16 text-center">
+          <h3 className="cbt-serif mb-2 text-3xl font-semibold">Este evento ya pasó</h3>
+          <p className="mb-6 text-sm text-[#EDE6D6]/60">La venta de entradas en línea ya no está disponible.</p>
+          <Link href={CBT_EVENTS} className="cbt-btn-gold px-6 py-2.5 text-sm">
+            Ver otros eventos
           </Link>
         </div>
-        {venueLine ? (
-          <p className="text-center text-stone-600 text-sm mb-6">{venueLine}</p>
-        ) : null}
-        {eventHasPassed ? (
-          <div className="text-center py-16 px-4 rounded-2xl border border-amber-200/50 bg-white/70 shadow-sm">
-            <div
-              className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center bg-amber-50"
-              style={{ border: '1px solid rgba(201,168,76,0.35)' }}
-            >
-              <svg className="w-10 h-10 text-amber-600/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-stone-700 mb-2">Este evento ya pasó</h3>
-            <p className="text-stone-500 mb-6 text-sm">La venta de entradas en línea ya no está disponible.</p>
-            <Link
-              href={CBT_EVENTS}
-              className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-2.5 rounded-full transition-all hover:scale-[1.02]"
-              style={{
-                background: 'linear-gradient(135deg, #d4af37, #9a7328)',
-                color: '#1a1510',
-                boxShadow: '0 4px 18px rgba(180, 140, 60, 0.3)',
-              }}
-            >
-              Ver otros eventos
-            </Link>
-          </div>
-        ) : freeOnly ? (
-          <FreeCoverEventView
-            name={event.name}
-            eventDateLabel={eventDateLabel}
-            description={event.description}
-            coverImage={event.coverImage}
-            listHref={CBT_EVENTS}
-            theme="cbtickets"
-          />
-        ) : (
-          <EventPurchaseClient event={eventData} eventsListPath={CBT_EVENTS} variant="cbtickets" />
-        )}
-      </main>
-
-      <footer className="py-8 mt-auto border-t border-amber-200/40 shrink-0 bg-white/50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-3">
-          <p className="text-xs text-stone-500">&copy; {new Date().getFullYear()} CBTickets · La Gran Casa Blanca</p>
-          <p className="text-xs text-stone-400">
-            Powered by{' '}
-            <a
-              href="https://www.nexusglobalsuministros.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-amber-800/80 hover:text-amber-950 underline underline-offset-2"
-            >
-              Nexus Global
-            </a>
-          </p>
-        </div>
-      </footer>
-    </>
+      ) : freeOnly ? (
+        <FreeCoverEventView
+          name={event.name}
+          eventDateLabel={eventDateLabel}
+          description={event.description}
+          coverImage={event.coverImage}
+          listHref={CBT_EVENTS}
+          theme="cbtickets"
+        />
+      ) : (
+        <EventPurchaseClient event={eventData} eventsListPath={CBT_EVENTS} variant="cbtickets" />
+      )}
+    </main>
   )
 }

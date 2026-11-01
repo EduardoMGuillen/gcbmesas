@@ -1,16 +1,18 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
 import { CbTicketsHeader } from './CbTicketsHeader'
+import { CbtFooter } from './_components/CbtFooter'
 
 const metadataBaseUrl = process.env.NEXT_PUBLIC_CBTICKETS_CANONICAL_BASE || 'https://gcbtickets.com'
 
 export const metadata: Metadata = {
   metadataBase: new URL(metadataBaseUrl),
   title: {
-    default: 'GCBTickets | Ticketera oficial de eventos',
+    default: 'GCBTickets | Entradas para eventos en Honduras',
     template: '%s | GCBTickets',
   },
-  description: 'GCBTickets es la ticketera en linea para comprar entradas de eventos en La Gran Casa Blanca.',
+  description: 'GCBTickets: compra entradas para eventos en Honduras en minutos. Pago seguro con tarjeta y QR al instante.',
+  icons: { icon: '/gcbtickets/icon.png', apple: '/gcbtickets/icon.png' },
   keywords: [
     'GCBTickets',
     'GCB Tickets',
@@ -31,13 +33,15 @@ export const metadata: Metadata = {
     locale: 'es_HN',
     url: '/',
     siteName: 'GCBTickets',
-    title: 'GCBTickets | Ticketera oficial de eventos',
-    description: 'Compra entradas de eventos en GCBTickets, la ticketera de La Gran Casa Blanca.',
+    title: 'GCBTickets | Entradas para eventos en Honduras',
+    description: 'Compra entradas para eventos en Honduras con GCBTickets. Pago seguro y QR al instante.',
+    images: ['/gcbtickets/logo.png'],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'GCBTickets | Ticketera oficial de eventos',
-    description: 'Compra entradas de eventos en GCBTickets.',
+    title: 'GCBTickets | Entradas para eventos en Honduras',
+    description: 'Compra entradas para eventos en Honduras con GCBTickets.',
+    images: ['/gcbtickets/logo.png'],
   },
 }
 
@@ -60,22 +64,33 @@ export default function CbTicketsLayout({ children }: { children: React.ReactNod
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap"
         rel="stylesheet"
       />
+      <style>{`
+        .cbtickets-shell { --cbt-bg: #0B0B0B; --cbt-surface: #141210; --cbt-gold: #B08F42; --cbt-gold-2: #A3832F; --cbt-ivory: #EDE6D6; }
+        .cbt-serif { font-family: 'Cormorant Garamond', Georgia, serif; }
+        .cbt-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: var(--cbt-gold); }
+        .cbt-btn-gold {
+          display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+          border-radius: 9999px; font-weight: 600; color: #0B0B0B;
+          background: linear-gradient(180deg, #C4A256, var(--cbt-gold-2));
+          box-shadow: 0 6px 22px rgba(176,143,66,0.28);
+          transition: transform .2s, box-shadow .2s, filter .2s;
+        }
+        .cbt-btn-gold:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 10px 30px rgba(176,143,66,0.4); }
+        .cbt-btn-ghost {
+          display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+          border-radius: 9999px; font-weight: 600; color: var(--cbt-ivory);
+          border: 1px solid rgba(176,143,66,0.55); transition: background .2s, border-color .2s;
+        }
+        .cbt-btn-ghost:hover { background: rgba(176,143,66,0.12); border-color: var(--cbt-gold); }
+        .cbtickets-shell :focus-visible { outline: 2px solid var(--cbt-gold); outline-offset: 3px; }
+      `}</style>
       <div
-        className="cbtickets-shell min-h-screen flex flex-col"
-        style={{
-          fontFamily: "'Exo 2', sans-serif",
-          background: 'linear-gradient(180deg, #f5efe2 0%, #ead9b8 42%, #d8c09a 100%)',
-        }}
+        className="cbtickets-shell min-h-screen flex flex-col bg-[#0B0B0B] text-[#EDE6D6]"
+        style={{ fontFamily: "'Exo 2', sans-serif" }}
       >
-        <div
-          className="pointer-events-none fixed inset-0 opacity-[0.11] z-0"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L30 60M0 30L60 30' stroke='%23a07828' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`,
-          }}
-          aria-hidden
-        />
         <CbTicketsHeader />
         <div className="relative z-[1] flex flex-col flex-1">{children}</div>
+        <CbtFooter />
       </div>
     </>
   )
