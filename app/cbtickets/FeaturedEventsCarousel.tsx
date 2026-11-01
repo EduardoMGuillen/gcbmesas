@@ -1,5 +1,6 @@
 'use client'
 
+import { cbtEventPath } from '@/lib/cbtickets-paths'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -86,7 +87,7 @@ export function FeaturedEventsCarousel({ events }: { events: FeaturedEvent[] }) 
             {freeOnly ? 'Cover gratis' : `L ${Number(event.paypalPrice).toFixed(2)}`}
           </span>
           <Link
-            href={`/cbtickets/${event.id}`}
+            href={cbtEventPath(event.id)}
             className="text-xs font-semibold px-3 py-1.5 rounded-full"
             style={{
               background: soldOut ? 'rgba(225,29,72,0.18)' : 'linear-gradient(135deg, #d4af37, #b8942f)',

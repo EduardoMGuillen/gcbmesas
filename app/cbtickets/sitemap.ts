@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { prisma } from '@/lib/prisma'
+import { CBT_EVENTS, CBT_HOME, cbtEventPath } from '@/lib/cbtickets-paths'
 import { deactivateEventsPastGracePeriod, isEventWithinPublicSalesWindow } from '@/lib/public-events'
 
 const CBTICKETS_BASE_URL = 'https://gcbtickets.com'
@@ -23,16 +24,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const events = candidates.filter((e) => isEventWithinPublicSalesWindow(e.date))
 
   const staticUrls: MetadataRoute.Sitemap = [
-    {
-      url: `${CBTICKETS_BASE_URL}/cbtickets`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 1,
-    },
+    { url: `${CBTICKETS_BASE_URL}${CBT_HOME}`, lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
+    { url: `${CBTICKETS_BASE_URL}${CBT_EVENTS}`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.95 },
   ]
 
   const eventUrls: MetadataRoute.Sitemap = events.map((event) => ({
-    url: `${CBTICKETS_BASE_URL}/cbtickets/${event.id}`,
+    url: `${CBTICKETS_BASE_URL}${cbtEventPath(event.id)}`,
     lastModified: event.updatedAt,
     changeFrequency: 'daily',
     priority: 0.9,

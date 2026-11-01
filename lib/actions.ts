@@ -3345,6 +3345,7 @@ export async function createEvent(data: {
   revalidatePath('/admin/entradas')
   revalidatePath('/eventos')
   revalidatePath('/cbtickets')
+  revalidatePath('/cbtickets/eventos')
   return event
 }
 
@@ -3470,6 +3471,7 @@ export async function updateEvent(
   revalidatePath('/admin/entradas')
   revalidatePath('/eventos')
   revalidatePath('/cbtickets')
+  revalidatePath('/cbtickets/eventos')
   return event
 }
 
@@ -3493,6 +3495,7 @@ export async function deleteEvent(id: string) {
   revalidatePath('/admin/entradas')
   revalidatePath('/eventos')
   revalidatePath('/cbtickets')
+  revalidatePath('/cbtickets/eventos')
 }
 
 // ========== ENTRY ACTIONS ==========

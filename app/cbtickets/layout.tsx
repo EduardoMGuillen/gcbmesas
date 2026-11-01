@@ -24,12 +24,12 @@ export const metadata: Metadata = {
     'eventos La Gran Casa Blanca',
   ],
   alternates: {
-    canonical: '/cbtickets',
+    canonical: '/',
   },
   openGraph: {
     type: 'website',
     locale: 'es_HN',
-    url: '/cbtickets',
+    url: '/',
     siteName: 'GCBTickets',
     title: 'GCBTickets | Ticketera oficial de eventos',
     description: 'Compra entradas de eventos en GCBTickets, la ticketera de La Gran Casa Blanca.',

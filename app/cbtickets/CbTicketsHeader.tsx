@@ -1,3 +1,4 @@
+import { CBT_HOME } from '@/lib/cbtickets-paths'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -8,7 +9,7 @@ export function CbTicketsHeader() {
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-center">
-        <Link href="/cbtickets" className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <Link href={CBT_HOME} className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Image
             src="/LogoCasaBlanca.png"
             alt="Casa Blanca"

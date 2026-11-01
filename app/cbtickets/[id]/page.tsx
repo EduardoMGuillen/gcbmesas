@@ -1,3 +1,4 @@
+import { CBT_EVENTS } from '@/lib/cbtickets-paths'
 import { getPublicEventById, hasOnlineTicketSale, isPublicFreeCoverOnly } from '@/lib/public-events'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -81,7 +82,7 @@ export default async function CbTicketsEventoPage({
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10 flex-1 w-full">
         <div className="mb-5">
           <Link
-            href="/cbtickets"
+            href={CBT_EVENTS}
             className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-stone-600 hover:text-amber-800 transition-colors"
           >
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,7 +107,7 @@ export default async function CbTicketsEventoPage({
             <h3 className="text-xl font-semibold text-stone-700 mb-2">Este evento ya pasó</h3>
             <p className="text-stone-500 mb-6 text-sm">La venta de entradas en línea ya no está disponible.</p>
             <Link
-              href="/cbtickets"
+              href={CBT_EVENTS}
               className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-2.5 rounded-full transition-all hover:scale-[1.02]"
               style={{
                 background: 'linear-gradient(135deg, #d4af37, #9a7328)',
@@ -123,11 +124,11 @@ export default async function CbTicketsEventoPage({
             eventDateLabel={eventDateLabel}
             description={event.description}
             coverImage={event.coverImage}
-            listHref="/cbtickets"
+            listHref={CBT_EVENTS}
             theme="cbtickets"
           />
         ) : (
-          <EventPurchaseClient event={eventData} eventsListPath="/cbtickets" variant="cbtickets" />
+          <EventPurchaseClient event={eventData} eventsListPath={CBT_EVENTS} variant="cbtickets" />
         )}
       </main>
 
