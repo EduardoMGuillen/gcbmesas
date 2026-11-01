@@ -180,7 +180,7 @@ export default function LandingPage({ events }: LandingPageProps) {
         </section>
 
         {/* ─── Eventos ─── */}
-        <section id="eventos" className="scroll-mt-20 bg-[#1C1640] px-4 py-24 sm:px-8" aria-labelledby="eventos-titulo">
+        <section id="eventos" className="scroll-mt-20 border-y border-white/10 bg-[#100C26] px-4 py-24 sm:px-8" aria-labelledby="eventos-titulo">
           <div className="mx-auto max-w-7xl">
             <div className="flex flex-wrap items-end justify-between gap-6">
               <h2 id="eventos-titulo" className="lcb-display text-6xl uppercase sm:text-7xl">
@@ -195,7 +195,7 @@ export default function LandingPage({ events }: LandingPageProps) {
 
             {events.length === 0 ? (
               <div className="mt-12">
-                <LcbNoEvents />
+                <LcbNoEvents onDark />
               </div>
             ) : (
               <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

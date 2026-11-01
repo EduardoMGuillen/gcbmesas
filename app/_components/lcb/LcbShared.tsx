@@ -177,9 +177,9 @@ export function LcbEventCard({ event }: { event: LcbEvent }) {
     </>
   )
   return c.soldOut ? (
-    <div className="overflow-hidden rounded-[24px] bg-[#140F2E] opacity-75">{card}</div>
+    <div className="overflow-hidden rounded-[24px] bg-[#1C1640] opacity-75 ring-1 ring-white/15">{card}</div>
   ) : (
-    <Link href={`/eventos/${event.id}`} className="group overflow-hidden rounded-[24px] bg-[#140F2E] transition-transform hover:-translate-y-1">
+    <Link href={`/eventos/${event.id}`} className="group overflow-hidden rounded-[24px] bg-[#1C1640] shadow-[0_24px_50px_-24px_rgba(0,0,0,.8)] ring-1 ring-white/15 transition hover:-translate-y-1 hover:ring-2 hover:ring-[#E8C531]">
       {card}
     </Link>
   )
