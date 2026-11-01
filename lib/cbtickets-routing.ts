@@ -39,6 +39,10 @@ export function resolveCbtRequest(input: {
 
   const path = raw.length > 1 ? raw.replace(/\/+$/, '') || '/' : raw
 
+  // SEO: robots y sitemap propios del dominio (no los de La Gran Casa Blanca)
+  if (path === '/robots.txt') return { kind: 'rewrite', pathname: '/cbtickets/robots.txt' }
+  if (path === '/sitemap.xml') return { kind: 'rewrite', pathname: '/cbtickets/sitemap.xml' }
+
   // Rutas antiguas /cbtickets/* → URLs públicas nuevas (el sitemap se queda donde está)
   if (path === '/cbtickets') return { kind: 'redirect', pathname: '/' }
   if (path.startsWith('/cbtickets/')) {

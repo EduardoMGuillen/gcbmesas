@@ -1,31 +1,26 @@
-import { CBT_ORGANIZERS_WHATSAPP, CBT_REFUND_POLICY, CBT_SUPPORT_PHONE_LABEL } from './contact'
-
-function SectionHeader({ eyebrow, title, lead }: { eyebrow: string; title: string; lead?: string }) {
-  return (
-    <header className="mb-10 max-w-2xl">
-      <p className="cbt-eyebrow">{eyebrow}</p>
-      <h2 className="cbt-serif mt-3 text-4xl font-semibold leading-tight sm:text-5xl">{title}</h2>
-      {lead && <p className="mt-4 text-[#EDE6D6]/60">{lead}</p>}
-    </header>
-  )
-}
+import { CBT_FAQ, CBT_ORGANIZERS_WHATSAPP, CBT_SELL_CTA } from './contact'
 
 const STEPS = [
-  { title: 'Elige tu evento', text: 'Encuentra el evento y la cantidad de entradas que necesitas.' },
-  { title: 'Paga con tarjeta', text: 'Pago seguro procesado por BAC. Sin cuentas ni registros.' },
-  { title: 'Recibe tu QR', text: 'Te llega al correo al instante. Preséntalo desde el celular en la entrada.' },
+  { title: 'Elige tu evento', text: 'Encuentra la fiesta o el concierto y cuántas entradas necesitas.' },
+  { title: 'Paga con tarjeta', text: 'Pago seguro procesado por BAC. Sin crear cuenta.' },
+  { title: 'Entra con tu QR', text: 'Llega a tu correo al instante. Lo muestras desde el celular.' },
 ]
 
 export function CbtHowItWorks() {
   return (
-    <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-      <SectionHeader eyebrow="Cómo funciona" title="Tres pasos y estás dentro" />
-      <ol className="grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 md:grid-cols-3">
+    <section className="mx-auto max-w-6xl px-4 py-24 sm:px-6" aria-labelledby="como-comprar">
+      <h2 id="como-comprar" className="cbt-display max-w-xl text-4xl font-medium leading-tight sm:text-5xl">
+        Comprar tu entrada toma menos de un minuto
+      </h2>
+      <ol className="relative mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
+        <div className="absolute left-0 right-0 top-6 hidden border-t-2 border-dashed border-cbt-gold/30 md:block" aria-hidden />
         {STEPS.map((s, i) => (
-          <li key={s.title} className="bg-[#0B0B0B] p-8">
-            <span className="cbt-serif text-5xl font-semibold text-[#B08F42]">0{i + 1}</span>
-            <h3 className="mt-4 text-lg font-semibold">{s.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-[#EDE6D6]/60">{s.text}</p>
+          <li key={s.title} className="relative">
+            <span className="cbt-display relative flex h-12 w-12 items-center justify-center rounded-full bg-cbt-night text-xl font-semibold text-cbt-gold-hi ring-1 ring-cbt-gold/50">
+              {i + 1}
+            </span>
+            <h3 className="mt-5 text-lg font-semibold">{s.title}</h3>
+            <p className="mt-2 max-w-xs leading-relaxed text-cbt-ivory/60">{s.text}</p>
           </li>
         ))}
       </ol>
@@ -33,56 +28,37 @@ export function CbtHowItWorks() {
   )
 }
 
-const WHY = [
-  { title: 'Pago seguro', text: 'Transacciones con tarjeta procesadas por BAC Credomatic.' },
-  { title: 'Entrada oficial', text: 'Cada QR es único y se valida en puerta: no se puede duplicar.' },
-  { title: 'Al instante', text: 'Tu entrada llega al correo apenas se confirma el pago.' },
-  { title: 'Soporte real', text: `Te atendemos por WhatsApp al ${CBT_SUPPORT_PHONE_LABEL}.` },
-]
-
-export function CbtWhy() {
-  return (
-    <section className="border-y border-white/10 bg-[#141210]">
-      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <SectionHeader eyebrow="Por qué GCBTickets" title="Compra con confianza" />
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {WHY.map((w) => (
-            <div key={w.title} className="border-t border-[#B08F42]/40 pt-5">
-              <h3 className="text-lg font-semibold">{w.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#EDE6D6]/60">{w.text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
 const ORGANIZER_BENEFITS = [
-  'Venta en línea con tarjeta, sin que tengas que manejar pagos.',
-  'QR anti-falsificación para cada entrada.',
-  'Escaneo en puerta con nuestra app: rápido y sin listas de papel.',
-  'Reporte de ventas en tiempo real.',
+  { title: 'Cobros con tarjeta', text: 'Tus clientes pagan en línea y tú no manejas efectivo.' },
+  { title: 'QR imposible de copiar', text: 'Cada entrada es única y se invalida al escanearla.' },
+  { title: 'Puerta sin filas', text: 'Tu equipo escanea con nuestra app desde el celular.' },
+  { title: 'Ventas en tiempo real', text: 'Sabes cuántas entradas llevas vendidas en todo momento.' },
 ]
 
 export function CbtOrganizers() {
   return (
-    <section id="organizadores" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-20 sm:px-6">
-      <div className="grid gap-10 rounded-3xl border border-[#B08F42]/35 bg-gradient-to-br from-[#1a1610] to-[#0B0B0B] p-8 sm:p-12 lg:grid-cols-2">
+    <section id="organizadores" className="cbt-paper scroll-mt-20 text-cbt-ink" aria-labelledby="organizadores-titulo">
+      <div className="mx-auto grid max-w-6xl gap-14 px-4 py-24 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:items-center">
         <div>
-          <p className="cbt-eyebrow">Para organizadores</p>
-          <h2 className="cbt-serif mt-3 text-4xl font-semibold leading-tight sm:text-5xl">¿Tienes un evento? Vende tus entradas con nosotros</h2>
-          <a href={CBT_ORGANIZERS_WHATSAPP} target="_blank" rel="noopener noreferrer" className="cbt-btn-gold mt-8 px-7 py-3">
-            Hablemos por WhatsApp
+          <p className="text-sm font-semibold text-cbt-gold-lo">Para organizadores de eventos</p>
+          <h2 id="organizadores-titulo" className="cbt-display mt-3 text-[2.6rem] font-medium leading-[1.04] sm:text-6xl">
+            {CBT_SELL_CTA}
+          </h2>
+          <p className="mt-6 max-w-md text-lg leading-relaxed text-cbt-ink/70">
+            Publicamos tu evento, activamos la venta en línea y te damos todo para controlar la puerta. Tú te enfocas en llenar el lugar.
+          </p>
+          <a href={CBT_ORGANIZERS_WHATSAPP} target="_blank" rel="noopener noreferrer" className="cbt-btn-ink mt-9 px-8 py-4 text-[15px]">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm5.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+            </svg>
+            Escríbenos por WhatsApp
           </a>
         </div>
-        <ul className="flex flex-col justify-center gap-4">
+        <ul className="grid gap-px overflow-hidden rounded-3xl bg-cbt-ink/10 sm:grid-cols-2">
           {ORGANIZER_BENEFITS.map((b) => (
-            <li key={b} className="flex gap-3 text-[#EDE6D6]/80">
-              <svg className="mt-0.5 h-5 w-5 shrink-0 text-[#B08F42]" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-                <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 011.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clipRule="evenodd" />
-              </svg>
-              {b}
+            <li key={b.title} className="bg-cbt-ivory p-7">
+              <h3 className="cbt-display text-xl font-semibold">{b.title}</h3>
+              <p className="mt-2 leading-relaxed text-cbt-ink/65">{b.text}</p>
             </li>
           ))}
         </ul>
@@ -91,42 +67,27 @@ export function CbtOrganizers() {
   )
 }
 
-const FAQ = [
-  {
-    q: '¿Cómo recibo mi entrada?',
-    a: 'Tu código QR llega al correo que indicaste al comprar, apenas se confirma el pago.',
-  },
-  {
-    q: '¿Qué hago si no me llega el correo?',
-    a: `Revisa tu carpeta de spam o promociones. Si no aparece, escríbenos por WhatsApp al ${CBT_SUPPORT_PHONE_LABEL} con el nombre y el correo que usaste en la compra.`,
-  },
-  {
-    q: '¿Tengo que imprimir la entrada?',
-    a: 'No. Muestra el QR desde tu celular en la entrada del evento.',
-  },
-]
-
 export function CbtFaq() {
   return (
-    <section id="faq" className="mx-auto max-w-3xl scroll-mt-24 px-4 py-20 sm:px-6">
-      <SectionHeader eyebrow="Preguntas frecuentes" title="Resolvemos tus dudas" />
-      <div className="divide-y divide-white/10 border-y border-white/10">
-        {FAQ.map((f) => (
-          <details key={f.q} className="group py-5">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-semibold [&::-webkit-details-marker]:hidden">
+    <section id="faq" className="mx-auto grid max-w-6xl scroll-mt-20 gap-12 px-4 py-24 sm:px-6 lg:grid-cols-[0.8fr_1.2fr]" aria-labelledby="faq-titulo">
+      <div>
+        <h2 id="faq-titulo" className="cbt-display text-4xl font-medium leading-tight sm:text-5xl">
+          Preguntas frecuentes
+        </h2>
+        <p className="mt-4 max-w-sm text-cbt-ivory/60">Todo lo que necesitas saber para comprar o vender entradas en Honduras.</p>
+      </div>
+      <div className="border-t border-cbt-gold/20">
+        {CBT_FAQ.map((f) => (
+          <details key={f.q} id={f.id} className="cbt-faq group scroll-mt-24 border-b border-cbt-gold/20">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-lg font-medium">
               {f.q}
-              <span className="text-2xl text-[#B08F42] transition-transform group-open:rotate-45" aria-hidden>+</span>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ring-cbt-gold/40 transition-transform duration-300 group-open:rotate-45" aria-hidden>
+                <svg width="12" height="12" viewBox="0 0 12 12" stroke="#E6CB86" strokeWidth="1.5"><path d="M6 1v10M1 6h10" /></svg>
+              </span>
             </summary>
-            <p className="mt-3 leading-relaxed text-[#EDE6D6]/65">{f.a}</p>
+            <p className="max-w-2xl pb-6 leading-relaxed text-cbt-ivory/65">{f.a}</p>
           </details>
         ))}
-        <details id="reembolsos" className="group scroll-mt-24 py-5">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-semibold [&::-webkit-details-marker]:hidden">
-            ¿Hay reembolsos?
-            <span className="text-2xl text-[#B08F42] transition-transform group-open:rotate-45" aria-hidden>+</span>
-          </summary>
-          <p className="mt-3 leading-relaxed text-[#EDE6D6]/65">{CBT_REFUND_POLICY}</p>
-        </details>
       </div>
     </section>
   )

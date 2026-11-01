@@ -9,6 +9,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // GCBTickets: verde botella + oro + marfil
+        cbt: {
+          night: '#10241D',
+          forest: '#173329',
+          moss: '#22463A',
+          gold: '#C8A257',
+          'gold-hi': '#E6CB86',
+          'gold-lo': '#A9843A',
+          ivory: '#F3ECDD',
+          ink: '#1D1B16',
+        },
         primary: {
           50: '#f0f9ff',
           100: '#e0f2fe',

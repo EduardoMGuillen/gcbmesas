@@ -49,6 +49,10 @@ describe('resolveCbtRequest', () => {
     expect(cbt('/cbtickets/eventos')).toEqual({ kind: 'redirect', pathname: '/eventos' })
     expect(cbt('/cbtickets/abc123')).toEqual({ kind: 'redirect', pathname: '/eventos/abc123' })
   })
+  it('robots y sitemap propios de GCBTickets', () => {
+    expect(cbt('/robots.txt')).toEqual({ kind: 'rewrite', pathname: '/cbtickets/robots.txt' })
+    expect(cbt('/sitemap.xml')).toEqual({ kind: 'rewrite', pathname: '/cbtickets/sitemap.xml' })
+  })
   it('deja pasar assets, api y rutas especiales', () => {
     for (const p of ['/cbtickets/sitemap.xml', '/api/x', '/_next/x', '/rifas', '/rifas/1', '/rifas.html', '/sw.js', '/manifest.json', '/favicon.ico', '/gcbtickets/logo.svg', '/Eventos/1.png']) {
       expect(cbt(p), p).toEqual({ kind: 'next' })

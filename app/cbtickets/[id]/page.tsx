@@ -1,5 +1,7 @@
 import { CBT_EVENTS } from '@/lib/cbtickets-paths'
 import { buildCbtEventMetadata } from '@/lib/cbtickets-metadata'
+import { eventJsonLd } from '@/lib/cbtickets-seo'
+import { toCbtEvent } from '../_components/CbtEventCard'
 import { getPublicEventById, hasOnlineTicketSale, isPublicFreeCoverOnly } from '@/lib/public-events'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -75,12 +77,15 @@ export default async function CbTicketsEventoPage({
     timeZone: 'UTC',
   })
 
+  const jsonLd = eventJsonLd({ ...toCbtEvent(event), description: event.description })
+
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="mb-5">
         <Link
           href={CBT_EVENTS}
-          className="inline-flex items-center gap-2 text-sm font-medium text-[#EDE6D6]/60 transition-colors hover:text-[#B08F42]"
+          className="inline-flex items-center gap-2 text-sm font-medium text-cbt-ivory/60 transition-colors hover:text-cbt-gold-hi"
         >
           <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -88,11 +93,11 @@ export default async function CbTicketsEventoPage({
           Todos los eventos
         </Link>
       </div>
-      {venueLine ? <p className="mb-6 text-center text-sm text-[#EDE6D6]/60">{venueLine}</p> : null}
+      {venueLine ? <p className="mb-6 text-center text-sm text-cbt-ivory/60">{venueLine}</p> : null}
       {eventHasPassed ? (
-        <div className="rounded-2xl border border-white/10 bg-[#141210] px-4 py-16 text-center">
-          <h3 className="cbt-serif mb-2 text-3xl font-semibold">Este evento ya pasó</h3>
-          <p className="mb-6 text-sm text-[#EDE6D6]/60">La venta de entradas en línea ya no está disponible.</p>
+        <div className="rounded-[28px] border border-cbt-gold/20 bg-cbt-forest/50 px-4 py-16 text-center">
+          <h3 className="cbt-display mb-2 text-3xl font-medium">Este evento ya pasó</h3>
+          <p className="mb-6 text-sm text-cbt-ivory/60">La venta de entradas en línea ya no está disponible.</p>
           <Link href={CBT_EVENTS} className="cbt-btn-gold px-6 py-2.5 text-sm">
             Ver otros eventos
           </Link>
