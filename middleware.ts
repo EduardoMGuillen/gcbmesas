@@ -1,6 +1,7 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 import type { NextRequest, NextFetchEvent } from 'next/server'
+import { getCbtHosts, resolveCbtRequest } from './lib/cbtickets-routing'
 
 // Importing node's crypto in middleware (Edge runtime) can fail, so read the secret directly
 const RAW_NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET
@@ -109,33 +110,22 @@ const authMiddleware = withAuth(
 export default function middleware(req: NextRequest, evt: NextFetchEvent) {
   const path = req.nextUrl.pathname
 
-  const hostRaw = (req.headers.get('host') || '').split(':')[0]?.toLowerCase() || ''
-  const defaultCbtHosts = ['gcbtickets.com', 'www.gcbtickets.com']
-  const cbtHosts = Array.from(
-    new Set([
-      ...defaultCbtHosts,
-      ...(process.env.CBTICKETS_HOST || '')
-        .split(',')
-        .map((h) => h.trim().toLowerCase())
-        .filter(Boolean),
-    ])
-  )
-  const isCbtHost = cbtHosts.length > 0 && cbtHosts.includes(hostRaw)
-  const isCbtSafePath =
-    path.startsWith('/cbtickets') ||
-    path.startsWith('/api') ||
-    path.startsWith('/_next') ||
-    path === '/favicon.ico' ||
-    path === '/sw.js' ||
-    path === '/manifest.json' ||
-    path === '/rifas' ||
-    path.startsWith('/rifas/') ||
-    path === '/rifas.html'
-
-  if (isCbtHost && (req.method === 'GET' || req.method === 'HEAD') && !isCbtSafePath) {
+  // GCBTickets: / → landing, /eventos → listado, /eventos/:id → detalle; /cbtickets/* → 301 a las rutas nuevas
+  const cbtDecision = resolveCbtRequest({
+    host: req.headers.get('host') || '',
+    pathname: path,
+    method: req.method,
+    cbtHosts: getCbtHosts(process.env.CBTICKETS_HOST),
+  })
+  if (cbtDecision.kind === 'rewrite') {
     const url = req.nextUrl.clone()
-    url.pathname = '/cbtickets'
+    url.pathname = cbtDecision.pathname
     return NextResponse.rewrite(url)
+  }
+  if (cbtDecision.kind === 'redirect') {
+    const url = req.nextUrl.clone()
+    url.pathname = cbtDecision.pathname
+    return NextResponse.redirect(url, 301)
   }
 
   // Exclude public redirects and API auth routes from NextAuth/middleware
