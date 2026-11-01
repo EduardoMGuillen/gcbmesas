@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getPublicEvents } from '@/lib/public-events'
 import { CBT_EVENTS } from '@/lib/cbtickets-paths'
 import { homeJsonLd } from '@/lib/cbtickets-seo'
+import { pickFeaturedEvent } from '@/lib/featured-event'
 import { CbtEventCard, toCbtEvent } from './_components/CbtEventCard'
 import { CbtHero } from './_components/CbtHero'
 import { CbtFaq, CbtHowItWorks, CbtOrganizers } from './_components/CbtSections'
@@ -16,7 +17,7 @@ export const metadata = {
 export default async function CbTicketsHomePage() {
   const raw = await getPublicEvents('cbtickets')
   const events = raw.map(toCbtEvent)
-  const featured = events[0] ?? null
+  const featured = pickFeaturedEvent(events)
   const upcoming = events.slice(0, 6)
   const jsonLd = homeJsonLd(
     raw.map((e, i) => ({ ...events[i], description: e.description })),

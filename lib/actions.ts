@@ -3307,6 +3307,7 @@ export async function createEvent(data: {
   maxEntries?: number | null
   publishOnLcb?: boolean
   publishOnCbtickets?: boolean
+  isFeatured?: boolean
   venueName?: string | null
   venueAddress?: string | null
 }) {
@@ -3328,6 +3329,7 @@ export async function createEvent(data: {
       paypalPrice: data.paypalPrice || null,
       publishOnLcb,
       publishOnCbtickets,
+      isFeatured: data.isFeatured === true,
       venueName: data.venueName?.trim() || null,
       venueAddress: data.venueAddress?.trim() || null,
       ...(maxEntries !== undefined ? { maxEntries } : {}),
@@ -3406,6 +3408,7 @@ export async function updateEvent(
     maxEntries?: number | null
     publishOnLcb?: boolean
     publishOnCbtickets?: boolean
+    isFeatured?: boolean
     venueName?: string | null
     venueAddress?: string | null
   }
@@ -3423,6 +3426,7 @@ export async function updateEvent(
   if (data.paypalPrice !== undefined) updateData.paypalPrice = data.paypalPrice || null
   if (data.publishOnLcb !== undefined) updateData.publishOnLcb = data.publishOnLcb
   if (data.publishOnCbtickets !== undefined) updateData.publishOnCbtickets = data.publishOnCbtickets
+  if (data.isFeatured !== undefined) updateData.isFeatured = data.isFeatured
   if (data.venueName !== undefined) updateData.venueName = data.venueName?.trim() || null
   if (data.venueAddress !== undefined) updateData.venueAddress = data.venueAddress?.trim() || null
   if (data.maxEntries !== undefined) {
@@ -3856,6 +3860,7 @@ export async function getEntradasDashboardData() {
       isActive: e.isActive,
       publishOnLcb: e.publishOnLcb,
       publishOnCbtickets: e.publishOnCbtickets,
+      isFeatured: e.isFeatured,
       venueName: e.venueName,
       venueAddress: e.venueAddress,
       createdAt: e.createdAt,

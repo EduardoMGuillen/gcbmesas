@@ -13,6 +13,7 @@ export type CbtEvent = {
   entriesSoldSum: number
   venueName: string | null
   venueAddress: string | null
+  isFeatured?: boolean
 }
 
 /** Convierte una fila de getPublicEvents (Decimal/Date) al formato serializable de las tarjetas. */
@@ -27,6 +28,7 @@ export function toCbtEvent(e: {
   entriesSoldSum?: number | null
   venueName?: string | null
   venueAddress?: string | null
+  isFeatured?: boolean | null
 }): CbtEvent {
   return {
     id: e.id,
@@ -39,6 +41,7 @@ export function toCbtEvent(e: {
     entriesSoldSum: Number(e.entriesSoldSum ?? 0),
     venueName: e.venueName ?? null,
     venueAddress: e.venueAddress ?? null,
+    isFeatured: e.isFeatured === true,
   }
 }
 

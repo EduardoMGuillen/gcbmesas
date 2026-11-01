@@ -427,6 +427,8 @@ model Event {
   publishOnLcb       Boolean  @default(true)
   /// Listado público CBTickets (/cbtickets).
   publishOnCbtickets Boolean  @default(false)
+  /// Destacado en la portada (si hay varios, el más próximo)
+  isFeatured         Boolean  @default(false)
   venueName          String?
   venueAddress       String?
   createdAt       DateTime @default(now())

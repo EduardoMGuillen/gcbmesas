@@ -35,6 +35,7 @@ type EventItem = {
   isActive: boolean
   publishOnLcb: boolean
   publishOnCbtickets: boolean
+  isFeatured?: boolean
   venueName: string | null
   venueAddress: string | null
   createdAt: string | Date
@@ -1256,6 +1257,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
   const [maxEntriesLimit, setMaxEntriesLimit] = useState('')
   const [publishOnLcb, setPublishOnLcb] = useState(true)
   const [publishOnCbtickets, setPublishOnCbtickets] = useState(false)
+  const [isFeatured, setIsFeatured] = useState(false)
   const [venueName, setVenueName] = useState('')
   const [venueAddress, setVenueAddress] = useState('')
   const [error, setError] = useState('')
@@ -1310,6 +1312,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
     setMaxEntriesLimit('')
     setPublishOnLcb(true)
     setPublishOnCbtickets(false)
+    setIsFeatured(false)
     setVenueName('')
     setVenueAddress('')
     setEditingId(null)
@@ -1350,6 +1353,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
     setMaxEntriesLimit(ev.maxEntries != null && ev.maxEntries >= 1 ? String(ev.maxEntries) : '')
     setPublishOnLcb(ev.publishOnLcb !== false)
     setPublishOnCbtickets(ev.publishOnCbtickets === true)
+    setIsFeatured(ev.isFeatured === true)
     setVenueName(ev.venueName?.trim() || '')
     setVenueAddress(ev.venueAddress?.trim() || '')
     setShowForm(true)
@@ -1404,6 +1408,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
           paypalPrice: paypalResolved,
           publishOnLcb,
           publishOnCbtickets,
+          isFeatured,
           venueName: venueName.trim() || null,
           venueAddress: venueAddress.trim() || null,
           ...(maxEntries !== undefined ? { maxEntries } : {}),
@@ -1503,7 +1508,11 @@ function EventosTab({ events }: { events: EventItem[] }) {
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input type="checkbox" checked={publishOnCbtickets} onChange={(e) => setPublishOnCbtickets(e.target.checked)} className="w-4 h-4 rounded border-dark-200" />
-                <span className="text-sm text-white">Publicar en CBTickets (/cbtickets)</span>
+                <span className="text-sm text-white">Publicar en GCBTickets (gcbtickets.com)</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} className="w-4 h-4 rounded border-dark-200" />
+                <span className="text-sm text-white">Destacar en portada</span>
               </label>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1620,7 +1629,10 @@ function EventosTab({ events }: { events: EventItem[] }) {
                     <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 font-medium">Casa Blanca</span>
                   )}
                   {ev.publishOnCbtickets && (
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-fuchsia-500/15 text-fuchsia-300 font-medium">CBTickets</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-fuchsia-500/15 text-fuchsia-300 font-medium">GCBTickets</span>
+                  )}
+                  {ev.isFeatured && (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">★ Destacado</span>
                   )}
                 </div>
                 {(ev.venueName || ev.venueAddress) && (

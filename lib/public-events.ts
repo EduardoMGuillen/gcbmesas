@@ -117,6 +117,7 @@ export async function getPublicEvents(channel: PublicEventChannel = 'lcb') {
       maxEntries: true,
       venueName: true,
       venueAddress: true,
+      isFeatured: true,
     },
   })
 
