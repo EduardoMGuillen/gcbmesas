@@ -17,9 +17,7 @@ export default async function EntradasPage() {
   const isTicketeraClient = session.user.role === 'CLIENTE_TICKETERA'
   const {
     events,
-    recentEntries,
     todayStats,
-    eventStats,
     entrySaleNotificationsEnabled,
     canManageEntrySaleNotifications,
   } = await getEntradasDashboardData()
@@ -31,7 +29,7 @@ export default async function EntradasPage() {
         description={
           isTicketeraClient
             ? 'Ventas e historial de los eventos que te asignó el administrador.'
-            : 'Vende entradas, administra eventos y envía QR por email o WhatsApp.'
+            : 'Elige un evento para ver ventas, ingresos y entradas.'
         }
       />
 
@@ -47,10 +45,7 @@ export default async function EntradasPage() {
 
       <EntradasClient
         events={events}
-        recentEntries={recentEntries}
-        eventStats={eventStats}
         isTicketeraClient={isTicketeraClient}
-        viewerUsername={session.user.username}
         entrySaleNotificationsEnabled={entrySaleNotificationsEnabled}
         canManageEntrySaleNotifications={canManageEntrySaleNotifications}
       />

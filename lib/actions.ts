@@ -3823,7 +3823,7 @@ export async function getEntradasDashboardData() {
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0))
   const saleOnly = saleEntriesWhere(await getNonSaleEntryCreatorIds())
 
-  const [events, recentEntries, todayStats, soldByEvent, todaySales, revenueByEvent] = await Promise.all([
+  const [events, recentEntries, todayStats, soldByEvent, todaySales, revenueByEvent, usedByEvent] = await Promise.all([
     prisma.event.findMany({
       where: eventWhere,
       orderBy: [{ isActive: 'desc' }, { date: 'desc' }],
@@ -3867,7 +3867,13 @@ export async function getEntradasDashboardData() {
       where: { status: { not: 'CANCELLED' }, ...entryEventFilter, ...saleOnly },
       _sum: { totalPrice: true },
     }),
+    prisma.entry.groupBy({
+      by: ['eventId'],
+      where: { status: 'USED', ...entryEventFilter },
+      _sum: { numberOfEntries: true },
+    }),
   ])
+  const usedMap = new Map(usedByEvent.map((r) => [r.eventId, Number(r._sum.numberOfEntries ?? 0)]))
 
   const soldMap = new Map<string, number>()
   const revenueByEventMap = new Map<string, number>()
@@ -3900,6 +3906,8 @@ export async function getEntradasDashboardData() {
       _count: e._count,
       createdBy: e.createdBy,
       entriesSoldSum: soldMap.get(e.id) ?? 0,
+      entriesUsedSum: usedMap.get(e.id) ?? 0,
+      revenueLps: revenueByEventMap.get(e.id) ?? 0,
     })),
     eventStats: events.map((e: any) => ({
       eventId: e.id,
@@ -4049,6 +4057,7 @@ export type EventEntryRow = {
   clientName: string
   clientEmail: string
   clientPhone: string | null
+  numberOfEntries: number
   totalPrice: number
   qrToken: string
   status: 'ACTIVE' | 'USED' | 'CANCELLED'
@@ -4115,6 +4124,7 @@ export async function searchEventEntries(input: {
       clientName: true,
       clientEmail: true,
       clientPhone: true,
+      numberOfEntries: true,
       totalPrice: true,
       qrToken: true,
       status: true,
@@ -4136,6 +4146,7 @@ export async function searchEventEntries(input: {
       clientName: r.clientName,
       clientEmail: r.clientEmail,
       clientPhone: r.clientPhone,
+      numberOfEntries: r.numberOfEntries,
       totalPrice: Number(r.totalPrice),
       qrToken: r.qrToken,
       status: r.status,
