@@ -1689,11 +1689,6 @@ export async function setBarCajeroWatches(cajeroIds: string[]) {
   revalidatePath('/bar')
 }
 
-/** Lectura pública (sin sesión) para landing /clientes */
-export async function getPublicClientOrderingSetting() {
-  return getClientSelfOrderingEnabled()
-}
-
 export async function getProductsForCashierInvoice() {
   const u = await getCurrentUser()
   if (!['ADMIN', 'CAJERO'].includes(u.role)) {
@@ -2580,9 +2575,15 @@ export async function getTableByIdPublic(tableId: string) {
           openedBy: { select: { name: true, username: true } },
           orders: {
             where: { rejected: false },
-            include: {
-              product: true,
-              user: true,
+            // Público: solo lo que ve el cliente. Nunca incluir `user` (trae username y hash de contraseña).
+            select: {
+              id: true,
+              quantity: true,
+              price: true,
+              served: true,
+              rejected: true,
+              createdAt: true,
+              product: { select: { name: true, price: true } },
             },
             orderBy: { createdAt: 'desc' },
           },
@@ -2606,9 +2607,15 @@ export async function getTableByShortCodePublic(shortCode: string) {
           openedBy: { select: { name: true, username: true } },
           orders: {
             where: { rejected: false },
-            include: {
-              product: true,
-              user: true,
+            // Público: solo lo que ve el cliente. Nunca incluir `user` (trae username y hash de contraseña).
+            select: {
+              id: true,
+              quantity: true,
+              price: true,
+              served: true,
+              rejected: true,
+              createdAt: true,
+              product: { select: { name: true, price: true } },
             },
             orderBy: { createdAt: 'desc' },
           },
