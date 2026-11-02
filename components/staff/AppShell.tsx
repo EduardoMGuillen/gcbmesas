@@ -10,16 +10,16 @@ import { RefreshButton } from '@/components/RefreshButton'
 import { CleanUrlParams } from '@/components/CleanUrlParams'
 import { StaffThemeProvider } from '@/lib/staff-theme'
 import {
+  adminHome,
   adminNavGroups,
   cajeroLinks,
   cajeroMoreLinks,
   groupContainsPath,
   homeForRole,
   isNavActive,
-  meseroBottomLinks,
-  meseroDesktopLinks,
-  meseroDesktopOverflow,
-  meseroMoreLinks,
+  meseroPrimaryLinks,
+  meseroSecondaryLinks,
+  type StaffNavGroup,
   type StaffNavItem,
   type StaffRole,
 } from '@/lib/staff-nav'
@@ -87,7 +87,8 @@ function AppShellInner({
   const pathname = usePathname()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  /** Sección del admin abierta en la hoja inferior (móvil) */
+  const [adminSheet, setAdminSheet] = useState<string | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
 
@@ -121,10 +122,10 @@ function AppShellInner({
     })
   }, [pathname])
 
-  const floorLinks = userRole === 'CAJERO' ? cajeroLinks : meseroDesktopLinks
-  const overflowLinks = userRole === 'MESERO' ? meseroDesktopOverflow : []
-  const moreLinks = userRole === 'MESERO' ? meseroMoreLinks : userRole === 'CAJERO' ? cajeroMoreLinks : []
-  const bottomLinks = userRole === 'CAJERO' ? cajeroLinks : meseroBottomLinks
+  const floorLinks = userRole === 'CAJERO' ? cajeroLinks : [meseroSecondaryLinks[0], ...meseroPrimaryLinks]
+  const overflowLinks = userRole === 'MESERO' ? meseroSecondaryLinks.slice(1) : []
+  const moreLinks = userRole === 'MESERO' ? meseroSecondaryLinks : userRole === 'CAJERO' ? cajeroMoreLinks : []
+  const bottomLinks = userRole === 'CAJERO' ? cajeroLinks : meseroPrimaryLinks
 
   const displayName = session?.user.name || session?.user.username || ''
   const roleLabel =
@@ -154,10 +155,13 @@ function AppShellInner({
     })
   }
 
-  const closeOverlays = () => {
-    setMobileMenuOpen(false)
+  // Cerrar hojas al navegar
+  useEffect(() => {
+    setAdminSheet(null)
     setMoreOpen(false)
-  }
+  }, [pathname])
+
+  const openSheetGroup = adminNavGroups.find((g) => g.id === adminSheet) ?? null
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -180,19 +184,6 @@ function AppShellInner({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                     ) : (
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                    )}
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="md:hidden p-2 text-staff-muted hover:text-staff-fg hover:bg-staff-hover rounded-xl"
-                  aria-label="Menú"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {mobileMenuOpen ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                     )}
                   </svg>
                 </button>
@@ -263,33 +254,6 @@ function AppShellInner({
           </div>
         </div>
 
-        {chrome === 'sidebar' && mobileMenuOpen && (
-          <div className="md:hidden border-t border-staff-border py-3 px-3 space-y-3 max-h-[75vh] overflow-y-auto bg-staff-surface">
-            {adminNavGroups.map((group) => (
-              <div key={group.id}>
-                <p className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-staff-muted">
-                  {group.label}
-                </p>
-                <div className="space-y-0.5">
-                  {group.items.map((item) => (
-                    <NavLink
-                      key={item.href}
-                      item={item}
-                      pathname={pathname}
-                      onClick={closeOverlays}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={handleLogout}
-              className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-staff-muted hover:text-staff-fg hover:bg-staff-hover"
-            >
-              Cerrar sesión
-            </button>
-          </div>
-        )}
       </header>
 
       {chrome === 'sidebar' && (
@@ -299,6 +263,9 @@ function AppShellInner({
           }`}
         >
           <nav className="flex-1 py-3 overflow-y-auto px-2">
+            <div className="mb-2">
+              <NavLink item={adminHome} pathname={pathname} collapsed={!sidebarOpen} />
+            </div>
             {adminNavGroups.map((group) => {
               const isOpen =
                 !sidebarOpen ||
@@ -334,6 +301,26 @@ function AppShellInner({
                           collapsed={!sidebarOpen}
                         />
                       ))}
+                      {group.secondary && sidebarOpen && (
+                        <div className="pt-2">
+                          <p className="px-3 pb-1 text-[10px] font-medium text-staff-muted">{group.secondary.label}</p>
+                          <div className="flex flex-wrap gap-1 px-2">
+                            {group.secondary.items.map((item) => (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                className={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                                  isNavActive(pathname, item)
+                                    ? 'bg-primary-600 text-white'
+                                    : 'bg-staff-raised text-staff-muted hover:text-staff-fg'
+                                }`}
+                              >
+                                {item.label}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -346,15 +333,29 @@ function AppShellInner({
       <main
         className={`flex-1 flex flex-col min-h-screen pt-header-safe transition-all duration-200 ${
           chrome === 'sidebar' ? (sidebarOpen ? 'md:pl-60' : 'md:pl-16') : ''
-        } ${chrome === 'topbar' ? 'pb-staff-nav md:pb-0' : ''}`}
+        } ${chrome === 'topbar' || chrome === 'sidebar' ? 'pb-staff-nav md:pb-0' : ''}`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 flex-1 w-full">
           {children}
         </div>
-        <div className={chrome === 'topbar' ? 'hidden md:block' : ''}>
+        <div className={chrome === 'topbar' || chrome === 'sidebar' ? 'hidden md:block' : ''}>
           <StaffFooter />
         </div>
       </main>
+
+      {chrome === 'sidebar' && (
+        <AdminBottomBar pathname={pathname} openId={adminSheet} onToggle={(id) => setAdminSheet((cur) => (cur === id ? null : id))} />
+      )}
+
+      {chrome === 'sidebar' && openSheetGroup && (
+        <AdminSheet
+          group={openSheetGroup}
+          pathname={pathname}
+          footer={`${displayName} · ${roleLabel}`}
+          onClose={() => setAdminSheet(null)}
+          onLogout={handleLogout}
+        />
+      )}
 
       {chrome === 'topbar' && (
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-staff-surface/95 backdrop-blur-md border-t border-staff-border h-staff-bottom">
@@ -419,6 +420,106 @@ function AppShellInner({
   )
 }
 
+/** Barra inferior del admin en móvil: Inicio + 4 secciones. */
+function AdminBottomBar({
+  pathname,
+  openId,
+  onToggle,
+}: {
+  pathname: string | null
+  openId: string | null
+  onToggle: (id: string) => void
+}) {
+  const homeActive = isNavActive(pathname, adminHome) && !openId
+  return (
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-[70] bg-staff-surface/95 backdrop-blur-md border-t border-staff-border h-staff-bottom">
+      <div className="grid grid-cols-5 h-full">
+        <Link
+          href={adminHome.href}
+          className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium touch-manipulation ${
+            homeActive ? 'text-primary-500' : 'text-staff-muted'
+          }`}
+        >
+          <NavIcon d={adminHome.icon} className="w-5 h-5" />
+          Inicio
+        </Link>
+        {adminNavGroups.map((g) => {
+          const active = openId ? openId === g.id : groupContainsPath(g, pathname)
+          return (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => onToggle(g.id)}
+              aria-expanded={openId === g.id}
+              className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium touch-manipulation ${
+                active ? 'text-primary-500' : 'text-staff-muted'
+              }`}
+            >
+              <NavIcon d={g.icon} className="w-5 h-5" />
+              {g.label}
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
+
+/** Hoja inferior con las opciones de una sección del admin (móvil). */
+function AdminSheet({
+  group,
+  pathname,
+  footer,
+  onClose,
+  onLogout,
+}: {
+  group: StaffNavGroup
+  pathname: string | null
+  footer: string
+  onClose: () => void
+  onLogout: () => void
+}) {
+  return (
+    <div className="md:hidden fixed inset-0 z-[60]">
+      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Cerrar" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-staff-nav rounded-t-2xl border-t border-staff-border bg-staff-surface p-3 shadow-2xl">
+        <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wider text-staff-muted">{group.label}</p>
+        <div className="space-y-0.5">
+          {group.items.map((item) => (
+            <NavLink key={item.href} item={item} pathname={pathname} onClick={onClose} />
+          ))}
+        </div>
+        {group.secondary && (
+          <div className="mt-3 border-t border-staff-border pt-3">
+            <p className="px-3 pb-2 text-[11px] font-medium text-staff-muted">{group.secondary.label}</p>
+            <div className="grid grid-cols-4 gap-2 px-1">
+              {group.secondary.items.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onClose}
+                  className="flex flex-col items-center gap-1 rounded-xl bg-staff-raised py-2.5 text-[11px] font-medium text-staff-fg"
+                >
+                  <NavIcon d={item.icon} className="w-5 h-5" />
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        {group.id === 'ajustes' && (
+          <div className="mt-3 flex items-center justify-between border-t border-staff-border px-3 pt-3">
+            <span className="truncate text-xs text-staff-muted">{footer}</span>
+            <button type="button" onClick={onLogout} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-red-500 hover:bg-red-500/10">
+              Cerrar sesión
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function AppShell({
   children,
   userRole,
@@ -433,4 +534,3 @@ export function AppShell({
   )
 }
 
-export { AppShell as AdminShell }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { assignWaiterZone } from '@/lib/ops-actions'
 import { VENUE_ZONE_LABELS, VENUE_ZONES, type VenueZone } from '@/lib/venue-zones'
 
@@ -16,8 +16,7 @@ export function WaiterShiftGate({
   role: string
   children: React.ReactNode
 }) {
-  const pathname = usePathname()
-  const skip = role !== 'MESERO' || pathname?.startsWith('/mesero/marcajes')
+  const skip = role !== 'MESERO'
   if (skip || zone) return <>{children}</>
   return <WaiterZonePicker businessDayLabel={businessDayLabel} />
 }

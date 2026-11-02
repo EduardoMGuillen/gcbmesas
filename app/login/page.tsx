@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { StaffThemeProvider } from '@/lib/staff-theme'
 import { ThemeToggle, Panel, StaffButton } from '@/components/staff/ui'
+import { roleHome } from '@/lib/roles'
 
 export default function LoginPage() {
   const { data: session, status } = useSession()
@@ -20,13 +21,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (status !== 'loading' && session?.user?.role) {
       const url =
-        session.user.role === 'ADMIN'    ? '/admin'    :
-        session.user.role === 'CLIENTE_TICKETERA' ? '/admin/entradas' :
-        session.user.role === 'MESERO'   ? '/mesero'   :
-        session.user.role === 'CAJERO'   ? '/cajero'   :
-        session.user.role === 'TAQUILLA' ? '/taquilla' :
-        session.user.role === 'COCINA' ? '/cocina'   :
-        session.user.role === 'BAR'    ? '/bar'      : '/'
+        roleHome(session.user.role)
       router.replace(`${url}?from=callback`)
       return
     }
@@ -35,13 +30,7 @@ export default function LoginPage() {
         const s = await getSession()
         if (s?.user?.role) {
           const url =
-            s.user.role === 'ADMIN'    ? '/admin'    :
-            s.user.role === 'CLIENTE_TICKETERA' ? '/admin/entradas' :
-            s.user.role === 'MESERO'   ? '/mesero'   :
-            s.user.role === 'CAJERO'   ? '/cajero'   :
-            s.user.role === 'TAQUILLA' ? '/taquilla' :
-            s.user.role === 'COCINA' ? '/cocina'   :
-            s.user.role === 'BAR'    ? '/bar'      : '/'
+            roleHome(s.user.role)
           router.replace(`${url}?from=callback`)
         }
       }, 1000)

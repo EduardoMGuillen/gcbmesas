@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { roleHome } from '@/lib/roles'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -41,21 +42,7 @@ export default async function AuthCallbackPage() {
 
   if (session?.user?.role) {
     const redirectUrl =
-      session.user.role === 'ADMIN'
-        ? '/admin'
-        : session.user.role === 'CLIENTE_TICKETERA'
-        ? '/admin/entradas'
-        : session.user.role === 'MESERO'
-        ? '/mesero'
-        : session.user.role === 'CAJERO'
-        ? '/cajero'
-        : session.user.role === 'TAQUILLA'
-        ? '/taquilla'
-        : session.user.role === 'COCINA'
-        ? '/cocina'
-        : session.user.role === 'BAR'
-        ? '/bar'
-        : '/'
+      roleHome(session.user.role)
     
     console.log('[AuthCallback] Redirecting to:', redirectUrl)
     // Add a query parameter to indicate we're coming from auth-callback

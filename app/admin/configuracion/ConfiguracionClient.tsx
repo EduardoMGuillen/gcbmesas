@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { setClientSelfOrderingEnabled, updateInvoiceSettings } from '@/lib/actions'
+import { updateInvoiceSettings } from '@/lib/actions'
 
 type Row = {
   clientSelfOrderingEnabled: boolean
@@ -28,7 +28,6 @@ function numFromDecimal(v: unknown | null): string {
 export function ConfiguracionClient({ initial }: { initial: Row }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [clientOrders, setClientOrders] = useState(initial.clientSelfOrderingEnabled)
   const [legal, setLegal] = useState(initial.invoiceLegalName || '')
   const [trade, setTrade] = useState(initial.invoiceTradeName || '')
   const [rtn, setRtn] = useState(initial.invoiceRtn || '')
@@ -39,20 +38,6 @@ export function ConfiguracionClient({ initial }: { initial: Row }) {
   const [foot, setFoot] = useState(initial.invoiceFooterNote || '')
   const [isv, setIsv] = useState(numFromDecimal(initial.invoiceIsvPercent))
   const [msg, setMsg] = useState('')
-
-  const saveClientSwitch = (v: boolean) => {
-    setClientOrders(v)
-    start(async () => {
-      try {
-        setMsg('')
-        await setClientSelfOrderingEnabled(v)
-        router.refresh()
-      } catch (e: any) {
-        setMsg(e?.message || 'Error')
-        setClientOrders(!v)
-      }
-    })
-  }
 
   const saveInvoice = (e: React.FormEvent) => {
     e.preventDefault()
@@ -86,23 +71,6 @@ export function ConfiguracionClient({ initial }: { initial: Row }) {
           {msg}
         </div>
       )}
-
-      <section className="bg-dark-100 border border-dark-200 rounded-xl p-6">
-        <h2 className="text-xl font-semibold text-white mb-2">Pedidos desde /clientes</h2>
-        <p className="text-sm text-white/70 mb-4">
-          Si está desactivado, los clientes no podrán agregar pedidos desde el código QR (el personal sigue usando mesero).
-        </p>
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            className="w-5 h-5 rounded border-dark-200"
-            checked={clientOrders}
-            disabled={pending}
-            onChange={(e) => saveClientSwitch(e.target.checked)}
-          />
-          <span className="text-white">Permitir que clientes ingresen pedidos desde /clientes</span>
-        </label>
-      </section>
 
       <section className="bg-dark-100 border border-dark-200 rounded-xl p-6">
         <h2 className="text-xl font-semibold text-white mb-2">Datos en factura (cajero)</h2>

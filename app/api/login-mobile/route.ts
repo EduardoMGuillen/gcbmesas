@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { findUserByUsernameInsensitive } from '@/lib/find-user-by-login'
 import bcrypt from 'bcryptjs'
 import { encode } from 'next-auth/jwt'
+import { roleHome } from '@/lib/roles'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -68,21 +69,7 @@ export async function POST(request: Request) {
 
     // Determine redirect URL
     const redirectUrl =
-      user.role === 'ADMIN'
-        ? '/admin'
-        : user.role === 'CLIENTE_TICKETERA'
-        ? '/admin/entradas'
-        : user.role === 'MESERO'
-        ? '/mesero'
-        : user.role === 'CAJERO'
-        ? '/cajero'
-        : user.role === 'TAQUILLA'
-        ? '/taquilla'
-        : user.role === 'COCINA'
-        ? '/cocina'
-        : user.role === 'BAR'
-        ? '/bar'
-        : '/'
+      roleHome(user.role)
 
     // Create response
     const response = NextResponse.json({

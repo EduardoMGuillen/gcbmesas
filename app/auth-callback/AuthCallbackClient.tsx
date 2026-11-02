@@ -87,27 +87,6 @@ export default function AuthCallbackClient({ initialRedirectUrl }: AuthCallbackC
           console.warn(`[AuthCallback Client] Server responded with status: ${response.status}`)
         }
         
-        // If auth-redirect fails, try test-session for debugging
-        try {
-          const testResponse = await fetch('/api/test-session', {
-            method: 'GET',
-            credentials: 'include',
-            cache: 'no-store',
-          })
-          
-          if (testResponse.ok) {
-            const testData = await testResponse.json()
-            console.log('[AuthCallback Client] Test session data:', testData)
-            
-            // If we have cookies but no session, wait a bit more
-            if (testData.cookies?.hasSessionToken || testData.cookies?.hasSecureSessionToken) {
-              console.log('[AuthCallback Client] Cookies found but session not ready, will retry')
-            }
-          }
-        } catch (testError) {
-          console.error('[AuthCallback Client] Test session error:', testError)
-        }
-
         // Session not ready yet, try again with progressive delay
         setAttempts(prev => prev + 1)
         const delay = Math.min(300 * (attemptNum + 1), 2000) // Progressive delay, max 2s

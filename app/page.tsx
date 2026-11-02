@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getPublicEvents } from '@/lib/public-events'
 import LandingPage from './_components/LandingPage'
+import { roleHome } from '@/lib/roles'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,13 +29,8 @@ export default async function Home() {
     const session = await getServerSession(authOptions)
 
     if (session?.user?.role) {
-      if (session.user.role === 'ADMIN')    redirect('/admin')
-      if (session.user.role === 'CLIENTE_TICKETERA') redirect('/admin/entradas')
-      if (session.user.role === 'MESERO')   redirect('/mesero')
-      if (session.user.role === 'CAJERO')   redirect('/cajero')
-      if (session.user.role === 'TAQUILLA') redirect('/taquilla')
-      if (session.user.role === 'COCINA') redirect('/cocina')
-      if (session.user.role === 'BAR') redirect('/bar')
+      const home = roleHome(session.user.role)
+      if (home !== '/') redirect(home)
     }
   } catch {
     // Not authenticated — show landing page

@@ -54,12 +54,6 @@ function ErrorContent() {
           >
             Intentar de Nuevo
           </Link>
-          <Link
-            href="/diagnostico"
-            className="block w-full bg-dark-200 hover:bg-dark-300 text-white font-semibold py-3 px-4 rounded-lg transition-colors text-center"
-          >
-            Ver Diagnóstico
-          </Link>
         </div>
 
         <div className="mt-6 pt-6 border-t border-dark-200">

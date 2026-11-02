@@ -373,16 +373,6 @@ export async function transferStock(
   revalidateOps()
 }
 
-export async function getOpenCashSessionForUser(userId?: string) {
-  const user = await getCurrentUser()
-  const id = userId || user.id
-  return prisma.cashSession.findFirst({
-    where: { status: CashSessionStatus.OPEN, openedByUserId: id },
-    include: { register: true },
-    orderBy: { openedAt: 'desc' },
-  })
-}
-
 export async function getCashOpsData() {
   const user = await getCurrentUser()
   requireAdmin(user.role)
@@ -904,22 +894,3 @@ export async function getInvoiceSaleCatalog() {
   ]
 }
 
-export async function getStockAvailabilityForZone(zone: VenueZone) {
-  const items = await prisma.stockItem.findMany({
-    where: {
-      venueZone: zone,
-      location: { in: ['BARRA', 'ABIERTO'] },
-      productId: { not: null },
-    },
-    select: { productId: true, quantity: true, deductOnSale: true, name: true },
-  })
-  const byProduct: Record<string, { qty: number; tracked: boolean }> = {}
-  for (const item of items) {
-    if (!item.productId) continue
-    const prev = byProduct[item.productId] || { qty: 0, tracked: true }
-    prev.qty += num(item.quantity)
-    prev.tracked = true
-    byProduct[item.productId] = prev
-  }
-  return byProduct
-}

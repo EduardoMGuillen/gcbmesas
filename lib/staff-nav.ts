@@ -1,3 +1,5 @@
+import { roleHome } from './roles'
+
 export type StaffRole =
   | 'ADMIN'
   | 'MESERO'
@@ -17,7 +19,11 @@ export type StaffNavItem = {
 export type StaffNavGroup = {
   id: string
   label: string
+  /** Ícono del grupo en la barra inferior móvil */
+  icon: string
   items: StaffNavItem[]
+  /** Enlaces secundarios mostrados aparte (p. ej. "Ver como…") */
+  secondary?: { label: string; items: StaffNavItem[] }
 }
 
 export const ICONS = {
@@ -62,106 +68,80 @@ export const ICONS = {
     'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
 }
 
+/** Inicio del admin (botón propio en la barra inferior y en la lateral). */
+export const adminHome: StaffNavItem = { href: '/admin', label: 'Inicio', icon: ICONS.dashboard, exact: true }
+
+/** Menú del admin: 4 secciones. Lo usan la barra lateral (escritorio) y la barra inferior (móvil). */
 export const adminNavGroups: StaffNavGroup[] = [
   {
-    id: 'inicio',
-    label: 'Inicio',
-    items: [{ href: '/admin', label: 'Dashboard', icon: ICONS.dashboard, exact: true }],
+    id: 'entradas',
+    label: 'Entradas',
+    icon: ICONS.ticket,
+    items: [
+      { href: '/admin/entradas', label: 'Eventos y entradas', icon: ICONS.ticket },
+      { href: '/taquilla', label: 'Taquilla', icon: ICONS.scan },
+      { href: '/admin/entradas/rechazos-pago', label: 'Rechazos de pago', icon: ICONS.warning },
+    ],
   },
   {
-    id: 'salon',
-    label: 'Salón',
+    id: 'operacion',
+    label: 'Operación',
+    icon: ICONS.mesasActivas,
     items: [
-      { href: '/admin/mesas', label: 'Mesas', icon: ICONS.mesas },
       { href: '/admin/cuentas', label: 'Cuentas', icon: ICONS.cuentas },
-      { href: '/admin/inventario', label: 'Inventario', icon: ICONS.inventario },
-    ],
-  },
-  {
-    id: 'dinero',
-    label: 'Dinero',
-    items: [
+      { href: '/admin/mesas', label: 'Mesas', icon: ICONS.mesas },
       { href: '/admin/caja', label: 'Caja', icon: ICONS.caja },
+    ],
+  },
+  {
+    id: 'negocio',
+    label: 'Negocio',
+    icon: ICONS.reportes,
+    items: [
+      { href: '/admin/inventario', label: 'Inventario', icon: ICONS.inventario },
       { href: '/admin/gastos', label: 'Gastos', icon: ICONS.gastos },
+      { href: '/admin/reportes', label: 'Reportes', icon: ICONS.reportes },
     ],
   },
   {
-    id: 'comandas',
-    label: 'Comandas',
-    items: [
-      { href: '/cocina', label: 'Cocina', icon: ICONS.cocina, exact: true },
-      { href: '/bar', label: 'Bar', icon: ICONS.bar, exact: true },
-      { href: '/admin/comandas', label: 'Ruta comandas', icon: ICONS.ruta },
-    ],
-  },
-  {
-    id: 'piso',
-    label: 'Piso',
-    items: [
-      { href: '/mesero', label: 'Mesero', icon: ICONS.mesero, exact: true },
-      { href: '/cajero', label: 'Cajero', icon: ICONS.cajero, exact: true },
-      { href: '/taquilla', label: 'Taquilla', icon: ICONS.ticket },
-    ],
-  },
-  {
-    id: 'eventos',
-    label: 'Eventos',
-    items: [
-      { href: '/admin/entradas', label: 'Entradas', icon: ICONS.ticket },
-      { href: '/admin/entradas/rechazos-pago', label: 'Rechazos pago', icon: ICONS.warning },
-      { href: '/admin/concursos', label: 'Concursos', icon: ICONS.trofeo },
-    ],
-  },
-  {
-    id: 'personal',
-    label: 'Personal',
+    id: 'ajustes',
+    label: 'Ajustes',
+    icon: ICONS.config,
     items: [
       { href: '/admin/usuarios', label: 'Usuarios', icon: ICONS.usuarios },
       { href: '/admin/configuracion', label: 'Configuración', icon: ICONS.config },
-      { href: '/admin/marcajes', label: 'Marcajes', icon: ICONS.clock },
-    ],
-  },
-  {
-    id: 'analisis',
-    label: 'Análisis',
-    items: [
-      { href: '/admin/reportes', label: 'Reportes', icon: ICONS.reportes, exact: true },
-      { href: '/admin/reportes/caja', label: 'Reportes de Caja', icon: ICONS.caja },
+      { href: '/admin/comandas', label: 'Ruta de comandas', icon: ICONS.ruta },
       { href: '/admin/logs', label: 'Logs', icon: ICONS.logs },
     ],
+    secondary: {
+      label: 'Ver como…',
+      items: [
+        { href: '/mesero', label: 'Mesero', icon: ICONS.mesero, exact: true },
+        { href: '/cajero', label: 'Cajero', icon: ICONS.cajero, exact: true },
+        { href: '/cocina', label: 'Cocina', icon: ICONS.cocina, exact: true },
+        { href: '/bar', label: 'Bar', icon: ICONS.bar, exact: true },
+      ],
+    },
   },
 ]
 
-export const meseroDesktopLinks: StaffNavItem[] = [
-  { href: '/mesero', label: 'Panel', icon: ICONS.dashboard, exact: true },
+/** Mesero: acciones principales (barra inferior y barra superior). */
+export const meseroPrimaryLinks: StaffNavItem[] = [
   { href: '/mesero/scan', label: 'Escanear', icon: ICONS.scan },
   { href: '/mesero/pedidos', label: 'Pedido', icon: ICONS.pedido },
   { href: '/mesero/mesas-activas', label: 'Mesas', icon: ICONS.mesasActivas },
   { href: '/admin/cuentas', label: 'Cuentas', icon: ICONS.cuentas },
 ]
 
-export const meseroDesktopOverflow: StaffNavItem[] = [
-  { href: '/mesero/marcajes', label: 'Marcaje', icon: ICONS.clock },
-  { href: '/taquilla', label: 'Taquilla', icon: ICONS.ticket },
-]
-
-export const meseroMoreLinks: StaffNavItem[] = [
+/** Mesero: secundarias (menú "Más"). */
+export const meseroSecondaryLinks: StaffNavItem[] = [
   { href: '/mesero', label: 'Panel', icon: ICONS.dashboard, exact: true },
-  { href: '/mesero/marcajes', label: 'Marcaje', icon: ICONS.clock },
   { href: '/taquilla', label: 'Taquilla', icon: ICONS.ticket },
-]
-
-export const meseroBottomLinks: StaffNavItem[] = [
-  { href: '/mesero/scan', label: 'Escanear', icon: ICONS.scan },
-  { href: '/mesero/pedidos', label: 'Pedido', icon: ICONS.pedido },
-  { href: '/mesero/mesas-activas', label: 'Mesas', icon: ICONS.mesasActivas },
-  { href: '/admin/cuentas', label: 'Cuentas', icon: ICONS.cuentas },
 ]
 
 export const cajeroLinks: StaffNavItem[] = [
   { href: '/cajero', label: 'Cajero', icon: ICONS.cajero, exact: true },
   { href: '/admin/cuentas', label: 'Cuentas', icon: ICONS.cuentas },
-  { href: '/cajero/marcajes', label: 'Marcaje', icon: ICONS.clock },
 ]
 
 export const cajeroMoreLinks: StaffNavItem[] = [
@@ -169,13 +149,7 @@ export const cajeroMoreLinks: StaffNavItem[] = [
 ]
 
 export function homeForRole(role: StaffRole): string {
-  if (role === 'ADMIN') return '/admin'
-  if (role === 'MESERO') return '/mesero'
-  if (role === 'CAJERO') return '/cajero'
-  if (role === 'COCINA') return '/cocina'
-  if (role === 'BAR') return '/bar'
-  if (role === 'CLIENTE_TICKETERA') return '/admin/entradas'
-  return '/taquilla'
+  return roleHome(role)
 }
 
 export function isNavActive(pathname: string | null, item: StaffNavItem): boolean {
@@ -200,5 +174,5 @@ export function isNavActive(pathname: string | null, item: StaffNavItem): boolea
 }
 
 export function groupContainsPath(group: StaffNavGroup, pathname: string | null): boolean {
-  return group.items.some((item) => isNavActive(pathname, item))
+  return [...group.items, ...(group.secondary?.items ?? [])].some((item) => isNavActive(pathname, item))
 }

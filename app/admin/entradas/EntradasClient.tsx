@@ -17,6 +17,8 @@ interface EntradasClientProps {
   /** Preferencia del usuario actual (solo ADMIN gestiona el interruptor) */
   entrySaleNotificationsEnabled?: boolean
   canManageEntrySaleNotifications?: boolean
+  /** Abrir directamente el panel de este evento (?evento=<id>) */
+  initialEventId?: string
 }
 
 type View =
@@ -30,9 +32,12 @@ export function EntradasClient({
   isTicketeraClient = false,
   entrySaleNotificationsEnabled = false,
   canManageEntrySaleNotifications = false,
+  initialEventId,
 }: EntradasClientProps) {
   const router = useRouter()
-  const [view, setView] = useState<View>({ kind: 'grid' })
+  const [view, setView] = useState<View>(() =>
+    initialEventId && events.some((e) => e.id === initialEventId) ? { kind: 'event', id: initialEventId } : { kind: 'grid' }
+  )
   const [notifyPending, setNotifyPending] = useState(false)
   const canManage = !isTicketeraClient
   const activeEvents = events.filter((e) => e.isActive)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
-import { createCustomerOrder, createOrder, addBalanceToAccount, cancelOrderByCustomer, cancelOrderByMesero } from '@/lib/actions'
+import { createOrder, addBalanceToAccount, cancelOrderByMesero } from '@/lib/actions'
 import { formatCurrency, formatDate, formatAccountBalance, isOpenAccount, OPEN_ACCOUNT_SENTINEL } from '@/lib/utils'
 import { isInsufficientBalanceError } from '@/lib/billing-errors'
 import { getTableLabel, isWalkInTable, WALK_IN_TABLE_ZONE } from '@/lib/walk-in-table'
@@ -311,19 +311,6 @@ export function CustomerOrderView({
     }, 800)
   }
 
-  const finishOrderSuccessCliente = () => {
-    setShowAddProduct(false)
-    setSelectedProduct('')
-    setQuantity('1')
-    setError('')
-    setInsufficientBalanceModal(null)
-    router.refresh()
-    setTimeout(() => {
-      const currentUrl = window.location.href
-      window.location.href = currentUrl
-    }, 1000)
-  }
-
   const handleAddOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -366,12 +353,7 @@ export function CustomerOrderView({
         })
         finishOrderSuccessMesero()
       } else {
-        await createCustomerOrder({
-          accountId: account.id,
-          productId: selectedProduct,
-          quantity: quantityNum,
-        })
-        finishOrderSuccessCliente()
+        throw new Error('Los pedidos los registra el personal.')
       }
     } catch (err: any) {
       const msg = err?.message || ''
@@ -472,11 +454,8 @@ export function CustomerOrderView({
     setLoading(true)
     setError('')
     try {
-      if (isMesero) {
-        await cancelOrderByMesero(orderId)
-      } else {
-        await cancelOrderByCustomer(orderId)
-      }
+      if (!isMesero) throw new Error('Solo el personal puede cancelar pedidos.')
+      await cancelOrderByMesero(orderId)
       
       // Actualizar el estado local
       const updatedOrders = account.orders.map((o: any) => {

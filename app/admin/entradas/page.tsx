@@ -7,7 +7,7 @@ import { PageHeader, StatCard } from '@/components/staff/ui'
 
 export const dynamic = 'force-dynamic'
 
-export default async function EntradasPage() {
+export default async function EntradasPage({ searchParams }: { searchParams: { evento?: string } }) {
   const session = await getServerSession(authOptions)
 
   if (!session || !['ADMIN', 'CLIENTE_TICKETERA'].includes(session.user.role)) {
@@ -46,6 +46,7 @@ export default async function EntradasPage() {
       <EntradasClient
         events={events}
         isTicketeraClient={isTicketeraClient}
+        initialEventId={searchParams.evento}
         entrySaleNotificationsEnabled={entrySaleNotificationsEnabled}
         canManageEntrySaleNotifications={canManageEntrySaleNotifications}
       />

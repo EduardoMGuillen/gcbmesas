@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { roleHome } from '@/lib/roles'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -32,21 +33,7 @@ export async function GET(request: Request) {
     
     // Determine redirect URL based on role
     const redirectUrl =
-      session.user.role === 'ADMIN'
-        ? '/admin'
-        : session.user.role === 'CLIENTE_TICKETERA'
-        ? '/admin/entradas'
-        : session.user.role === 'MESERO'
-        ? '/mesero'
-        : session.user.role === 'CAJERO'
-        ? '/cajero'
-        : session.user.role === 'TAQUILLA'
-        ? '/taquilla'
-        : session.user.role === 'COCINA'
-        ? '/cocina'
-        : session.user.role === 'BAR'
-        ? '/bar'
-        : '/'
+      roleHome(session.user.role)
     
     console.log('[AuthRedirect API] Returning redirect URL:', redirectUrl)
     
