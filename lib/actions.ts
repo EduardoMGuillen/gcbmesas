@@ -1955,7 +1955,7 @@ export async function exportAccountToExcel(accountId: string) {
       orders: {
         include: {
           product: true,
-          user: true,
+          user: { select: { id: true, name: true, username: true } },
         },
         orderBy: { createdAt: 'asc' },
       },
@@ -2552,7 +2552,7 @@ export async function getTableById(tableId: string, opts?: { accountId?: string 
           orders: {
             include: {
               product: true,
-              user: true,
+              user: { select: { id: true, name: true, username: true } },
             },
             orderBy: { createdAt: 'desc' },
           },
