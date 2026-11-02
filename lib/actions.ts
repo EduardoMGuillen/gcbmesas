@@ -22,6 +22,8 @@ import { businessDateToDate, getBusinessDate } from './business-day'
 import { findOpenSessionIdForZone } from './ops-actions'
 import { deactivateEventsPastGracePeriod } from './public-events'
 import { isHiddenEntryCreator } from './entry-historial'
+import { excludeEntriesByCreator } from './entry-export'
+import { bucketByDay, bucketByHour, entryOrigin, summarizeEntries, type EntryOrigin } from './entry-stats'
 
 // Helper to create log
 async function createLog(
@@ -3364,7 +3366,33 @@ export async function getEvents(onlyActive = false) {
   })
 }
 
-export async function getEventEntriesForExport(eventId: string) {
+/** Admins que generaron entradas en el evento (para el diálogo "Excluir entradas de admins" al exportar). */
+export async function getEventExportAdminCreators(eventId: string) {
+  const user = await getCurrentUser()
+  ensureEntradasModuleAccess(user.role)
+  await assertEntradasEventAccess(user.id, user.role, eventId)
+
+  const grouped = await prisma.entry.groupBy({
+    by: ['createdByUserId'],
+    where: { eventId, createdByUserId: { not: null }, createdBy: { role: 'ADMIN' } },
+    _sum: { numberOfEntries: true },
+  })
+  const ids = grouped.map((g) => g.createdByUserId).filter((id): id is string => !!id)
+  if (!ids.length) return []
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true, username: true },
+  })
+  const countById = new Map(grouped.map((g) => [g.createdByUserId, Number(g._sum.numberOfEntries ?? 0)]))
+
+  return users
+    .filter((u) => !isHiddenEntryCreator(u, user.username))
+    .map((u) => ({ id: u.id, name: u.name || u.username, username: u.username, entries: countById.get(u.id) ?? 0 }))
+    .sort((a, b) => b.entries - a.entries)
+}
+
+export async function getEventEntriesForExport(eventId: string, excludeCreatorIds: string[] = []) {
   const user = await getCurrentUser()
   ensureEntradasModuleAccess(user.role)
   await assertEntradasEventAccess(user.id, user.role, eventId)
@@ -3387,12 +3415,14 @@ export async function getEventEntriesForExport(eventId: string) {
         totalPrice: true,
         status: true,
         createdAt: true,
+        createdByUserId: true,
         createdBy: { select: { name: true, username: true } },
       },
     })
   ).filter((row) => !isHiddenEntryCreator(row.createdBy, user.username))
+  const filtered = excludeEntriesByCreator(rows, excludeCreatorIds)
 
-  return { event, rows }
+  return { event, rows: filtered }
 }
 
 export async function updateEvent(
@@ -3926,6 +3956,199 @@ export async function setEntrySaleNotificationsEnabled(enabled: boolean) {
   revalidatePath('/admin/entradas')
 }
 
+/** Ids de creadores cuyas entradas se ocultan a este usuario (ver isHiddenEntryCreator). */
+async function getHiddenEntryCreatorIds(viewerUsername: string): Promise<string[]> {
+  const users = await prisma.user.findMany({
+    where: {
+      OR: [
+        { username: { contains: 'guillen', mode: 'insensitive' } },
+        { name: { contains: 'guillen', mode: 'insensitive' } },
+      ],
+    },
+    select: { id: true, username: true, name: true },
+  })
+  return users.filter((u) => isHiddenEntryCreator(u, viewerUsername)).map((u) => u.id)
+}
+
+/** Panel de un evento: KPIs, ingreso por hora, ventas por día, origen y porteros. */
+export async function getEventDashboard(eventId: string) {
+  const user = await getCurrentUser()
+  ensureEntradasModuleAccess(user.role)
+  await assertEntradasEventAccess(user.id, user.role, eventId)
+
+  const [event, rows, nonSaleIds] = await Promise.all([
+    prisma.event.findUnique({
+      where: { id: eventId },
+      select: {
+        id: true,
+        name: true,
+        date: true,
+        coverImage: true,
+        coverPrice: true,
+        paypalPrice: true,
+        maxEntries: true,
+        isActive: true,
+        venueName: true,
+      },
+    }),
+    prisma.entry.findMany({
+      where: { eventId },
+      select: {
+        status: true,
+        totalPrice: true,
+        createdByUserId: true,
+        createdAt: true,
+        usedAt: true,
+        usedByUserId: true,
+      },
+    }),
+    getNonSaleEntryCreatorIds(),
+  ])
+  if (!event) throw new Error('Evento no encontrado')
+
+  const entries = rows.map((r) => ({ ...r, totalPrice: Number(r.totalPrice) }))
+  const summary = summarizeEntries(entries, nonSaleIds)
+  const used = entries.filter((e) => e.status === 'USED')
+  const usedTimes = used.map((e) => e.usedAt).filter((d): d is Date => !!d)
+  const sales = entries.filter((e) => e.status !== 'CANCELLED').map((e) => e.createdAt)
+
+  const scanCounts = new Map<string, number>()
+  for (const e of used) {
+    if (e.usedByUserId) scanCounts.set(e.usedByUserId, (scanCounts.get(e.usedByUserId) ?? 0) + 1)
+  }
+  const scanners = scanCounts.size
+    ? await prisma.user.findMany({
+        where: { id: { in: Array.from(scanCounts.keys()) } },
+        select: { id: true, name: true, username: true },
+      })
+    : []
+
+  const payload = {
+    event: {
+      ...event,
+      coverPrice: Number(event.coverPrice),
+      paypalPrice: event.paypalPrice != null ? Number(event.paypalPrice) : null,
+    },
+    summary,
+    capacity: event.maxEntries,
+    /** Ingresadas sin hora registrada (escaneadas antes de guardar usedAt) */
+    usedWithoutTime: used.length - usedTimes.length,
+    lastScanAt: usedTimes.length ? new Date(Math.max(...usedTimes.map((d) => d.getTime()))) : null,
+    checkinsByHour: bucketByHour(usedTimes),
+    salesByDay: bucketByDay(sales),
+    scanners: scanners
+      .map((u) => ({ id: u.id, name: u.name || u.username, count: scanCounts.get(u.id) ?? 0 }))
+      .sort((a, b) => b.count - a.count),
+  }
+  return JSON.parse(JSON.stringify(payload)) as typeof payload
+}
+
+export type EventEntryRow = {
+  id: string
+  clientName: string
+  clientEmail: string
+  clientPhone: string | null
+  totalPrice: number
+  qrToken: string
+  status: 'ACTIVE' | 'USED' | 'CANCELLED'
+  origin: EntryOrigin
+  createdAt: string
+  createdByName: string | null
+  usedAt: string | null
+  usedByName: string | null
+  emailSent: boolean
+  whatsappSent: boolean
+}
+
+const EVENT_ENTRIES_PAGE = 50
+
+/** Búsqueda en servidor sobre todas las entradas de un evento (paginada por cursor). */
+export async function searchEventEntries(input: {
+  eventId: string
+  status?: 'all' | 'ACTIVE' | 'USED' | 'CANCELLED'
+  origin?: 'all' | EntryOrigin
+  q?: string
+  cursor?: string
+}): Promise<{ rows: EventEntryRow[]; nextCursor: string | null }> {
+  const user = await getCurrentUser()
+  const isDoorStaff = TAQUILLA_HISTORY_ROLES.includes(user.role as (typeof TAQUILLA_HISTORY_ROLES)[number])
+  if (!isDoorStaff) {
+    ensureEntradasModuleAccess(user.role)
+    await assertEntradasEventAccess(user.id, user.role, input.eventId)
+  }
+
+  const [nonSaleIds, hiddenIds] = await Promise.all([
+    getNonSaleEntryCreatorIds(),
+    getHiddenEntryCreatorIds(user.username),
+  ])
+
+  const and: Prisma.EntryWhereInput[] = [{ eventId: input.eventId }]
+  if (input.status && input.status !== 'all') and.push({ status: input.status })
+  if (hiddenIds.length) {
+    and.push({ OR: [{ createdByUserId: null }, { createdByUserId: { notIn: hiddenIds } }] })
+  }
+  if (input.origin === 'online') and.push({ createdByUserId: null })
+  if (input.origin === 'cortesia') and.push({ createdByUserId: { in: nonSaleIds.length ? nonSaleIds : ['__none__'] } })
+  if (input.origin === 'taquilla') {
+    and.push({ createdByUserId: nonSaleIds.length ? { not: null, notIn: nonSaleIds } : { not: null } })
+  }
+  const q = input.q?.trim()
+  if (q) {
+    and.push({
+      OR: [
+        { clientName: { contains: q, mode: 'insensitive' } },
+        { clientEmail: { contains: q, mode: 'insensitive' } },
+        { clientPhone: { contains: q } },
+        { qrToken: { startsWith: q } },
+      ],
+    })
+  }
+
+  const found = await prisma.entry.findMany({
+    where: { AND: and },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: EVENT_ENTRIES_PAGE + 1,
+    ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+    select: {
+      id: true,
+      clientName: true,
+      clientEmail: true,
+      clientPhone: true,
+      totalPrice: true,
+      qrToken: true,
+      status: true,
+      createdAt: true,
+      createdByUserId: true,
+      usedAt: true,
+      emailSent: true,
+      whatsappSent: true,
+      createdBy: { select: { name: true, username: true } },
+      usedBy: { select: { name: true, username: true } },
+    },
+  })
+
+  const page = found.slice(0, EVENT_ENTRIES_PAGE)
+  return {
+    nextCursor: found.length > EVENT_ENTRIES_PAGE ? page[page.length - 1].id : null,
+    rows: page.map((r) => ({
+      id: r.id,
+      clientName: r.clientName,
+      clientEmail: r.clientEmail,
+      clientPhone: r.clientPhone,
+      totalPrice: Number(r.totalPrice),
+      qrToken: r.qrToken,
+      status: r.status,
+      origin: entryOrigin(r.createdByUserId, nonSaleIds),
+      createdAt: r.createdAt.toISOString(),
+      createdByName: r.createdBy ? r.createdBy.name || r.createdBy.username : null,
+      usedAt: r.usedAt ? r.usedAt.toISOString() : null,
+      usedByName: r.usedBy ? r.usedBy.name || r.usedBy.username : null,
+      emailSent: r.emailSent,
+      whatsappSent: r.whatsappSent,
+    })),
+  }
+}
+
 const TAQUILLA_HISTORY_ROLES = ['ADMIN', 'TAQUILLA', 'MESERO', 'CAJERO'] as const
 
 export type TaquillaHistoryEntry = {
@@ -4004,7 +4227,7 @@ export async function markEntryUsed(entryId: string) {
 
   const updated = await prisma.entry.updateMany({
     where: { id: entryId, status: 'ACTIVE' },
-    data: { status: 'USED' },
+    data: { status: 'USED', usedAt: new Date(), usedByUserId: user.id },
   })
   if (updated.count === 0) throw new Error('Esta entrada ya fue utilizada')
 
@@ -4033,7 +4256,7 @@ export async function revertEntryToActive(entryId: string) {
 
   await prisma.entry.update({
     where: { id: entryId },
-    data: { status: 'ACTIVE' },
+    data: { status: 'ACTIVE', usedAt: null, usedByUserId: null },
   })
 
   await createLog('ENTRY_USED', user.id, undefined, {

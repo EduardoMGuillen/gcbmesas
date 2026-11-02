@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getEventEntriesForExport } from '@/lib/actions'
 import { buildEntryHistorialExcelBuffer, entryHistorialFileName } from '@/lib/entry-historial-excel'
+import { parseExcludeParam } from '@/lib/entry-export'
 
 export const runtime = 'nodejs'
 
@@ -13,12 +14,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const eventId = new URL(req.url).searchParams.get('eventId')
+    const params = new URL(req.url).searchParams
+    const eventId = params.get('eventId')
+    const excludeCreatorIds = parseExcludeParam(params.get('exclude'))
     if (!eventId) {
       return NextResponse.json({ error: 'Falta el evento' }, { status: 400 })
     }
 
-    const { event, rows } = await getEventEntriesForExport(eventId)
+    const { event, rows } = await getEventEntriesForExport(eventId, excludeCreatorIds)
     const buffer = await buildEntryHistorialExcelBuffer(event, rows)
     const fileName = entryHistorialFileName(event.name, event.date)
 

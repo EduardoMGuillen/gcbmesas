@@ -16,6 +16,7 @@ import {
   validateEntryByToken,
   markEntryWhatsappSent,
 } from '@/lib/actions'
+import { ExportEntriesDialog } from './_components/ExportEntriesDialog'
 import { isPublicFreeCoverOnly } from '@/lib/public-event-pricing'
 import { isHiddenEntryCreator, isNonSaleEntryCreator } from '@/lib/entry-historial'
 import { StaffTabs } from '@/components/staff/ui'
@@ -84,23 +85,6 @@ interface EntradasClientProps {
 type Tab = 'vender' | 'eventos' | 'historial' | 'escanear' | 'estadisticas'
 
 // ==================== SHARED HELPERS ====================
-
-async function downloadEventEntriesExcel(eventId: string) {
-  const res = await fetch(`/api/entradas/historial?eventId=${encodeURIComponent(eventId)}`)
-  if (!res.ok) {
-    const body = await res.json().catch(() => null)
-    throw new Error(body?.error || 'No se pudo descargar')
-  }
-  const blob = await res.blob()
-  const cd = res.headers.get('Content-Disposition')
-  const match = cd?.match(/filename="([^"]+)"/)
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = match?.[1] || 'Entradas.xlsx'
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 async function generateQRDataUrl(text: string): Promise<string> {
   return QRCode.toDataURL(text, {
@@ -1106,7 +1090,7 @@ const VENUE_FILTER_NONE = '__sin_lugar__'
 function EstadisticasTab({ rows }: { rows: EventStatRow[] }) {
   const [filterVenue, setFilterVenue] = useState('')
   const [filterEventName, setFilterEventName] = useState('')
-  const [downloadingId, setDownloadingId] = useState('')
+  const [exportEvent, setExportEvent] = useState<{ id: string; name: string } | null>(null)
 
   const distinctVenueNames = useMemo(() => {
     const set = new Set<string>()
@@ -1219,16 +1203,10 @@ function EstadisticasTab({ rows }: { rows: EventStatRow[] }) {
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"
-                      disabled={downloadingId === r.eventId}
-                      onClick={() => {
-                        setDownloadingId(r.eventId)
-                        void downloadEventEntriesExcel(r.eventId)
-                          .catch((e) => alert(e instanceof Error ? e.message : 'No se pudo descargar'))
-                          .finally(() => setDownloadingId(''))
-                      }}
+                      onClick={() => setExportEvent({ id: r.eventId, name: r.name })}
                       className="text-xs px-3 py-1.5 bg-dark-50 hover:bg-dark-200 text-white/70 hover:text-white rounded-lg transition-colors disabled:opacity-50"
                     >
-                      {downloadingId === r.eventId ? 'Bajando…' : 'Excel'}
+                      Excel
                     </button>
                   </td>
                 </tr>
@@ -1237,6 +1215,7 @@ function EstadisticasTab({ rows }: { rows: EventStatRow[] }) {
           </table>
         </div>
       )}
+      {exportEvent && <ExportEntriesDialog event={exportEvent} onClose={() => setExportEvent(null)} />}
     </div>
   )
 }
@@ -1264,7 +1243,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
   const [uploading, setUploading] = useState(false)
   const [filterListVenue, setFilterListVenue] = useState('')
   const [filterListEventName, setFilterListEventName] = useState('')
-  const [downloadingId, setDownloadingId] = useState('')
+  const [exportEvent, setExportEvent] = useState<{ id: string; name: string } | null>(null)
 
   const distinctListVenueNames = useMemo(() => {
     const set = new Set<string>()
@@ -1666,16 +1645,10 @@ function EventosTab({ events }: { events: EventItem[] }) {
                 <button onClick={() => startEdit(ev)} disabled={isPending} className="text-xs px-3 py-1.5 bg-dark-50 hover:bg-dark-200 text-white/70 hover:text-white rounded-lg transition-colors">Editar</button>
                 <button
                   type="button"
-                  disabled={downloadingId === ev.id}
-                  onClick={() => {
-                    setDownloadingId(ev.id)
-                    void downloadEventEntriesExcel(ev.id)
-                      .catch((e) => alert(e instanceof Error ? e.message : 'No se pudo descargar'))
-                      .finally(() => setDownloadingId(''))
-                  }}
+                  onClick={() => setExportEvent({ id: ev.id, name: ev.name })}
                   className="text-xs px-3 py-1.5 bg-dark-50 hover:bg-dark-200 text-white/70 hover:text-white rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {downloadingId === ev.id ? 'Bajando…' : 'Excel'}
+                  Excel
                 </button>
                 <button onClick={() => handleToggleActive(ev)} disabled={isPending} className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${ev.isActive ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'}`}>{ev.isActive ? 'Desactivar' : 'Activar'}</button>
                 {ev._count.entries === 0 && <button onClick={() => handleDelete(ev)} disabled={isPending} className="text-xs px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors">Eliminar</button>}
@@ -1686,6 +1659,7 @@ function EventosTab({ events }: { events: EventItem[] }) {
           )}
         </>
       )}
+      {exportEvent && <ExportEntriesDialog event={exportEvent} onClose={() => setExportEvent(null)} />}
     </div>
   )
 }
