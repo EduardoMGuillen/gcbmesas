@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createEntry, createBulkEntries, markEntryWhatsappSent } from '@/lib/actions'
 import { generateQRDataUrl, buildPrintHtml, printHtml, buildWhatsAppUrl } from './entry-delivery'
 import type { EventItem } from './types'
 
-/** Formulario de venta en taquilla/admin (movido sin cambios de lógica desde EntradasClient). */
+/** Venta de entradas (admin / ticketera). La lógica de venta y entrega es la misma de antes; solo cambió la UI. */
 export function SellEntry({ events, initialEventId = '' }: { events: EventItem[]; initialEventId?: string }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -30,6 +30,12 @@ export function SellEntry({ events, initialEventId = '' }: { events: EventItem[]
   const [emailSent, setEmailSent] = useState(false)
   const [whatsappSent, setWhatsappSent] = useState(false)
   const [printing, setPrinting] = useState(false)
+
+  const resultRef = useRef<HTMLElement>(null)
+  // En móvil el resultado queda debajo del formulario: llevar la vista hasta él.
+  useEffect(() => {
+    if (success && window.innerWidth < 1024) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [success])
 
   const selectedEvent = events.find((e) => e.id === eventId)
   const totalPrice = selectedEvent ? selectedEvent.coverPrice * numberOfEntries : 0
@@ -230,164 +236,339 @@ export function SellEntry({ events, initialEventId = '' }: { events: EventItem[]
 
   if (events.length === 0) {
     return (
-      <div className="bg-dark-100 border border-dark-200 rounded-xl p-8 text-center">
-        <svg className="w-16 h-16 mx-auto text-white/20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-        <h3 className="text-lg font-semibold text-white mb-2">No hay eventos activos</h3>
-        <p className="text-dark-300">Crea un evento primero en la pestaña &quot;Eventos&quot; para empezar a vender entradas.</p>
+      <div className="rounded-2xl border border-dashed border-staff-border p-10 text-center">
+        <p className="text-lg font-semibold text-staff-fg">No hay eventos activos</p>
+        <p className="mt-1 text-sm text-staff-muted">Crea o activa un evento para empezar a vender.</p>
       </div>
     )
   }
 
+  const resetSale = () => {
+    setSuccess(null)
+    setEmailSent(false)
+    setWhatsappSent(false)
+    setError('')
+  }
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Form */}
-      <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Nueva Entrada</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-dark-300 mb-2">Evento</label>
-            <select value={eventId} onChange={(e) => setEventId(e.target.value)} className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500">
-              <option value="">Seleccionar evento...</option>
-              {events.map((ev) => (
-                <option key={ev.id} value={ev.id}>
-                  {ev.name} - L {ev.coverPrice.toFixed(2)} ({new Date(ev.date).toLocaleDateString('es-HN', { timeZone: 'UTC' })})
-                </option>
-              ))}
-            </select>
-            {doorSoldOut && (
-              <p className="text-sm text-amber-400 mt-2">Cupo agotado: no quedan entradas disponibles para este evento.</p>
-            )}
-            {remainingAtDoor != null && remainingAtDoor >= 1 && (
-              <p className="text-xs text-dark-300 mt-2">Quedan {remainingAtDoor} entrada{remainingAtDoor !== 1 ? 's' : ''} disponibles.</p>
-            )}
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
+      {/* ── Formulario ── */}
+      <form id="sell-entry-form" onSubmit={handleSubmit} className="space-y-4">
+        <Section step={1} title="Evento">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {events.map((ev) => {
+              const left =
+                ev.maxEntries != null && ev.maxEntries >= 1 ? Math.max(0, ev.maxEntries - ev.entriesSoldSum) : null
+              const selected = ev.id === eventId
+              return (
+                <button
+                  key={ev.id}
+                  type="button"
+                  onClick={() => {
+                    setEventId(ev.id)
+                    if (success) resetSale()
+                  }}
+                  className={`flex items-center gap-3 rounded-xl border p-2.5 text-left transition ${
+                    selected
+                      ? 'border-primary-500 bg-primary-500/10 ring-1 ring-primary-500'
+                      : 'border-staff-border hover:border-primary-500/50 hover:bg-staff-hover'
+                  }`}
+                >
+                  <div className="h-14 w-11 shrink-0 overflow-hidden rounded-lg bg-staff-raised">
+                    {ev.coverImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={ev.coverImage} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-lg font-black text-staff-muted">
+                        {ev.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-staff-fg">{ev.name}</p>
+                    <p className="text-xs text-staff-muted">
+                      {new Date(ev.date).toLocaleDateString('es-HN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })}
+                    </p>
+                    <p className="mt-0.5 text-xs">
+                      <span className="font-semibold text-primary-500">L {ev.coverPrice.toFixed(2)}</span>
+                      {left != null && (
+                        <span className={left < 1 ? 'text-red-500' : 'text-staff-muted'}>
+                          {' · '}
+                          {left < 1 ? 'Agotado' : `quedan ${left}`}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-300 mb-2">Email del Cliente</label>
-            <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="correo@ejemplo.com" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          {doorSoldOut && <p className="mt-2 text-sm text-amber-500">Cupo agotado: no quedan entradas para este evento.</p>}
+        </Section>
+
+        <Section step={2} title="Cliente">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Correo">
+              <input
+                type="email"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+                placeholder="correo@ejemplo.com"
+                className={inputCls}
+                autoComplete="off"
+              />
+            </Field>
+            <Field label="WhatsApp" hint="opcional">
+              <input
+                type="tel"
+                value={clientPhone}
+                onChange={(e) => setClientPhone(e.target.value)}
+                placeholder="9999-9999"
+                className={inputCls}
+              />
+            </Field>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-300 mb-2">WhatsApp del Cliente <span className="text-white/30 font-normal">(opcional)</span></label>
-            <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="9999-9999" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-300 mb-2">Número de Entradas</label>
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => updateNumberOfEntries(numberOfEntries - 1)} className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors">-</button>
-              <input type="number" min={1} value={numberOfEntries} onChange={(e) => updateNumberOfEntries(parseInt(e.target.value) || 1)} className="w-20 text-center px-3 py-2.5 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+        </Section>
+
+        <Section
+          step={3}
+          title="Entradas"
+          aside={
+            <div className="flex items-center gap-1 rounded-xl border border-staff-border p-1">
+              <button
+                type="button"
+                onClick={() => updateNumberOfEntries(numberOfEntries - 1)}
+                disabled={numberOfEntries <= 1}
+                className="h-9 w-9 rounded-lg text-lg font-bold text-staff-fg hover:bg-staff-hover disabled:opacity-30"
+                aria-label="Menos"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min={1}
+                value={numberOfEntries}
+                onChange={(e) => updateNumberOfEntries(parseInt(e.target.value) || 1)}
+                className="w-12 bg-transparent text-center text-lg font-bold tabular-nums text-staff-fg focus:outline-none"
+                aria-label="Cantidad"
+              />
               <button
                 type="button"
                 onClick={() => updateNumberOfEntries(numberOfEntries + 1)}
                 disabled={doorSoldOut || (remainingAtDoor != null && numberOfEntries >= remainingAtDoor)}
-                className="w-10 h-10 flex items-center justify-center bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                className="h-9 w-9 rounded-lg text-lg font-bold text-staff-fg hover:bg-staff-hover disabled:opacity-30"
+                aria-label="Más"
               >
                 +
               </button>
             </div>
-          </div>
-          {/* Guest names */}
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-dark-300">
-              {numberOfEntries === 1 ? 'Nombre del Cliente' : `Nombres (${numberOfEntries} entradas)`}
-            </label>
+          }
+        >
+          <div className="space-y-2">
             {guestNames.slice(0, numberOfEntries).map((name, i) => (
               <div key={i} className="flex items-center gap-2">
-                {numberOfEntries > 1 && (
-                  <span className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-primary-600/20 text-primary-400 text-xs font-bold">{i + 1}</span>
-                )}
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-500/15 text-xs font-bold text-primary-500">
+                  {i + 1}
+                </span>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => updateGuestName(i, e.target.value)}
-                  placeholder={numberOfEntries === 1 ? 'Nombre completo' : `Nombre entrada ${i + 1}`}
-                  className="flex-1 px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder={numberOfEntries === 1 ? 'Nombre completo' : `Nombre de la persona ${i + 1}`}
+                  className={inputCls}
                 />
               </div>
             ))}
           </div>
-          {selectedEvent && (
-            <div className="bg-primary-600/10 border border-primary-500/30 rounded-lg p-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-dark-300">Total a cobrar</span>
-                <span className="text-2xl font-bold text-primary-400">L {totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })}</span>
-              </div>
-              <p className="text-xs text-dark-300 mt-1">{numberOfEntries} entrada{numberOfEntries > 1 ? 's' : ''} × L {selectedEvent.coverPrice.toFixed(2)}</p>
-            </div>
-          )}
-          {error && <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">{error}</div>}
-          <button type="submit" disabled={isPending || doorSoldOut} className="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors">
-            {isPending ? 'Procesando...' : 'Registrar Venta'}
-          </button>
-        </form>
-      </div>
+        </Section>
 
-      {/* Success / QR section */}
-      <div className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6">
+        {error && (
+          <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-500">{error}</div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isPending || doorSoldOut || !!success}
+          className="w-full rounded-xl bg-primary-600 py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 lg:hidden"
+        >
+          {isPending ? 'Procesando…' : `Cobrar L ${totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })}`}
+        </button>
+      </form>
+
+      {/* ── Boleto / resultado ── */}
+      <aside ref={resultRef} className={`scroll-mt-20 lg:sticky lg:top-24 lg:block lg:self-start ${success ? '' : 'hidden'}`}>
         {success ? (
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 mx-auto bg-green-500/20 border border-green-500/50 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          <div className="overflow-hidden rounded-2xl border border-emerald-500/40 bg-staff-surface">
+            <div className="bg-emerald-600 px-5 py-4 text-white">
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/80">Venta registrada</p>
+              <p className="truncate text-lg font-bold">{success.eventName}</p>
             </div>
-            <h3 className="text-lg font-semibold text-white">Venta Registrada</h3>
-            <div className="space-y-2 text-sm">
-              <p className="text-dark-300"><span className="text-white font-medium">{success.eventName}</span></p>
-              <p className="text-dark-300">Email: <span className="text-white">{success.clientEmail}</span></p>
-              <p className="text-dark-300">Entradas: <span className="text-white">{success.entries.length}</span></p>
-              {success.entries.length > 1 && (
-                <div className="bg-dark-50 border border-dark-200 rounded-lg p-3 text-left space-y-1">
-                  {success.entries.map((entry, i) => (
-                    <div key={entry.entryId} className="flex items-center gap-2">
-                      <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-primary-600/20 text-primary-400 text-[10px] font-bold">{i + 1}</span>
-                      <span className="text-white text-sm">{entry.clientName}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {success.entries.length === 1 && (
-                <p className="text-dark-300">Cliente: <span className="text-white">{success.entries[0].clientName}</span></p>
-              )}
-              <p className="text-dark-300">Total: <span className="text-primary-400 font-bold">L {success.totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })}</span></p>
-            </div>
-            <div className="border-t border-dark-200 pt-4 space-y-3">
-              {emailSent ? (
-                <div className="bg-green-500/20 border border-green-500/50 text-green-400 px-4 py-3 rounded-lg text-sm">Email enviado exitosamente a {success.clientEmail}</div>
-              ) : (
-                <button onClick={handleEmail} disabled={sendingEmail} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                  {sendingEmail ? 'Enviando...' : `Enviar ${success.entries.length > 1 ? `${success.entries.length} QRs` : 'QR'} por Email`}
-                </button>
-              )}
-              {success.clientPhone ? (
-                whatsappSent ? (
-                  <div className="bg-green-500/20 border border-green-500/50 text-green-400 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.344 0-4.507-.81-6.214-2.163l-.436-.345-2.648.888.888-2.648-.345-.436A9.956 9.956 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
-                    WhatsApp enviado
-                  </div>
-                ) : (
-                  <button onClick={handleWhatsApp} className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.344 0-4.507-.81-6.214-2.163l-.436-.345-2.648.888.888-2.648-.345-.436A9.956 9.956 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
-                    {`Enviar ${success.entries.length > 1 ? `${success.entries.length} Entradas` : 'Entrada'} por WhatsApp`}
-                  </button>
-                )
-              ) : null}
-              <button onClick={handlePrint} disabled={printing} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                {printing ? 'Generando...' : `Imprimir ${success.entries.length > 1 ? `${success.entries.length} Entradas` : 'Entrada'}`}
-              </button>
-              <button onClick={() => { setSuccess(null); setEmailSent(false); setWhatsappSent(false); setError('') }} className="w-full bg-dark-50 hover:bg-dark-200 text-white/80 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm">
-                Vender otra entrada
+            <div className="space-y-3 p-5">
+              <ul className="space-y-1.5">
+                {success.entries.map((entry, i) => (
+                  <li key={entry.entryId} className="flex items-center gap-2 text-sm text-staff-fg">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-500">
+                      {i + 1}
+                    </span>
+                    <span className="truncate">{entry.clientName}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex items-baseline justify-between border-t border-dashed border-staff-border pt-3">
+                <span className="truncate text-xs text-staff-muted">{success.clientEmail}</span>
+                <span className="text-xl font-bold text-primary-500">
+                  L {success.totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <DeliveryTile
+                  label={emailSent ? 'Enviado' : sendingEmail ? 'Enviando…' : 'Correo'}
+                  done={emailSent}
+                  disabled={sendingEmail || emailSent}
+                  onClick={handleEmail}
+                  icon="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+                <DeliveryTile
+                  label={!success.clientPhone ? 'Sin número' : whatsappSent ? 'Enviado' : 'WhatsApp'}
+                  done={whatsappSent}
+                  disabled={!success.clientPhone}
+                  onClick={handleWhatsApp}
+                  icon="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
+                <DeliveryTile
+                  label={printing ? 'Generando…' : 'Imprimir'}
+                  disabled={printing}
+                  onClick={handlePrint}
+                  icon="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={resetSale}
+                className="w-full rounded-xl border border-staff-border py-2.5 text-sm font-semibold text-staff-fg hover:bg-staff-hover"
+              >
+                Vender otra
               </button>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center">
-            <svg className="w-20 h-20 text-white/10 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
-            <h3 className="text-lg font-medium text-white/40 mb-1">Completa la venta</h3>
-            <p className="text-sm text-white/20">Llena el formulario para generar la entrada y enviar el QR.</p>
+          <div className="overflow-hidden rounded-2xl border border-staff-border bg-staff-surface">
+            <div className="relative h-28 bg-staff-raised">
+              {selectedEvent?.coverImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={selectedEvent.coverImage} alt="" className="h-full w-full object-cover" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+              <p className="absolute bottom-3 left-4 right-4 truncate text-lg font-bold text-white">
+                {selectedEvent?.name ?? 'Elige un evento'}
+              </p>
+            </div>
+            <div className="space-y-3 p-5">
+              <div className="flex justify-between text-sm">
+                <span className="text-staff-muted">Entradas</span>
+                <span className="font-semibold tabular-nums text-staff-fg">
+                  {numberOfEntries} × L {(selectedEvent?.coverPrice ?? 0).toFixed(2)}
+                </span>
+              </div>
+              {remainingAtDoor != null && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-staff-muted">Disponibles</span>
+                  <span className="font-semibold tabular-nums text-staff-fg">{remainingAtDoor}</span>
+                </div>
+              )}
+              <div className="flex items-baseline justify-between border-t border-dashed border-staff-border pt-3">
+                <span className="text-sm text-staff-muted">Total</span>
+                <span className="text-3xl font-black tabular-nums text-primary-500">
+                  L {totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <button
+                type="submit"
+                form="sell-entry-form"
+                disabled={isPending || doorSoldOut || !selectedEvent || !!success}
+                className="hidden w-full rounded-xl bg-primary-600 py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 lg:block"
+              >
+                {isPending ? 'Procesando…' : 'Registrar venta'}
+              </button>
+            </div>
           </div>
         )}
-      </div>
+      </aside>
     </div>
+  )
+}
+
+const inputCls =
+  'w-full rounded-xl border border-staff-border bg-staff-raised px-4 py-2.5 text-sm text-staff-fg placeholder:text-staff-muted focus:outline-none focus:ring-2 focus:ring-primary-500'
+
+function Section({
+  step,
+  title,
+  aside,
+  children,
+}: {
+  step: number
+  title: string
+  aside?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section className="rounded-2xl border border-staff-border bg-staff-surface p-4 sm:p-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-staff-raised text-xs font-bold text-staff-muted">
+            {step}
+          </span>
+          <h3 className="font-semibold text-staff-fg">{title}</h3>
+        </div>
+        {aside}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-medium text-staff-muted">
+        {label} {hint && <span className="font-normal opacity-70">({hint})</span>}
+      </span>
+      {children}
+    </label>
+  )
+}
+
+function DeliveryTile({
+  label,
+  icon,
+  done,
+  disabled,
+  onClick,
+}: {
+  label: string
+  icon: string
+  done?: boolean
+  disabled?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
+        done
+          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500'
+          : 'border-staff-border text-staff-fg hover:bg-staff-hover disabled:opacity-50'
+      }`}
+    >
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d={done ? 'M5 13l4 4L19 7' : icon} />
+      </svg>
+      {label}
+    </button>
   )
 }
