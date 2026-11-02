@@ -8,6 +8,7 @@ import {
   validateEntryByToken,
   type TaquillaHistoryEntry,
 } from '@/lib/actions'
+import { createScanGate, isRepeatScan, type LastMarked } from '@/lib/entry-scan'
 
 type ActiveEvent = {
   id: string
@@ -35,10 +36,19 @@ type ScannedEntry = {
 }
 
 type ScanPopup = {
-  kind: 'valid' | 'used' | 'cancelled' | 'error'
+  kind: 'valid' | 'repeat' | 'used' | 'cancelled' | 'error'
   title: string
   message?: string
   entry?: ScannedEntry
+}
+
+function repeatPopup(entry: ScannedEntry): ScanPopup {
+  return {
+    kind: 'repeat',
+    title: 'ESCANEO REPETIDO',
+    message: 'Esta entrada se acaba de marcar en este dispositivo. Si la persona ya pasó, no hay que hacer nada.',
+    entry,
+  }
 }
 
 function toScannedEntry(entry: NonNullable<Awaited<ReturnType<typeof validateEntryByToken>>>): ScannedEntry {
@@ -122,6 +132,10 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
   const camerasRef = useRef<{ id: string; label: string }[]>([])
   const currentCameraIndexRef = useRef(0)
   const switchingCameraRef = useRef(false)
+  /** Solo una lectura de cámara se procesa hasta reabrir el escáner (evita verde→rojo por doble lectura). */
+  const scanGateRef = useRef(createScanGate())
+  /** Última entrada marcada desde este dispositivo, para reconocer re-escaneos del mismo QR. */
+  const lastMarkedRef = useRef<LastMarked>(null)
   const [canSwitchCamera, setCanSwitchCamera] = useState(false)
 
   const selectedEvent = useMemo(
@@ -209,6 +223,10 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
 
         if (entry.status === 'USED') {
           setScannedEntry(scanned)
+          if (isRepeatScan(lastMarkedRef.current, entry.id, new Date())) {
+            setScanPopup(repeatPopup(scanned))
+            return
+          }
           setScanPopup({ kind: 'used', title: 'ENTRADA USADA', message: 'Esta entrada ya fue utilizada.', entry: scanned })
           return
         }
@@ -226,6 +244,10 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
           if (fresh?.status === 'USED') {
             const freshScanned = toScannedEntry(fresh)
             setScannedEntry(freshScanned)
+            if (isRepeatScan(lastMarkedRef.current, fresh.id, new Date())) {
+              setScanPopup(repeatPopup(freshScanned))
+              return
+            }
             setScanPopup({ kind: 'used', title: 'ENTRADA USADA', message: 'Esta entrada ya fue utilizada.', entry: freshScanned })
             return
           }
@@ -239,6 +261,7 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
           return
         }
 
+        lastMarkedRef.current = { entryId: entry.id, at: new Date() }
         const usedNow: ScannedEntry = { ...scanned, status: 'USED' }
         setScannedEntry(usedNow)
         setScanPopup({ kind: 'valid', title: 'ENTRADA VÁLIDA', message: 'Marcada como usada. Permitir ingreso.', entry: usedNow })
@@ -268,6 +291,7 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
     startTransition(async () => {
       try {
         await markEntryUsed(scannedEntry.id)
+        lastMarkedRef.current = { entryId: scannedEntry.id, at: new Date() }
         setScannedEntry({ ...scannedEntry, status: 'USED' })
         setSuccessMsg('Entrada marcada como USADA correctamente.')
         router.refresh()
@@ -317,6 +341,7 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
 
     await stopScanner()
     await new Promise((r) => setTimeout(r, 100))
+    scanGateRef.current.release()
     setScannerError('')
 
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -385,6 +410,8 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
         },
         async (decodedText: string) => {
           if (!isMountedRef.current) return
+          // Síncrono, antes de cualquier await: las lecturas siguientes del mismo cuadro se descartan.
+          if (!scanGateRef.current.tryAcquire()) return
           await stopScanner()
           await lookupEntry(decodedText)
         },
@@ -689,11 +716,15 @@ export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
           >
             <div
               className={`w-full max-w-md rounded-2xl border-4 p-6 text-center shadow-2xl ${
-                scanPopup.kind === 'valid' ? 'bg-green-600 border-green-300' : 'bg-red-600 border-red-300'
+                scanPopup.kind === 'valid'
+                  ? 'bg-green-600 border-green-300'
+                  : scanPopup.kind === 'repeat'
+                    ? 'bg-amber-500 border-amber-200'
+                    : 'bg-red-600 border-red-300'
               }`}
             >
               <div className="text-6xl font-black text-white leading-none mb-3">
-                {scanPopup.kind === 'valid' ? '✓' : '✕'}
+                {scanPopup.kind === 'valid' ? '✓' : scanPopup.kind === 'repeat' ? '↻' : '✕'}
               </div>
               <h2 className="text-3xl font-black text-white tracking-wide">{scanPopup.title}</h2>
               {scanPopup.message && <p className="mt-2 text-lg font-semibold text-white/95">{scanPopup.message}</p>}
