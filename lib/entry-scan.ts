@@ -35,3 +35,31 @@ export function isRepeatScan(last: LastMarked, entryId: string, now: Date): bool
   if (!last || last.entryId !== entryId) return false
   return now.getTime() - last.at.getTime() <= REPEAT_SCAN_WINDOW_MS
 }
+
+export type DoorScanKind = 'valid' | 'used' | 'cancelled' | 'wrong_event' | 'not_found'
+
+/** Qué hacer con una entrada leída en puerta para el evento seleccionado. */
+export function classifyDoorScan(
+  entry: { eventId: string; status: 'ACTIVE' | 'USED' | 'CANCELLED' } | null,
+  selectedEventId: string
+): DoorScanKind {
+  if (!entry) return 'not_found'
+  if (entry.eventId !== selectedEventId) return 'wrong_event'
+  if (entry.status === 'CANCELLED') return 'cancelled'
+  if (entry.status === 'USED') return 'used'
+  return 'valid'
+}
+
+/** Extrae el token de un QR: acepta la URL /entradas/validar/<token> o el token solo. */
+export function parseScanToken(text: string): string {
+  const cleaned = text.trim()
+  if (!cleaned) return ''
+  try {
+    const parts = new URL(cleaned).pathname.split('/').filter(Boolean)
+    const i = parts.indexOf('validar')
+    if (i !== -1 && parts[i + 1]) return parts[i + 1]
+    return parts.pop() || cleaned
+  } catch {
+    return cleaned
+  }
+}

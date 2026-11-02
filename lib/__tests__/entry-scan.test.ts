@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createScanGate, isRepeatScan, REPEAT_SCAN_WINDOW_MS } from '@/lib/entry-scan'
+import { classifyDoorScan, createScanGate, isRepeatScan, parseScanToken, REPEAT_SCAN_WINDOW_MS } from '@/lib/entry-scan'
 
 describe('createScanGate', () => {
   it('deja pasar la primera lectura y bloquea las siguientes mientras está ocupado', () => {
@@ -43,5 +43,37 @@ describe('isRepeatScan', () => {
 
   it('no es repetido si no hay marca previa', () => {
     expect(isRepeatScan(null, 'e1', now)).toBe(false)
+  })
+})
+
+describe('classifyDoorScan', () => {
+  const base = { eventId: 'ev1', status: 'ACTIVE' as const }
+
+  it('sin entrada = not_found', () => {
+    expect(classifyDoorScan(null, 'ev1')).toBe('not_found')
+  })
+  it('otro evento = wrong_event (aunque esté activa)', () => {
+    expect(classifyDoorScan({ ...base, eventId: 'ev2' }, 'ev1')).toBe('wrong_event')
+  })
+  it('cancelada = cancelled', () => {
+    expect(classifyDoorScan({ ...base, status: 'CANCELLED' }, 'ev1')).toBe('cancelled')
+  })
+  it('usada = used', () => {
+    expect(classifyDoorScan({ ...base, status: 'USED' }, 'ev1')).toBe('used')
+  })
+  it('activa del evento = valid', () => {
+    expect(classifyDoorScan(base, 'ev1')).toBe('valid')
+  })
+})
+
+describe('parseScanToken', () => {
+  it('saca el token de la URL de validación', () => {
+    expect(parseScanToken('https://gcb.hn/entradas/validar/abc123?x=1')).toBe('abc123')
+  })
+  it('acepta el token solo', () => {
+    expect(parseScanToken('  abc123 ')).toBe('abc123')
+  })
+  it('vacío = vacío', () => {
+    expect(parseScanToken('   ')).toBe('')
   })
 })

@@ -1,14 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  getTaquillaEventEntries,
-  markEntryUsed,
-  validateEntryByToken,
-  type TaquillaHistoryEntry,
+  getDoorStats,
+  scanEntryAtDoor,
+  searchEventEntries,
+  type DoorScanResult,
+  type EventEntryRow,
 } from '@/lib/actions'
-import { createScanGate, isRepeatScan, type LastMarked } from '@/lib/entry-scan'
+import { isRepeatScan, type LastMarked } from '@/lib/entry-scan'
+import { QrScanner } from '@/components/entries/QrScanner'
+import { HourBars } from '@/components/entries/HourBars'
 
 type ActiveEvent = {
   id: string
@@ -18,752 +20,540 @@ type ActiveEvent = {
   venueAddress: string | null
 }
 
-type ScannedEntry = {
-  id: string
-  clientName: string
-  clientEmail: string
-  numberOfEntries: number
-  status: 'ACTIVE' | 'USED' | 'CANCELLED'
-  event: {
-    id: string
-    name: string
-    date: string | Date
-    description: string | null
-    coverImage: string | null
-    venueName: string | null
-    venueAddress: string | null
+type DoorStats = Awaited<ReturnType<typeof getDoorStats>>
+type ResultKind = DoorScanResult['kind'] | 'repeat' | 'error'
+type ScanOutcome = { kind: ResultKind; result?: DoorScanResult; message?: string }
+
+const AUTO_CLOSE_VALID_MS = 2000
+const STATS_REFRESH_MS = 30_000
+
+const timeHn = (iso: string | null | undefined) =>
+  iso
+    ? new Date(iso).toLocaleTimeString('es-HN', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Tegucigalpa' })
+    : ''
+
+const OUTCOME_STYLE: Record<ResultKind, { bg: string; icon: string; title: string }> = {
+  valid: { bg: 'bg-emerald-600', icon: '✓', title: 'PASA' },
+  repeat: { bg: 'bg-amber-500', icon: '↻', title: 'ESCANEO REPETIDO' },
+  used: { bg: 'bg-red-600', icon: '✕', title: 'YA USADA' },
+  cancelled: { bg: 'bg-red-600', icon: '✕', title: 'CANCELADA' },
+  wrong_event: { bg: 'bg-red-600', icon: '✕', title: 'OTRO EVENTO' },
+  not_found: { bg: 'bg-red-600', icon: '?', title: 'NO EXISTE' },
+  error: { bg: 'bg-zinc-700', icon: '!', title: 'ERROR' },
+}
+
+function outcomeDetail(o: ScanOutcome): string {
+  const e = o.result?.entry
+  switch (o.kind) {
+    case 'valid':
+      return 'Ingreso registrado'
+    case 'repeat':
+      return 'Se acaba de marcar en este dispositivo. Si ya pasó, no hay que hacer nada.'
+    case 'used':
+      return e?.usedAt
+        ? `Ingresó a las ${timeHn(e.usedAt)}${e.usedByName ? ` · escaneó ${e.usedByName}` : ''}`
+        : 'Esta entrada ya fue utilizada'
+    case 'cancelled':
+      return 'Entrada cancelada. No permitir ingreso.'
+    case 'wrong_event':
+      return `Es de "${o.result?.eventName ?? 'otro evento'}"`
+    case 'not_found':
+      return 'Verifica el código QR'
+    default:
+      return o.message || 'Intenta de nuevo'
   }
 }
 
-type ScanPopup = {
-  kind: 'valid' | 'repeat' | 'used' | 'cancelled' | 'error'
-  title: string
-  message?: string
-  entry?: ScannedEntry
+function vibrateFor(kind: ResultKind) {
+  if (typeof navigator === 'undefined' || !navigator.vibrate) return
+  if (kind === 'valid') navigator.vibrate(80)
+  else if (kind === 'repeat') navigator.vibrate([60, 60, 60])
+  else navigator.vibrate([200, 80, 200, 80, 200])
 }
 
-function repeatPopup(entry: ScannedEntry): ScanPopup {
-  return {
-    kind: 'repeat',
-    title: 'ESCANEO REPETIDO',
-    message: 'Esta entrada se acaba de marcar en este dispositivo. Si la persona ya pasó, no hay que hacer nada.',
-    entry,
-  }
+const STATUS_BADGE: Record<EventEntryRow['status'], { label: string; cls: string }> = {
+  ACTIVE: { label: 'Falta', cls: 'bg-sky-500/15 text-sky-500' },
+  USED: { label: 'Ingresó', cls: 'bg-emerald-500/15 text-emerald-500' },
+  CANCELLED: { label: 'Cancelada', cls: 'bg-red-500/15 text-red-500' },
 }
 
-function toScannedEntry(entry: NonNullable<Awaited<ReturnType<typeof validateEntryByToken>>>): ScannedEntry {
-  return {
-    id: entry.id,
-    clientName: entry.clientName,
-    clientEmail: entry.clientEmail,
-    numberOfEntries: entry.numberOfEntries,
-    status: entry.status,
-    event: {
-      id: entry.event.id,
-      name: entry.event.name,
-      date: entry.event.date,
-      description: entry.event.description ?? null,
-      coverImage: entry.event.coverImage ?? null,
-      venueName: entry.event.venueName ?? null,
-      venueAddress: entry.event.venueAddress ?? null,
-    },
-  }
-}
+// ─────────────────────────────────────────────────────────────
 
 export function TaquillaScanClient({ events }: { events: ActiveEvent[] }) {
-  const router = useRouter()
-  const [selectedEventId, setSelectedEventId] = useState(events[0]?.id ?? '')
-  const [manualToken, setManualToken] = useState('')
-  const [scannedEntry, setScannedEntry] = useState<ScannedEntry | null>(null)
-  const [error, setError] = useState('')
-  const [successMsg, setSuccessMsg] = useState('')
-  const [scannerError, setScannerError] = useState('')
-  const [isScanning, setIsScanning] = useState(false)
-  const [scanPopup, setScanPopup] = useState<ScanPopup | null>(null)
-  const [isPending, startTransition] = useTransition()
-
-  const [histStatus, setHistStatus] = useState<'all' | 'ACTIVE' | 'USED' | 'CANCELLED'>('all')
-  const [histSearch, setHistSearch] = useState('')
-  const [histSearchDebounced, setHistSearchDebounced] = useState('')
-  const [histRows, setHistRows] = useState<TaquillaHistoryEntry[]>([])
-  const [histLoading, setHistLoading] = useState(false)
-  const [histError, setHistError] = useState('')
-  const [resendingId, setResendingId] = useState<string | null>(null)
-  const [histMsg, setHistMsg] = useState('')
-
-  useEffect(() => {
-    const t = setTimeout(() => setHistSearchDebounced(histSearch), 400)
-    return () => clearTimeout(t)
-  }, [histSearch])
-
-  useEffect(() => {
-    if (!selectedEventId) {
-      setHistRows([])
-      return
-    }
-    let cancelled = false
-    setHistLoading(true)
-    setHistError('')
-    getTaquillaEventEntries({
-      eventId: selectedEventId,
-      status: histStatus,
-      search: histSearchDebounced.trim() || undefined,
-    })
-      .then((rows) => {
-        if (!cancelled) setHistRows(rows)
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setHistError(e?.message || 'No se pudo cargar el historial')
-          setHistRows([])
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setHistLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [selectedEventId, histStatus, histSearchDebounced])
-
-  const scannerRef = useRef<any>(null)
-  const scannerContainerRef = useRef<HTMLDivElement>(null)
-  const isMountedRef = useRef(true)
-  const camerasRef = useRef<{ id: string; label: string }[]>([])
-  const currentCameraIndexRef = useRef(0)
-  const switchingCameraRef = useRef(false)
-  /** Solo una lectura de cámara se procesa hasta reabrir el escáner (evita verde→rojo por doble lectura). */
-  const scanGateRef = useRef(createScanGate())
-  /** Última entrada marcada desde este dispositivo, para reconocer re-escaneos del mismo QR. */
+  const [eventId, setEventId] = useState(events[0]?.id ?? '')
+  const [tab, setTab] = useState<'scan' | 'history'>('scan')
+  const [stats, setStats] = useState<DoorStats | null>(null)
+  const [outcome, setOutcome] = useState<ScanOutcome | null>(null)
   const lastMarkedRef = useRef<LastMarked>(null)
-  const [canSwitchCamera, setCanSwitchCamera] = useState(false)
+  const event = useMemo(() => events.find((e) => e.id === eventId) ?? null, [events, eventId])
 
-  const selectedEvent = useMemo(
-    () => events.find((event) => event.id === selectedEventId) ?? null,
-    [events, selectedEventId]
+  const refreshStats = useCallback(async () => {
+    if (!eventId) return
+    try {
+      setStats(await getDoorStats(eventId))
+    } catch {
+      // se reintenta en el próximo ciclo
+    }
+  }, [eventId])
+
+  useEffect(() => {
+    setStats(null)
+    void refreshStats()
+    const t = setInterval(() => void refreshStats(), STATS_REFRESH_MS)
+    return () => clearInterval(t)
+  }, [refreshStats])
+
+  // Verde se cierra solo; el resto requiere un toque.
+  useEffect(() => {
+    if (outcome?.kind !== 'valid') return
+    const t = setTimeout(() => setOutcome(null), AUTO_CLOSE_VALID_MS)
+    return () => clearTimeout(t)
+  }, [outcome])
+
+  /** Procesa un token (de la cámara o de la búsqueda). */
+  const processToken = useCallback(
+    async (token: string) => {
+      if (!eventId) return
+      const show = (o: ScanOutcome) => {
+        vibrateFor(o.kind)
+        setOutcome(o)
+      }
+      try {
+        const result = await scanEntryAtDoor(token, eventId)
+        if (result.kind === 'valid' && result.entry) {
+          lastMarkedRef.current = { entryId: result.entry.id, at: new Date() }
+        }
+        const repeat =
+          result.kind === 'used' && !!result.entry && isRepeatScan(lastMarkedRef.current, result.entry.id, new Date())
+        show({ kind: repeat ? 'repeat' : result.kind, result })
+        if (result.kind === 'valid') void refreshStats()
+      } catch (err) {
+        show({ kind: 'error', message: err instanceof Error ? err.message : 'No se pudo validar' })
+      }
+    },
+    [eventId, refreshStats]
   )
 
-  const stopScanner = useCallback(async () => {
-    if (scannerRef.current) {
-      try {
-        const scanner = scannerRef.current
-        if (typeof scanner.stop === 'function') await scanner.stop().catch(() => {})
-        if (typeof scanner.clear === 'function') await scanner.clear().catch(() => {})
-        if (scannerContainerRef.current) scannerContainerRef.current.innerHTML = ''
-      } catch {
-        // no-op
-      }
-      scannerRef.current = null
-    }
+  if (!events.length) {
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <p className="text-lg font-semibold text-staff-fg">No hay eventos activos</p>
+        <p className="mt-1 text-sm text-staff-muted">Cuando haya un evento hoy o mañana aparecerá aquí.</p>
+      </div>
+    )
+  }
 
-    if (isMountedRef.current) {
-      setIsScanning(false)
-      setScannerError('')
+  return (
+    <div className="mx-auto max-w-md space-y-4">
+      <DoorHeader events={events} eventId={eventId} onEventChange={setEventId} stats={stats} />
+
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-staff-raised p-1" role="tablist">
+        {(
+          [
+            ['scan', 'Escanear'],
+            ['history', 'Historial'],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
+              tab === id ? 'bg-staff-surface text-staff-fg shadow-sm' : 'text-staff-muted'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'scan' ? (
+        <div className="space-y-4">
+          <QrScanner onDecode={processToken} paused={!!outcome} />
+          <QuickSearch eventId={eventId} onMark={(row) => processToken(row.qrToken)} />
+        </div>
+      ) : (
+        event && <HistoryPanel event={event} stats={stats} />
+      )}
+
+      {outcome && <OutcomeOverlay outcome={outcome} onClose={() => setOutcome(null)} />}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+
+function DoorHeader({
+  events,
+  eventId,
+  onEventChange,
+  stats,
+}: {
+  events: ActiveEvent[]
+  eventId: string
+  onEventChange: (id: string) => void
+  stats: DoorStats | null
+}) {
+  const current = events.find((e) => e.id === eventId)
+  const pct = stats?.usedPct ?? 0
+
+  return (
+    <div className="rounded-2xl border border-staff-border bg-staff-surface p-4">
+      {events.length > 1 ? (
+        <select
+          value={eventId}
+          onChange={(e) => onEventChange(e.target.value)}
+          className="w-full truncate bg-transparent text-lg font-bold text-staff-fg focus:outline-none"
+          aria-label="Evento"
+        >
+          {events.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <p className="truncate text-lg font-bold text-staff-fg">{current?.name}</p>
+      )}
+
+      <div className="mt-3 flex items-end justify-between">
+        <p className="text-4xl font-black leading-none tabular-nums text-staff-fg">
+          {stats ? stats.used : '—'}
+          <span className="ml-1 text-lg font-semibold text-staff-muted">/ {stats ? stats.sold : '—'}</span>
+        </p>
+        <p className="text-sm font-semibold text-primary-500">{stats ? `${pct}%` : ''}</p>
+      </div>
+      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-staff-raised">
+        <div className="h-full rounded-full bg-primary-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-2 text-xs text-staff-muted">
+        {stats ? (
+          <>
+            <span className="font-semibold text-staff-fg">{stats.used}</span> ingresaron ·{' '}
+            <span className="font-semibold text-staff-fg">{stats.pending}</span> faltan
+            {stats.capacity ? ` · cupo ${stats.capacity}` : ''}
+          </>
+        ) : (
+          'Cargando…'
+        )}
+      </p>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+
+function useDebounced<T>(value: T, ms: number) {
+  const [v, setV] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms)
+    return () => clearTimeout(t)
+  }, [value, ms])
+  return v
+}
+
+function QuickSearch({ eventId, onMark }: { eventId: string; onMark: (row: EventEntryRow) => Promise<void> }) {
+  const [q, setQ] = useState('')
+  const debounced = useDebounced(q.trim(), 300)
+  const [rows, setRows] = useState<EventEntryRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    if (debounced.length < 2) {
+      setRows([])
+      return
     }
-  }, [])
+    setLoading(true)
+    try {
+      const res = await searchEventEntries({ eventId, q: debounced })
+      setRows(res.rows.slice(0, 8))
+    } catch {
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
+  }, [eventId, debounced])
 
   useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-      stopScanner()
-    }
-  }, [stopScanner])
+    void load()
+  }, [load])
 
-  const parseTokenFromUrl = (text: string): string => {
-    const cleaned = text.trim()
-    if (!cleaned) return ''
-    try {
-      const url = new URL(cleaned)
-      const parts = url.pathname.split('/').filter(Boolean)
-      const validarIdx = parts.findIndex((p) => p === 'validar')
-      if (validarIdx !== -1 && parts[validarIdx + 1]) return parts[validarIdx + 1]
-      return parts.pop() || cleaned
-    } catch {
-      return cleaned
-    }
-  }
+  return (
+    <div className="rounded-2xl border border-staff-border bg-staff-surface p-3">
+      <div className="relative">
+        <svg
+          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-staff-muted"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+        </svg>
+        <input
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value)
+            setConfirmId(null)
+          }}
+          placeholder="¿No lee el QR? Busca por nombre, correo o código"
+          className="w-full rounded-xl bg-staff-raised py-3 pl-9 pr-9 text-sm text-staff-fg placeholder:text-staff-muted focus:outline-none focus:ring-2 focus:ring-primary-500"
+          inputMode="search"
+          autoComplete="off"
+        />
+        {q && (
+          <button
+            type="button"
+            onClick={() => setQ('')}
+            aria-label="Limpiar"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-staff-muted"
+          >
+            ✕
+          </button>
+        )}
+      </div>
 
-  const lookupEntry = async (tokenInput: string) => {
-    const token = parseTokenFromUrl(tokenInput)
-    if (!token) {
-      setError('Ingresa un token o URL válida.')
-      return
-    }
+      {debounced.length >= 2 && (
+        <ul className="mt-2 divide-y divide-staff-border">
+          {loading && !rows.length && <li className="py-3 text-center text-xs text-staff-muted">Buscando…</li>}
+          {!loading && !rows.length && <li className="py-3 text-center text-xs text-staff-muted">Sin resultados</li>}
+          {rows.map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-staff-fg">{r.clientName}</p>
+                <p className="truncate text-xs text-staff-muted">
+                  {r.status === 'USED' && r.usedAt ? `Ingresó ${timeHn(r.usedAt)}` : r.clientEmail}
+                </p>
+              </div>
+              {r.status === 'ACTIVE' ? (
+                confirmId === r.id ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setConfirmId(null)
+                      await onMark(r)
+                      await load()
+                    }}
+                    className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
+                  >
+                    Confirmar
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmId(r.id)}
+                    className="shrink-0 rounded-lg border border-emerald-500/50 px-3 py-2 text-xs font-bold text-emerald-500"
+                  >
+                    Dar ingreso
+                  </button>
+                )
+              ) : (
+                <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ${STATUS_BADGE[r.status].cls}`}>
+                  {STATUS_BADGE[r.status].label}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
-    if (!selectedEventId) {
-      setError('Selecciona un evento antes de escanear.')
-      return
-    }
+// ─────────────────────────────────────────────────────────────
 
+function OutcomeOverlay({ outcome, onClose }: { outcome: ScanOutcome; onClose: () => void }) {
+  const st = OUTCOME_STYLE[outcome.kind]
+  const entry = outcome.result?.entry
+  return (
+    <button
+      type="button"
+      onClick={onClose}
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center px-6 text-center text-white ${st.bg}`}
+      aria-live="assertive"
+    >
+      <span className="text-[7rem] font-black leading-none">{st.icon}</span>
+      <span className="mt-2 text-4xl font-black tracking-wide">{st.title}</span>
+      {entry && <span className="mt-6 max-w-full break-words text-2xl font-bold">{entry.clientName}</span>}
+      <span className="mt-2 max-w-sm text-lg font-medium text-white/90">{outcomeDetail(outcome)}</span>
+      <span className="absolute bottom-10 text-sm font-semibold text-white/70">
+        {outcome.kind === 'valid' ? 'Continúa escaneando…' : 'Toca para continuar'}
+      </span>
+    </button>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+
+type Chip = { id: string; label: string; status?: 'ACTIVE' | 'USED' | 'CANCELLED'; origin?: 'online' | 'taquilla' }
+const CHIPS: Chip[] = [
+  { id: 'all', label: 'Todas' },
+  { id: 'pending', label: 'Faltan', status: 'ACTIVE' },
+  { id: 'used', label: 'Ingresaron', status: 'USED' },
+  { id: 'cancelled', label: 'Canceladas', status: 'CANCELLED' },
+  { id: 'online', label: 'Online', origin: 'online' },
+  { id: 'taquilla', label: 'Taquilla', origin: 'taquilla' },
+]
+
+function HistoryPanel({ event, stats }: { event: ActiveEvent; stats: DoorStats | null }) {
+  const [chip, setChip] = useState('all')
+  const [q, setQ] = useState('')
+  const debounced = useDebounced(q.trim(), 350)
+  const [rows, setRows] = useState<EventEntryRow[]>([])
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [msg, setMsg] = useState('')
+  const [resendingId, setResendingId] = useState<string | null>(null)
+  const active = CHIPS.find((c) => c.id === chip) ?? CHIPS[0]
+
+  const fetchPage = useCallback(
+    async (after?: string) => {
+      setLoading(true)
+      setError('')
+      try {
+        const res = await searchEventEntries({
+          eventId: event.id,
+          status: active.status ?? 'all',
+          origin: active.origin ?? 'all',
+          q: debounced || undefined,
+          cursor: after,
+        })
+        setRows((prev) => (after ? [...prev, ...res.rows] : res.rows))
+        setCursor(res.nextCursor)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'No se pudo cargar')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [event.id, active.status, active.origin, debounced]
+  )
+
+  useEffect(() => {
+    void fetchPage()
+  }, [fetchPage])
+
+  const resend = async (r: EventEntryRow) => {
+    setResendingId(r.id)
+    setMsg('')
     setError('')
-    setSuccessMsg('')
-    setScannedEntry(null)
-    setScanPopup(null)
-
-    startTransition(async () => {
-      try {
-        const entry = await validateEntryByToken(token)
-        if (!entry) {
-          setScanPopup({ kind: 'error', title: 'ENTRADA NO ENCONTRADA', message: 'Verifica el código QR.' })
-          return
-        }
-
-        if (entry.event.id !== selectedEventId) {
-          setScanPopup({
-            kind: 'error',
-            title: 'EVENTO INCORRECTO',
-            message: `Esta entrada pertenece a "${entry.event.name}", no al evento seleccionado.`,
-          })
-          return
-        }
-
-        setManualToken(token)
-        const scanned = toScannedEntry(entry)
-
-        if (entry.status === 'USED') {
-          setScannedEntry(scanned)
-          if (isRepeatScan(lastMarkedRef.current, entry.id, new Date())) {
-            setScanPopup(repeatPopup(scanned))
-            return
-          }
-          setScanPopup({ kind: 'used', title: 'ENTRADA USADA', message: 'Esta entrada ya fue utilizada.', entry: scanned })
-          return
-        }
-
-        if (entry.status === 'CANCELLED') {
-          setScannedEntry(scanned)
-          setScanPopup({ kind: 'cancelled', title: 'ENTRADA CANCELADA', message: 'Esta entrada fue cancelada. No permitir ingreso.', entry: scanned })
-          return
-        }
-
-        try {
-          await markEntryUsed(entry.id)
-        } catch (markErr: any) {
-          const fresh = await validateEntryByToken(token).catch(() => null)
-          if (fresh?.status === 'USED') {
-            const freshScanned = toScannedEntry(fresh)
-            setScannedEntry(freshScanned)
-            if (isRepeatScan(lastMarkedRef.current, fresh.id, new Date())) {
-              setScanPopup(repeatPopup(freshScanned))
-              return
-            }
-            setScanPopup({ kind: 'used', title: 'ENTRADA USADA', message: 'Esta entrada ya fue utilizada.', entry: freshScanned })
-            return
-          }
-          setScannedEntry(scanned)
-          setScanPopup({
-            kind: 'error',
-            title: 'NO SE PUDO MARCAR',
-            message: markErr?.message || 'Intenta de nuevo.',
-            entry: scanned,
-          })
-          return
-        }
-
-        lastMarkedRef.current = { entryId: entry.id, at: new Date() }
-        const usedNow: ScannedEntry = { ...scanned, status: 'USED' }
-        setScannedEntry(usedNow)
-        setScanPopup({ kind: 'valid', title: 'ENTRADA VÁLIDA', message: 'Marcada como usada. Permitir ingreso.', entry: usedNow })
-        void refreshHistorial()
-      } catch (err: any) {
-        setScanPopup({ kind: 'error', title: 'ERROR AL VALIDAR', message: err?.message || 'Intenta de nuevo.' })
-      }
-    })
-  }
-
-  const refreshHistorial = useCallback(async () => {
-    if (!selectedEventId) return
-    try {
-      const rows = await getTaquillaEventEntries({
-        eventId: selectedEventId,
-        status: histStatus,
-        search: histSearchDebounced.trim() || undefined,
-      })
-      setHistRows(rows)
-    } catch {
-      // ignore
-    }
-  }, [selectedEventId, histStatus, histSearchDebounced])
-
-  const handleMarkUsed = () => {
-    if (!scannedEntry || scannedEntry.status !== 'ACTIVE') return
-    startTransition(async () => {
-      try {
-        await markEntryUsed(scannedEntry.id)
-        lastMarkedRef.current = { entryId: scannedEntry.id, at: new Date() }
-        setScannedEntry({ ...scannedEntry, status: 'USED' })
-        setSuccessMsg('Entrada marcada como USADA correctamente.')
-        router.refresh()
-        await refreshHistorial()
-      } catch (err: any) {
-        setError(err.message || 'No se pudo marcar la entrada')
-      }
-    })
-  }
-
-  const handleResendTaquillaEmail = async (entry: TaquillaHistoryEntry) => {
-    if (entry.status === 'CANCELLED' || !selectedEvent) return
-    setResendingId(entry.id)
-    setHistError('')
-    setHistMsg('')
     try {
       const res = await fetch('/api/send-entry-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          entries: [{ entryId: entry.id, qrToken: entry.qrToken, clientName: entry.clientName }],
-          clientEmail: entry.clientEmail,
-          eventName: selectedEvent.name,
-          eventDate: String(selectedEvent.date),
-          totalPrice: entry.totalPrice,
-          venueName: selectedEvent.venueName ?? undefined,
-          venueAddress: selectedEvent.venueAddress ?? undefined,
+          entries: [{ entryId: r.id, qrToken: r.qrToken, clientName: r.clientName }],
+          clientEmail: r.clientEmail,
+          eventName: event.name,
+          eventDate: String(event.date),
+          totalPrice: r.totalPrice,
+          venueName: event.venueName ?? undefined,
+          venueAddress: event.venueAddress ?? undefined,
         }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error((json as { error?: string }).error || 'Error al enviar correo')
-      setHistMsg(`QR reenviado a ${entry.clientEmail}`)
-      router.refresh()
-      await refreshHistorial()
-    } catch (err: unknown) {
-      setHistError(err instanceof Error ? err.message : 'Error al reenviar')
+      setMsg(`QR reenviado a ${r.clientEmail}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al reenviar')
     } finally {
       setResendingId(null)
     }
   }
 
-  const startScanner = async () => {
-    if (!selectedEventId) {
-      setError('Selecciona un evento antes de abrir la cámara.')
-      return
-    }
-
-    await stopScanner()
-    await new Promise((r) => setTimeout(r, 100))
-    scanGateRef.current.release()
-    setScannerError('')
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setScannerError('Tu dispositivo no soporta el acceso a la cámara.')
-      return
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-      stream.getTracks().forEach((track) => track.stop())
-    } catch {
-      setScannerError('No pudimos acceder a la cámara. Revisa permisos del navegador.')
-      return
-    }
-
-    setIsScanning(true)
-    await new Promise((r) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 200)))
-    )
-
-    try {
-      const { Html5Qrcode } = await import('html5-qrcode')
-      let attempts = 0
-      while (!scannerContainerRef.current && attempts < 10) {
-        await new Promise((r) => setTimeout(r, 50))
-        attempts++
-      }
-      if (!scannerContainerRef.current) {
-        setScannerError('Error con el contenedor del escáner.')
-        setIsScanning(false)
-        return
-      }
-
-      if (!scannerContainerRef.current.id) {
-        scannerContainerRef.current.id = 'taquilla-qr-reader'
-      }
-      scannerContainerRef.current.innerHTML = ''
-
-      const cameras = await Html5Qrcode.getCameras()
-      if (!cameras.length) {
-        setScannerError('No se encontró cámara disponible.')
-        setIsScanning(false)
-        return
-      }
-
-      camerasRef.current = cameras
-      if (!switchingCameraRef.current) {
-        const backLabels = ['back', 'rear', 'trasera', 'posterior', 'environment']
-        const backIdx = cameras.findIndex((camera) =>
-          backLabels.some((label) => camera.label.toLowerCase().includes(label))
-        )
-        currentCameraIndexRef.current = backIdx >= 0 ? backIdx : cameras.length >= 2 ? 1 : 0
-      }
-      switchingCameraRef.current = false
-      setCanSwitchCamera(cameras.length > 1)
-
-      const html5QrCode = new Html5Qrcode(scannerContainerRef.current.id, { verbose: false })
-      scannerRef.current = html5QrCode
-
-      await html5QrCode.start(
-        cameras[currentCameraIndexRef.current].id,
-        {
-          fps: 10,
-          qrbox: window.innerWidth < 640 ? { width: 220, height: 220 } : { width: 300, height: 300 },
-          aspectRatio: 1.0,
-        },
-        async (decodedText: string) => {
-          if (!isMountedRef.current) return
-          // Síncrono, antes de cualquier await: las lecturas siguientes del mismo cuadro se descartan.
-          if (!scanGateRef.current.tryAcquire()) return
-          await stopScanner()
-          await lookupEntry(decodedText)
-        },
-        () => {}
-      )
-    } catch (err: any) {
-      setScannerError(err?.message || 'Error al iniciar escáner.')
-      await stopScanner()
-      if (isMountedRef.current) setIsScanning(false)
-    }
-  }
-
-  const handleSwitchCamera = async () => {
-    if (camerasRef.current.length <= 1) return
-    switchingCameraRef.current = true
-    currentCameraIndexRef.current = (currentCameraIndexRef.current + 1) % camerasRef.current.length
-    await stopScanner()
-    await new Promise((r) => setTimeout(r, 300))
-    await startScanner()
-  }
-
-  const statusPill =
-    scannedEntry?.status === 'ACTIVE'
-      ? 'bg-green-500/20 border-green-500/40 text-green-300'
-      : scannedEntry?.status === 'USED'
-      ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
-      : 'bg-red-500/20 border-red-500/40 text-red-300'
+  const peak = stats?.checkinsByHour.length
+    ? stats.checkinsByHour.reduce((a, b) => (b.count > a.count ? b : a))
+    : null
 
   return (
-    <div className="space-y-6">
-        <header>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">Taquilla</h1>
-          <p className="text-sm text-dark-400 mt-1">Escaneo de entradas por evento</p>
-        </header>
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-staff-border bg-staff-surface p-4">
+        <div className="mb-3 flex items-baseline justify-between">
+          <p className="text-sm font-semibold text-staff-fg">Ingreso por hora</p>
+          {peak && <p className="text-xs text-staff-muted">pico: {peak.label}</p>}
+        </div>
+        <HourBars buckets={stats?.checkinsByHour ?? []} emptyText="Aún no hay ingresos" />
+      </div>
 
-        <section className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 space-y-4">
-          <label className="block text-sm font-medium text-dark-300">Evento activo</label>
-          <select
-            value={selectedEventId}
-            onChange={(e) => {
-              setSelectedEventId(e.target.value)
-              setError('')
-              setSuccessMsg('')
-              setScannedEntry(null)
-              setHistMsg('')
-              setHistError('')
-            }}
-            className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+        {CHIPS.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => setChip(c.id)}
+            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              chip === c.id
+                ? 'border-primary-500 bg-primary-500 text-white'
+                : 'border-staff-border bg-staff-surface text-staff-muted'
+            }`}
           >
-            {events.length === 0 && <option value="">No hay eventos activos</option>}
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name} - {new Date(event.date).toLocaleDateString('es-HN')}
-              </option>
-            ))}
-          </select>
-          {selectedEvent && (
-            <p className="text-xs text-dark-400">
-              Validando entradas para: <span className="text-white/90">{selectedEvent.name}</span>
-            </p>
-          )}
-        </section>
+            {c.label}
+          </button>
+        ))}
+      </div>
 
-        <section className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 space-y-4">
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => (isScanning ? stopScanner() : startScanner())}
-              disabled={!selectedEventId || events.length === 0}
-              className={`flex-1 font-semibold py-3 px-4 rounded-lg transition-colors ${
-                isScanning ? 'bg-red-500/20 border border-red-500/40 text-red-200' : 'bg-primary-600 hover:bg-primary-700 text-white'
-              } disabled:opacity-50`}
-            >
-              {isScanning ? 'Detener escaneo' : 'Escanear QR'}
-            </button>
-            {canSwitchCamera && isScanning && (
-              <button
-                type="button"
-                onClick={handleSwitchCamera}
-                className="px-4 py-3 bg-dark-200 hover:bg-dark-50 text-white rounded-lg text-sm font-medium"
-              >
-                Cambiar camara
-              </button>
-            )}
-          </div>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Buscar nombre, correo, teléfono…"
+        className="w-full rounded-xl border border-staff-border bg-staff-surface px-4 py-3 text-sm text-staff-fg placeholder:text-staff-muted focus:outline-none focus:ring-2 focus:ring-primary-500"
+        inputMode="search"
+      />
 
-          {isScanning && (
-            <div>
-              <div id="taquilla-qr-reader" ref={scannerContainerRef} className="w-full bg-dark-50 rounded-xl overflow-hidden border border-dark-200 min-h-[260px]" />
-            </div>
-          )}
+      {error && <p className="text-sm text-red-500">{error}</p>}
+      {msg && <p className="text-sm text-emerald-500">{msg}</p>}
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              lookupEntry(manualToken)
-            }}
-            className="flex gap-2 sm:gap-3"
-          >
-            <input
-              type="text"
-              value={manualToken}
-              onChange={(e) => setManualToken(e.target.value)}
-              placeholder="Pega URL o token de entrada..."
-              className="flex-1 min-w-0 px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-            <button
-              type="submit"
-              disabled={isPending || !selectedEventId}
-              className="shrink-0 bg-primary-600 hover:bg-primary-700 text-white font-semibold px-5 py-3 rounded-lg disabled:opacity-50"
-            >
-              {isPending ? '...' : 'Validar'}
-            </button>
-          </form>
-
-          {scannerError && <div className="bg-amber-500/10 border border-amber-500/40 text-amber-200 px-4 py-3 rounded-lg text-sm">{scannerError}</div>}
-          {error && <div className="bg-red-500/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg text-sm">{error}</div>}
-          {successMsg && <div className="bg-green-500/20 border border-green-500/50 text-green-300 px-4 py-3 rounded-lg text-sm">{successMsg}</div>}
-        </section>
-
-        {scannedEntry && (
-          <section className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 space-y-4">
-            <div className={`inline-flex items-center border px-3 py-1 rounded-full text-xs font-semibold ${statusPill}`}>
-              {scannedEntry.status}
-            </div>
-            <h2 className="text-xl font-semibold text-white">{scannedEntry.event.name}</h2>
-            <p className="text-sm text-dark-300">
-              {new Date(scannedEntry.event.date).toLocaleDateString('es-HN', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                timeZone: 'UTC',
-              })}
-            </p>
-            {[scannedEntry.event.venueName, scannedEntry.event.venueAddress].filter(Boolean).length > 0 ? (
-              <p className="text-sm text-dark-400">
-                {[scannedEntry.event.venueName, scannedEntry.event.venueAddress].filter(Boolean).join(' · ')}
-              </p>
-            ) : null}
-            {scannedEntry.event.coverImage ? (
-              <div className="rounded-xl overflow-hidden border border-dark-200 max-h-48">
-                <img
-                  src={scannedEntry.event.coverImage}
-                  alt=""
-                  className="w-full h-full max-h-48 object-cover object-top"
-                />
-              </div>
-            ) : null}
-            {scannedEntry.event.description ? (
-              <p className="text-sm text-dark-300 leading-relaxed whitespace-pre-wrap border-t border-dark-200 pt-3">
-                {scannedEntry.event.description}
-              </p>
-            ) : null}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div className="bg-dark-50 border border-dark-200 rounded-lg p-3">
-                <p className="text-dark-400">Cliente</p>
-                <p className="text-white font-medium">{scannedEntry.clientName}</p>
-              </div>
-              <div className="bg-dark-50 border border-dark-200 rounded-lg p-3">
-                <p className="text-dark-400">Correo</p>
-                <p className="text-white font-medium break-all">{scannedEntry.clientEmail}</p>
-              </div>
-              <div className="bg-dark-50 border border-dark-200 rounded-lg p-3">
-                <p className="text-dark-400">Cantidad</p>
-                <p className="text-white font-medium">{scannedEntry.numberOfEntries}</p>
-              </div>
-            </div>
-
-            {scannedEntry.status === 'ACTIVE' && (
-              <button
-                type="button"
-                onClick={handleMarkUsed}
-                disabled={isPending}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg disabled:opacity-50"
-              >
-                Marcar como usada
-              </button>
-            )}
-          </section>
-        )}
-
-        <section className="bg-dark-100 border border-dark-200 rounded-xl p-4 sm:p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Historial del evento</h2>
-              <p className="text-xs text-dark-400 mt-1">
-                Lista filtrable del evento seleccionado. Puedes reenviar el QR al correo del cliente. No hay revertir
-                desde taquilla.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void refreshHistorial()}
-              disabled={histLoading || !selectedEventId}
-              className="text-sm px-4 py-2 bg-dark-50 border border-dark-200 rounded-lg text-white hover:bg-dark-200 disabled:opacity-50 shrink-0"
-            >
-              Actualizar lista
-            </button>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {(['all', 'ACTIVE', 'USED', 'CANCELLED'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setHistStatus(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  histStatus === s
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-dark-50 border border-dark-200 text-white/70 hover:text-white'
-                }`}
-              >
-                {s === 'all'
-                  ? 'Todas'
-                  : s === 'ACTIVE'
-                    ? 'Activas'
-                    : s === 'USED'
-                      ? 'Usadas'
-                      : 'Canceladas'}
-              </button>
-            ))}
-          </div>
-
-          <input
-            type="search"
-            value={histSearch}
-            onChange={(e) => setHistSearch(e.target.value)}
-            placeholder="Filtrar por nombre o correo…"
-            disabled={!selectedEventId}
-            className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-lg text-white placeholder-white/30 disabled:opacity-50"
-          />
-
-          {histError && (
-            <div className="bg-red-500/15 border border-red-500/40 text-red-300 px-4 py-3 rounded-lg text-sm">
-              {histError}
-            </div>
-          )}
-          {histMsg && (
-            <div className="bg-green-500/15 border border-green-500/40 text-green-300 px-4 py-3 rounded-lg text-sm">
-              {histMsg}
-            </div>
-          )}
-
-          {!selectedEventId || events.length === 0 ? (
-            <p className="text-dark-400 text-sm py-4 text-center">Selecciona un evento para ver el historial.</p>
-          ) : histLoading ? (
-            <p className="text-dark-400 text-sm py-8 text-center">Cargando historial…</p>
-          ) : histRows.length === 0 ? (
-            <p className="text-dark-400 text-sm py-8 text-center">No hay entradas con estos filtros.</p>
-          ) : (
-            <ul className="space-y-2 max-h-[min(420px,50vh)] overflow-y-auto pr-1">
-              {histRows.map((row) => (
-                <li
-                  key={row.id}
-                  className="bg-dark-50 border border-dark-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-white truncate">{row.clientName}</span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          row.status === 'ACTIVE'
-                            ? 'bg-green-500/20 text-green-300'
-                            : row.status === 'USED'
-                              ? 'bg-blue-500/20 text-blue-300'
-                              : 'bg-red-500/20 text-red-300'
-                        }`}
-                      >
-                        {row.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-dark-400 break-all">{row.clientEmail}</p>
-                    <p className="text-xs text-dark-500 mt-1">
-                      {row.numberOfEntries} entrada{row.numberOfEntries !== 1 ? 's' : ''} · L{' '}
-                      {row.totalPrice.toLocaleString('es-HN', { minimumFractionDigits: 2 })} ·{' '}
-                      {new Date(row.createdAt).toLocaleString('es-HN')}
-                      {row.emailSent ? ' · Email enviado' : ''}
-                    </p>
-                  </div>
-                  {row.status !== 'CANCELLED' && (
-                    <button
-                      type="button"
-                      onClick={() => void handleResendTaquillaEmail(row)}
-                      disabled={resendingId === row.id}
-                      className="shrink-0 text-xs sm:text-sm px-4 py-2 bg-blue-600/25 text-blue-300 hover:bg-blue-600/35 rounded-lg disabled:opacity-50 border border-blue-500/30"
-                    >
-                      {resendingId === row.id ? 'Enviando…' : 'Reenviar al correo'}
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {scanPopup && (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
-            role="dialog"
-            aria-modal="true"
-          >
-            <div
-              className={`w-full max-w-md rounded-2xl border-4 p-6 text-center shadow-2xl ${
-                scanPopup.kind === 'valid'
-                  ? 'bg-green-600 border-green-300'
-                  : scanPopup.kind === 'repeat'
-                    ? 'bg-amber-500 border-amber-200'
-                    : 'bg-red-600 border-red-300'
+      <ul className="divide-y divide-staff-border overflow-hidden rounded-2xl border border-staff-border bg-staff-surface">
+        {!rows.length && !loading && <li className="p-6 text-center text-sm text-staff-muted">No hay entradas</li>}
+        {!rows.length && loading && <li className="p-6 text-center text-sm text-staff-muted">Cargando…</li>}
+        {rows.map((r) => (
+          <li key={r.id} className="flex items-center gap-3 px-4 py-3">
+            <span
+              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                r.status === 'USED' ? 'bg-emerald-500' : r.status === 'ACTIVE' ? 'bg-sky-500' : 'bg-red-500'
               }`}
-            >
-              <div className="text-6xl font-black text-white leading-none mb-3">
-                {scanPopup.kind === 'valid' ? '✓' : scanPopup.kind === 'repeat' ? '↻' : '✕'}
-              </div>
-              <h2 className="text-3xl font-black text-white tracking-wide">{scanPopup.title}</h2>
-              {scanPopup.message && <p className="mt-2 text-lg font-semibold text-white/95">{scanPopup.message}</p>}
-
-              {scanPopup.entry && (
-                <div className="mt-4 rounded-xl bg-black/25 p-4 text-left text-white space-y-1">
-                  <p className="text-xl font-bold break-words">{scanPopup.entry.clientName}</p>
-                  <p className="text-sm text-white/85 break-all">{scanPopup.entry.clientEmail}</p>
-                  <p className="text-sm text-white/85">
-                    {scanPopup.entry.numberOfEntries} entrada{scanPopup.entry.numberOfEntries !== 1 ? 's' : ''} ·{' '}
-                    {scanPopup.entry.event.name}
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-6 flex flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScanPopup(null)
-                    setManualToken('')
-                    void startScanner()
-                  }}
-                  className="w-full rounded-xl bg-white py-4 text-lg font-bold text-black hover:bg-white/90"
-                >
-                  Escanear siguiente
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScanPopup(null)}
-                  className="w-full rounded-xl border-2 border-white/70 py-3 font-semibold text-white hover:bg-white/10"
-                >
-                  Cerrar
-                </button>
-              </div>
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-staff-fg">{r.clientName}</p>
+              <p className="truncate text-xs text-staff-muted">
+                {r.status === 'USED'
+                  ? `Ingresó ${timeHn(r.usedAt) || '—'}${r.usedByName ? ` · ${r.usedByName}` : ''}`
+                  : r.status === 'CANCELLED'
+                    ? 'Cancelada'
+                    : r.clientEmail}
+                {' · '}
+                {r.origin === 'online' ? 'Online' : r.origin === 'cortesia' ? 'Cortesía' : 'Taquilla'}
+              </p>
             </div>
-          </div>
-        )}
+            {r.status !== 'CANCELLED' && (
+              <button
+                type="button"
+                onClick={() => void resend(r)}
+                disabled={resendingId === r.id}
+                className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary-500 hover:bg-staff-hover disabled:opacity-50"
+              >
+                {resendingId === r.id ? 'Enviando…' : 'Reenviar'}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {cursor && (
+        <button
+          type="button"
+          onClick={() => void fetchPage(cursor)}
+          disabled={loading}
+          className="w-full rounded-xl border border-staff-border bg-staff-surface py-3 text-sm font-semibold text-staff-fg disabled:opacity-50"
+        >
+          {loading ? 'Cargando…' : 'Cargar más'}
+        </button>
+      )}
     </div>
   )
 }
-

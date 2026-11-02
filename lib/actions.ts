@@ -24,6 +24,7 @@ import { deactivateEventsPastGracePeriod } from './public-events'
 import { isHiddenEntryCreator } from './entry-historial'
 import { excludeEntriesByCreator } from './entry-export'
 import { bucketByDay, bucketByHour, entryOrigin, summarizeEntries, type EntryOrigin } from './entry-stats'
+import { classifyDoorScan, parseScanToken, type DoorScanKind } from './entry-scan'
 
 // Helper to create log
 async function createLog(
@@ -4151,66 +4152,105 @@ export async function searchEventEntries(input: {
 
 const TAQUILLA_HISTORY_ROLES = ['ADMIN', 'TAQUILLA', 'MESERO', 'CAJERO'] as const
 
-export type TaquillaHistoryEntry = {
-  id: string
-  clientName: string
-  clientEmail: string
-  numberOfEntries: number
-  totalPrice: number
-  qrToken: string
-  status: 'ACTIVE' | 'USED' | 'CANCELLED'
-  createdAt: Date
-  emailSent: boolean
+export type DoorScanResult = {
+  kind: DoorScanKind
+  /** Nombre del evento al que pertenece la entrada (útil en wrong_event) */
+  eventName?: string
+  entry?: {
+    id: string
+    clientName: string
+    clientEmail: string
+    usedAt: string | null
+    usedByName: string | null
+  }
 }
 
-/** Historial de entradas por evento (taquilla): lectura + reenvío de correo en UI */
-export async function getTaquillaEventEntries(input: {
-  eventId: string
-  status?: 'all' | 'ACTIVE' | 'USED' | 'CANCELLED'
-  search?: string
-}): Promise<TaquillaHistoryEntry[]> {
+/**
+ * Escaneo en puerta: valida y, si está activa, la marca usada en un solo viaje.
+ * La marca es condicional (status ACTIVE), así que dos lecturas simultáneas nunca cuentan doble.
+ */
+export async function scanEntryAtDoor(token: string, eventId: string): Promise<DoorScanResult> {
   const user = await getCurrentUser()
-  if (!TAQUILLA_HISTORY_ROLES.includes(user.role as (typeof TAQUILLA_HISTORY_ROLES)[number])) {
-    throw new Error('No autorizado')
-  }
+  ensureEntryScanAccess(user.role)
 
-  const where: Record<string, unknown> = { eventId: input.eventId }
-  if (input.status && input.status !== 'all') {
-    where.status = input.status
-  }
-  const q = input.search?.trim()
-  if (q) {
-    where.AND = [
-      {
-        OR: [
-          { clientName: { contains: q, mode: 'insensitive' } },
-          { clientEmail: { contains: q, mode: 'insensitive' } },
-        ],
+  const clean = parseScanToken(token)
+  if (!clean) return { kind: 'not_found' }
+
+  const load = () =>
+    prisma.entry.findUnique({
+      where: { qrToken: clean },
+      select: {
+        id: true,
+        eventId: true,
+        status: true,
+        clientName: true,
+        clientEmail: true,
+        usedAt: true,
+        event: { select: { name: true } },
+        usedBy: { select: { name: true, username: true } },
       },
-    ]
-  }
-
-  const rows = await prisma.entry.findMany({
-    where: where as any,
-    orderBy: { createdAt: 'desc' },
-    take: 400,
-    select: {
-      id: true,
-      clientName: true,
-      clientEmail: true,
-      numberOfEntries: true,
-      totalPrice: true,
-      qrToken: true,
-      status: true,
-      createdAt: true,
-      emailSent: true,
-    },
+    })
+  const toPayload = (e: NonNullable<Awaited<ReturnType<typeof load>>>) => ({
+    id: e.id,
+    clientName: e.clientName,
+    clientEmail: e.clientEmail,
+    usedAt: e.usedAt ? e.usedAt.toISOString() : null,
+    usedByName: e.usedBy ? e.usedBy.name || e.usedBy.username : null,
   })
 
-  return rows.map((r) => ({
-    ...r,
-    totalPrice: Number(r.totalPrice),
-  }))
+  const entry = await load()
+  const kind = classifyDoorScan(entry, eventId)
+  if (!entry) return { kind }
+  if (kind !== 'valid') return { kind, eventName: entry.event.name, entry: toPayload(entry) }
+
+  const now = new Date()
+  const updated = await prisma.entry.updateMany({
+    where: { id: entry.id, status: 'ACTIVE' },
+    data: { status: 'USED', usedAt: now, usedByUserId: user.id },
+  })
+  if (updated.count === 0) {
+    // Otro dispositivo la marcó entre la lectura y la actualización.
+    const fresh = await load()
+    return { kind: fresh ? classifyDoorScan(fresh, eventId) : 'not_found', eventName: entry.event.name, entry: fresh ? toPayload(fresh) : undefined }
+  }
+
+  await createLog('ENTRY_USED', user.id, undefined, { entryId: entry.id, clientName: entry.clientName })
+
+  return {
+    kind: 'valid',
+    eventName: entry.event.name,
+    entry: { ...toPayload(entry), usedAt: now.toISOString(), usedByName: user.name || user.username },
+  }
+}
+
+/** Contador de puerta: vendidas, ingresadas, faltan e ingreso por hora. */
+export async function getDoorStats(eventId: string) {
+  const user = await getCurrentUser()
+  ensureEntryScanAccess(user.role)
+
+  const [event, rows, nonSaleIds] = await Promise.all([
+    prisma.event.findUnique({ where: { id: eventId }, select: { maxEntries: true } }),
+    prisma.entry.findMany({
+      where: { eventId },
+      select: { status: true, totalPrice: true, createdByUserId: true, usedAt: true },
+    }),
+    getNonSaleEntryCreatorIds(),
+  ])
+  if (!event) throw new Error('Evento no encontrado')
+
+  const summary = summarizeEntries(
+    rows.map((r) => ({ ...r, totalPrice: Number(r.totalPrice) })),
+    nonSaleIds
+  )
+  const usedTimes = rows.map((r) => r.usedAt).filter((d): d is Date => !!d)
+  return {
+    sold: summary.sold,
+    used: summary.used,
+    pending: summary.pending,
+    usedPct: summary.usedPct,
+    capacity: event.maxEntries,
+    checkinsByHour: bucketByHour(usedTimes),
+  }
 }
 
 export async function markEntryUsed(entryId: string) {
