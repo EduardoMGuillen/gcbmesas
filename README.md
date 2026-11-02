@@ -262,12 +262,15 @@ npm run dev
 |--------|-------------|
 | `npm run dev` | Servidor de desarrollo (localhost) |
 | `npm run dev:network` | Servidor accesible en red local |
-| `npm run build` | Build de producción |
+| `npm run build` | Build de producción (no toca la base de datos) |
 | `npm run start` | Iniciar en producción |
-| `npm run db:push` | Sincronizar schema con base de datos |
+| `npm run db:new-migration -- <nombre>` | Crear migración a partir de cambios en `schema.prisma` |
+| `npm run db:deploy` | Aplicar migraciones pendientes (manual) |
+| `npm run db:status` | Ver qué migraciones faltan en la base |
 | `npm run db:studio` | Abrir Prisma Studio (GUI de BD) |
-| `npm run db:seed` | Seed de datos iniciales |
-| `npm run db:migrate` | Ejecutar migraciones |
+| `npm run db:seed` | Seed inicial (solo base nueva; manual) |
+
+> Cambios de base de datos: ver [docs/BASE_DE_DATOS.md](docs/BASE_DE_DATOS.md).
 | `npm run cap:android` | Sincronizar y abrir proyecto Android |
 | `npm run build:apk` | Generar APK de Android |
 
