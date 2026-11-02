@@ -13,6 +13,7 @@
     "lint": "next lint",
     "db:studio": "prisma studio",
     "db:new-migration": "node scripts/new-migration.js",
+    "db:sql": "node scripts/migration-sql.js",
     "db:deploy": "node scripts/db-deploy.js",
     "db:status": "prisma migrate status",
     "db:generate": "prisma generate",

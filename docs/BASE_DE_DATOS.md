@@ -14,10 +14,20 @@
 # 2. Genera la migración (no se conecta a la base)
 npm run db:new-migration -- agregar_telefono_evento
 # 3. Lee prisma/migrations/<fecha>_agregar_telefono_evento/migration.sql
-# 4. Aplícala en la base ANTES de subir el código que la usa
-npm run db:deploy
-# 5. Commit (schema + migración + código) y push
+# 4. Genera el SQL para Supabase y pégalo en SQL Editor → Run
+npm run -s db:sql > /tmp/migracion.sql
+# 5. Verifica (debe decir "Database schema is up to date!")
+npm run db:status
+# 6. Commit (schema + migración + código) y push
 ```
+
+El usuario de la app (`gcb_local`) **no tiene permisos para cambiar el esquema** (a propósito), por eso
+las migraciones se aplican desde el SQL Editor con el usuario dueño. El SQL de `db:sql` es
+idempotente (se puede correr varias veces), va en una sola transacción y registra cada migración
+en `_prisma_migrations` para que `db:status` sepa qué está aplicado.
+
+`npm run db:deploy` hace lo mismo con `prisma migrate deploy`, pero solo funciona con una conexión
+que tenga permisos de dueño.
 
 Preferir siempre cambios aditivos: columnas nuevas opcionales (`String?`) o con `@default`.
 
@@ -32,20 +42,11 @@ Preferir siempre cambios aditivos: columnas nuevas opcionales (`String?`) o con 
 ## Puesta en marcha (una sola vez)
 
 La base de producción ya existía antes de las migraciones. `prisma/migrations/0_init` describe ese
-esquema completo; hay que marcarla como **ya aplicada** (no ejecuta nada sobre las tablas):
+esquema; el SQL de `db:sql` la **registra como aplicada sin ejecutarla**, crea `_prisma_migrations`
+y aplica las migraciones posteriores que falten.
 
-```bash
-# a) Comprobar que la base coincide con el esquema (solo lectura). Debe decir que no hay diferencias:
-npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script
-
-# b) Marcar 0_init como aplicada (crea la tabla _prisma_migrations, no toca tus datos):
-npx prisma migrate resolve --applied 0_init
-
-# c) Verificar:
-npm run db:status
-```
-
-Si el paso (a) muestra diferencias, **no sigas**: compártelas para revisarlas primero.
+Tablas `site_state`, `supremo_site_state` y `user_id_map`: son de **otro proyecto** que comparte la
+base. No están en `schema.prisma` y ninguna migración las toca. No las agregues ni las borres.
 
 ## Seed
 

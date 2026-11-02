@@ -22,5 +22,7 @@ try {
   console.log('\n✅ Base de datos al día.')
 } catch {
   console.error('\n❌ prisma migrate deploy falló. No se aplicaron más cambios. Revisa el mensaje de arriba.')
+  console.error('   Si dice "permission denied": el usuario de la app no puede cambiar el esquema.')
+  console.error('   Usa `npm run -s db:sql` y pega el resultado en Supabase → SQL Editor.')
   process.exit(1)
 }
